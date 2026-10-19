@@ -61,7 +61,12 @@ CAND = {
     "pip": ["PIP"],
     "crv": ["CRVCRG"],
     "ctmt": ["CTMT"],
+    "ucmt": ["UCMT_tab", "UCMT"],
+    "ssdmt": ["SSDMT"],
+    "segcon": ["SEGCON"],
 }
+# Tabela TTEN da ANEEL (só as tensões de MT usadas nos alimentadores)
+TTEN_KV = {"49": 13.8, "63": 23.0}
 ENE = [f"ENE_{i:02d}" for i in range(1, 13)]
 POT = [f"POT_{i:02d}" for i in range(1, 97)]
 DIAS_MES = np.array([31, 28.25, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31])
@@ -256,6 +261,87 @@ def nomes_ibge():
         return {}
 
 
+def calc_alimentadores(gdb, L, curvas, janela, fp, ctmts=None):
+    """Carregamento estimado de cada alimentador (CTMT).
+    Demanda: energia injetada no mês de maior energia (CTMT.ENE_xx) → kW médio, × fator de pico
+    da soma das curvas típicas das cargas do alimentador (UCs de BT e MT e iluminação pública).
+    Capacidade: corrente nominal (SEGCON.CNOM) do condutor do trecho de saída (SSDMT ligado ao
+    PAC_INI), × tensão nominal (TEN_NOM) × √3."""
+    if not L.get("ctmt"):
+        return pd.DataFrame()
+    ct = ler(gdb, L["ctmt"], ["COD_ID", "PAC_INI", "TEN_NOM"] + ENE)
+    ct["COD_ID"] = txt(ct["COD_ID"])
+    if ctmts is not None:
+        ct = ct[ct["COD_ID"].isin(ctmts)]
+    if ct.empty:
+        return pd.DataFrame()
+    filtro = None if ctmts is None else "CTMT IN (" + ",".join(f"'{c}'" for c in sorted(ct["COD_ID"])) + ")"
+    for c in ENE:
+        ct[c] = pd.to_numeric(ct.get(c, 0), errors="coerce").fillna(0)
+    pmed = ct[ENE].to_numpy(float) / (DIAS_MES * 24)
+    ct["PMED"] = pmed.max(axis=1)
+
+    # fator de pico pelas curvas típicas das cargas do alimentador
+    partes = []
+    for chave in ("uc", "ucmt", "pip"):
+        if not L.get(chave):
+            continue
+        try:
+            d = ler(gdb, L[chave], ["CTMT", "SIT_ATIV", "TIP_CC"] + ENE, where=filtro)
+        except Exception:
+            continue
+        if "SIT_ATIV" in d.columns:
+            d = d[txt(d["SIT_ATIV"]).str.upper().isin(["AT", ""])]
+        d["TRAFO"] = txt(d["CTMT"])
+        d = d[d["TRAFO"].isin(set(ct["COD_ID"]))]
+        d["TIP_CC"] = txt(d["TIP_CC"]) if "TIP_CC" in d.columns else ""
+        for c in ENE:
+            d[c] = pd.to_numeric(d.get(c, 0), errors="coerce").fillna(0)
+        partes.append(d[["TRAFO", "TIP_CC"] + ENE])
+    fc = pd.Series(dtype=float)
+    if partes:
+        cg = pd.concat(partes, ignore_index=True)
+        pares = pd.DataFrame(cg[ENE].to_numpy(float) / (DIAS_MES * 24), columns=[f"P_{i:02d}" for i in range(1, 13)])
+        pares["TRAFO"], pares["TIP_CC"], pares["N"] = cg["TRAFO"].to_numpy(), cg["TIP_CC"].to_numpy(), 1
+        r = agregar_carga(pares.groupby(["TRAFO", "TIP_CC"], as_index=False).sum(), curvas, janela)
+        mes = r["Mês de maior consumo"].map(MESES.index).to_numpy()
+        base = r["Energia mês máx (kWh)"] / (DIAS_MES[mes] * 24)
+        fc = (r["Demanda pico estimada (kW)"] / base.where(base > 0)).set_axis(r["TRAFO"])
+        pico_cargas = r.set_index("TRAFO")["Demanda pico estimada (kW)"]
+    else:
+        pico_cargas = pd.Series(dtype=float)
+    ct["FC"] = ct["COD_ID"].map(fc)
+    ct["PICO"] = (ct["PMED"] * ct["FC"]).where(ct["PMED"] > 0, ct["COD_ID"].map(pico_cargas))
+
+    # capacidade do trecho de saída
+    ct["I"] = np.nan
+    if L.get("ssdmt") and L.get("segcon"):
+        try:
+            sd = ler(gdb, L["ssdmt"], ["CTMT", "PAC_1", "PAC_2", "TIP_CND"], where=filtro)
+            sc = ler(gdb, L["segcon"], ["COD_ID", "CNOM"])
+            sc["COD_ID"] = txt(sc["COD_ID"])
+            ini = set(txt(ct["PAC_INI"]))
+            sd = sd[txt(sd["PAC_1"]).isin(ini) | txt(sd["PAC_2"]).isin(ini)]
+            sd = sd.assign(CTMT=txt(sd["CTMT"]), TIP_CND=txt(sd["TIP_CND"])).merge(
+                sc, left_on="TIP_CND", right_on="COD_ID", how="left")
+            corr = pd.to_numeric(sd["CNOM"], errors="coerce")
+            ct["I"] = ct["COD_ID"].map(corr.groupby(sd["CTMT"]).min())
+        except Exception as e:
+            log(f"  (capacidade dos alimentadores indisponível: {e})")
+    ct["KV"] = txt(ct["TEN_NOM"]).map(TTEN_KV)
+    ct["MVA"] = np.sqrt(3) * ct["KV"] * ct["I"] / 1000
+    ct["CAR"] = ct["PICO"] / fp / (ct["MVA"] * 1000) * 100
+    return pd.DataFrame({
+        "Alimentador (CTMT)": ct["COD_ID"],
+        "Tensão nominal (kV)": ct["KV"],
+        "Corrente nominal do trecho de saída (A)": ct["I"],
+        "Capacidade do alimentador (MVA)": ct["MVA"],
+        "Energia injetada mês máx (MWh)": ct[ENE].max(axis=1) / 1000,
+        "Demanda pico estimada do alimentador (kW)": ct["PICO"],
+        "Carregamento do alimentador (%)": ct["CAR"],
+    })
+
+
 def classe_carreg(x):
     if pd.isna(x):
         return "sem dado"
@@ -295,6 +381,7 @@ def _registros(pts):
         "alim": "" if pd.isna(r["Alimentador (CTMT)"]) else str(r["Alimentador (CTMT)"]),
         "sub": "" if pd.isna(r.get("Subestação")) else str(r.get("Subestação")),
         "ucs": int(r["Nº UCs"]), "ugs": int(r["Nº UGs (GD)"]),
+        "ca": n(r.get("Carregamento do alimentador (%)"), 1),
     } for _, r in pts.iterrows()]
 
 
@@ -459,6 +546,13 @@ def main():
     pares = pares.groupby(["TRAFO", "TIP_CC"], as_index=False).sum()
     carga = agregar_carga(pares, curvas, a.janela)
 
+    log("Calculando carregamento dos alimentadores ...")
+    tab_ct = calc_alimentadores(gdb, L, curvas, a.janela, a.fp,
+                                None if todos else set(txt(tr["CTMT"])) - {""})
+    if len(tab_ct):
+        log(f"  {len(tab_ct):,} alimentadores; {tab_ct['Carregamento do alimentador (%)'].notna().sum():,} "
+            f"com carregamento; mediana {tab_ct['Carregamento do alimentador (%)'].median():.0f}%")
+
     # 6) Junta tudo
     n_uc = uc.groupby("TRAFO").size().rename("Nº UCs")
     n_ucgd = uc[txt(uc.get("CEG_GD", pd.Series("", index=uc.index))) != ""].groupby("TRAFO").size() \
@@ -474,6 +568,9 @@ def main():
     kva = df["KVA"].where(df["KVA"] > 0)
     df["Carregamento estimado (%)"] = df["Demanda pico estimada (kW)"] / a.fp / kva * 100
     df["Situação carregamento"] = df["Carregamento estimado (%)"].map(classe_carreg)
+    df["CTMT"] = txt(df["CTMT"]) if "CTMT" in df.columns else ""
+    df["Carregamento do alimentador (%)"] = df["CTMT"].map(
+        tab_ct.set_index("Alimentador (CTMT)")["Carregamento do alimentador (%)"]) if len(tab_ct) else np.nan
     df["GD / potência do trafo (%)"] = df["GD instalada (kW)"] / kva * 100
     cmin = df["Carga mín. diurna estimada (kW)"] * a.fator_seg
     df["Ocupação GD / carga mín. (%)"] = (df["GD instalada (kW)"] / cmin.where(cmin > 0) * 100) \
@@ -496,7 +593,8 @@ def main():
              "Fases primário", "Nº UCs", "Nº UCs com GD", "Nº UGs (GD)", "GD instalada (kW)",
              "GD / potência do trafo (%)", "Energia média mensal (kWh)", "Energia mês máx (kWh)",
              "Mês de maior consumo", "Demanda pico estimada (kW)", "Hora do pico",
-             "Carregamento estimado (%)", "Situação carregamento", "Carga mín. diurna estimada (kW)",
+             "Carregamento estimado (%)", "Situação carregamento", "Carregamento do alimentador (%)",
+             "Carga mín. diurna estimada (kW)",
              "Mês de menor consumo", "Ocupação GD / carga mín. (%)", "Margem p/ nova GD sem inversão (kW)",
              "Situação inversão de fluxo", "Capacidade disponível estimada (kW)", "UCs sem curva típica", "POT_NOM (bruto)", "lat", "lon",
              "Google Maps"]
@@ -515,6 +613,8 @@ def main():
         "Trafos em sobrecarga": ("Situação carregamento", lambda s: (s == "sobrecarga").sum()),
     }).reset_index()
     alim["GD / kVA trafos (%)"] = alim["GD instalada (kW)"] / alim["Potência instalada trafos (kVA)"] * 100
+    if len(tab_ct):
+        alim = alim.merge(tab_ct, on="Alimentador (CTMT)", how="left")
     alim = alim.sort_values("GD instalada (kW)", ascending=False)
 
     # Municípios
@@ -572,6 +672,7 @@ def main():
         "LIGAÇÃO: UCs (UCBT), GD (UGBT) e iluminação pública (PIP) são ligadas ao trafo pelo campo UNI_TR_MT (ou UNI_TR_D).",
         "GD INSTALADA: soma da potência instalada das unidades geradoras de BT ativas no trafo. Com --gd-aneel, vem da base oficial de GD da ANEEL (MdaPotenciaInstaladaKW, cruzada pelo CEG_GD); sem ela, do POT_INST da BDGD (valores > 1000 tratados como W).",
         "DEMANDA: energia mensal de cada UC (ENE_01..12) → kW médio → multiplicada pela curva típica da UC (CRVCRG via TIP_CC).",
+        "ALIMENTADOR: demanda de pico = energia injetada no mês de maior energia (CTMT) em kW médio × fator de pico da soma das curvas típicas das cargas do alimentador; capacidade = √3 × tensão nominal (TEN_NOM) × corrente nominal (SEGCON.CNOM) do condutor do trecho de saída; carregamento = pico ÷ fp ÷ capacidade. Não considera limites de proteção/disjuntor nem manobras.",
         "PICO: maior valor da soma das curvas no mês de maior consumo do trafo, entre dia útil, sábado e domingo.",
         "CARREGAMENTO (%) = pico estimado (kW) ÷ fp ÷ potência nominal (kVA) × 100.",
         "CARGA MÍN. DIURNA: menor valor da soma das curvas dentro da janela solar, no mês de menor consumo.",
@@ -737,6 +838,7 @@ dt{color:var(--muted)} dd{margin:0;font-family:var(--mono);font-variant-numeric:
       <label for="alim">Alimentador</label>
       <select id="alim"><option value="">Todos</option></select>
     </div>
+    <label class="chk"><input type="checkbox" id="uc1"> Só trafos com 1 unidade consumidora</label>
     <label class="chk" id="filtraRow" hidden><input type="checkbox" id="filtra" checked> Mostrar só os trafos que comportam a GD pretendida</label>
   </header>
   <div class="scroll" id="info"></div>
@@ -778,7 +880,7 @@ function preencherAlim(){alimEl.length=1;[...new Set(D.map(t=>t.alim).filter(Boo
 preencherAlim();
 
 // base(): filtro de alimentador; visiveis(): base + (se marcado) só trafos com capacidade ≥ GD pretendida
-function base(){const a=alimEl.value;return a?D.filter(t=>t.alim===a):D}
+function base(){const a=alimEl.value,u=uc1El.checked;return (a||u)?D.filter(t=>(!a||t.alim===a)&&(!u||t.ucs===1)):D}
 function filtrando(){return (+potEl.value||0)>0&&filtraEl.checked}
 function visiveis(){const v=base(),pot=+potEl.value||0;return filtrando()?v.filter(t=>t.cap!=null&&t.cap>=pot):v}
 function desenhar(){
@@ -792,12 +894,15 @@ function desenhar(){
 function resumo(){
   const v=base(),pot=+potEl.value||0;const n={ok:0,mid:0,low:0,none:0,nd:0};v.forEach(t=>n[classe(t,pot)]++);
   const oc=filtrando()?v.length-visiveis().length:0;
+  const ca=alimEl.value&&v.length?v[0].ca:null;
   const gd=v.reduce((s,t)=>s+t.gd,0),kva=v.reduce((s,t)=>s+(t.kva||0),0);
   const r=pot>0?ROTP:ROT;
   return `<section><h2>${alimEl.value?"Alimentador "+esc(alimEl.value):(META.muns?esc(META.munNome.split(",")[0]):"Município")}</h2>
   <div class="stats"><div class="stat"><b>${v.length.toLocaleString("pt-BR")}</b><span>trafos</span></div>
   <div class="stat"><b>${fmt(gd/1000,2)}</b><span>MW de GD</span></div>
-  <div class="stat"><b>${fmt(kva/1000,2)}</b><span>MVA instalado</span></div></div></section>
+  <div class="stat"><b>${fmt(kva/1000,2)}</b><span>MVA instalado</span></div></div>
+  ${alimEl.value?`<p class="hint">Carregamento estimado do alimentador: <b>${fmt(ca)} %</b></p>`:""}
+  ${uc1El.checked?`<p class="hint">Mostrando só trafos com 1 unidade consumidora.</p>`:""}</section>
   <section><h2>${pot>0?"Para "+fmt(pot)+" kW":"Capacidade disponível"}</h2><div class="legend">
   ${Object.keys(r).map(k=>`<div><span class="dot" style="background:${COR[k]}"></span>${r[k]} <span class="base">(${n[k]})</span></div>`).join("")}</div>
   ${oc?`<p class="hint">${oc.toLocaleString("pt-BR")} trafos com capacidade abaixo de ${fmt(pot)} kW estão ocultos no mapa.</p>`:""}</section>`;
@@ -811,7 +916,7 @@ function ficha(t){
   <dt>Potência do trafo</dt><dd>${fmt(t.kva,1)} kVA</dd><dt>GD instalada</dt><dd>${fmt(t.gd,2)} kW</dd>
   <dt>Unidades geradoras</dt><dd>${t.ugs}</dd><dt>Unidades consumidoras</dt><dd>${t.ucs}</dd>
   <dt>Carga mín. diurna</dt><dd>${fmt(t.cmin,2)} kW</dd><dt>Demanda de pico</dt><dd>${fmt(t.pico,2)} kW</dd>
-  <dt>Carregamento</dt><dd>${fmt(t.car)} %</dd><dt>GD / trafo</dt><dd>${fmt(t.kva?t.gd/t.kva*100:null)} %</dd></dl>
+  <dt>Carregamento do trafo</dt><dd>${fmt(t.car)} %</dd><dt>Carregamento do alimentador</dt><dd>${fmt(t.ca)} %</dd><dt>GD / trafo</dt><dd>${fmt(t.kva?t.gd/t.kva*100:null)} %</dd></dl>
   <div class="links"><a href="https://www.google.com/maps?q=${t.lat},${t.lon}" target="_blank" rel="noopener">Abrir no Google Maps</a>
   <span class="base">${t.lat.toFixed(6)}, ${t.lon.toFixed(6)}</span></div></div>`;
 }
@@ -882,9 +987,9 @@ document.getElementById("f").addEventListener("submit",async e=>{
     else{msg="Endereço não encontrado. Tente rua e número, ou cole a coordenada (ex.: -29.6842, -53.8069).";render()}
   }catch(err){msg="Não consegui buscar o endereço agora (sem internet?). Cole a coordenada ou clique no mapa.";render()}
 });
-const filtraEl=document.getElementById("filtra"),filtraRow=document.getElementById("filtraRow");
+const uc1El=document.getElementById("uc1"),filtraEl=document.getElementById("filtra"),filtraRow=document.getElementById("filtraRow");
 function aoMudarPot(){filtraRow.hidden=!((+potEl.value||0)>0);if(ponto){const p=proximos(ponto[0],ponto[1],1)[0];if(sel&&!visiveis().includes(sel))sel=p?p.t:null}desenhar();render()}
-potEl.addEventListener("input",aoMudarPot);filtraEl.addEventListener("change",aoMudarPot);
+potEl.addEventListener("input",aoMudarPot);uc1El.addEventListener("change",aoMudarPot);filtraEl.addEventListener("change",aoMudarPot);
 alimEl.addEventListener("change",()=>{sel=null;desenhar();render();ajustar()});
 const side=document.getElementById("side"),tog=document.getElementById("tog");
 tog.onclick=()=>{side.classList.toggle("min");tog.setAttribute("aria-expanded",!side.classList.contains("min"));setTimeout(()=>map.invalidateSize(),50)};

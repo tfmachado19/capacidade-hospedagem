@@ -7,6 +7,13 @@ da área atendida pela RGE (376 municípios do RS) para receber nova geração d
 
 Ao informar a "GD pretendida", o mapa mostra só os trafos cuja capacidade disponível
 estimada comporta essa potência (dá para desligar o filtro).
+A opção "Só trafos com 1 unidade consumidora" restringe o mapa a esses trafos.
+
+Cada trafo mostra também o carregamento estimado do seu alimentador: demanda de pico
+(energia injetada no mês de maior energia, da BDGD/CTMT, × fator de pico das curvas
+típicas das cargas) ÷ capacidade do condutor do trecho de saída (√3 × tensão nominal ×
+corrente nominal do SEGCON). Não considera limites de proteção nem manobras; valores
+muito acima de 100% indicam alimentador com dado atípico na BDGD e devem ser conferidos.
 
 Site: https://tfmachado19.github.io/capacidade-hospedagem
 
