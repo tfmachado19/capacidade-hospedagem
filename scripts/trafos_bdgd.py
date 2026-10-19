@@ -62,6 +62,7 @@ CAND = {
     "crv": ["CRVCRG"],
     "ctmt": ["CTMT"],
     "ucmt": ["UCMT_tab", "UCMT"],
+    "ugmt": ["UGMT_tab", "UGMT"],
     "ssdmt": ["SSDMT"],
     "segcon": ["SEGCON"],
 }
@@ -70,6 +71,8 @@ TTEN_KV = {"49": 13.8, "63": 23.0}
 ENE = [f"ENE_{i:02d}" for i in range(1, 13)]
 POT = [f"POT_{i:02d}" for i in range(1, 97)]
 DIAS_MES = np.array([31, 28.25, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31])
+# Geração FV típica no RS (kWh/kWp por mês), escalada para ~1.150 kWh/kWp·ano
+GER_FV = np.array([150, 130, 125, 100, 80, 65, 72, 92, 105, 128, 145, 155]) * 1150 / 1347
 MESES = ["jan", "fev", "mar", "abr", "mai", "jun", "jul", "ago", "set", "out", "nov", "dez"]
 KVA_PADRAO = {3, 5, 10, 15, 25, 30, 37.5, 45, 50, 75, 100, 112.5, 150, 200, 225,
               250, 300, 400, 500, 750, 1000, 1500, 2000}
@@ -231,6 +234,7 @@ def _agregar_carga(pares, curvas, janela):
         "Hora do pico": [f"{int(h):02d}:{int(round((h % 1) * 60)):02d}" for h in hora_pico],
         "Carga mín. diurna estimada (kW)": cmin,
         "Mês de menor consumo": [MESES[m] for m in m_min],
+        "_pmed_min": soma_mes[np.arange(n), m_min],
     }).merge(sem_curva.rename("UCs sem curva típica").reset_index(), on="TRAFO", how="left")
 
 
@@ -261,7 +265,42 @@ def nomes_ibge():
         return {}
 
 
-def calc_alimentadores(gdb, L, curvas, janela, fp, ctmts=None):
+def gd_alimentadores(gdb, L, gdmap, ctmts=None):
+    """GD ligada em cada alimentador, em BT (UGBT) e MT (UGMT), em kW.
+    Potência: base de GD da ANEEL via CEG_GD; sem casamento, BT usa POT_INST e MT usa DEM_CONT
+    (usinas fora do cadastro de GD, como PCH/UHE/UTE, têm DEM_CONT = potência de injeção)."""
+    filtro = None if ctmts is None else "CTMT IN (" + ",".join(f"'{c}'" for c in sorted(ctmts)) + ")"
+    out = {}
+    for chave, rot in (("ug", "BT"), ("ugmt", "MT")):
+        if not L.get(chave):
+            continue
+        try:
+            u = ler(gdb, L[chave], ["CTMT", "CEG_GD", "POT_INST", "DEM_CONT", "SIT_ATIV"], where=filtro)
+        except Exception:
+            continue
+        if "SIT_ATIV" in u.columns:
+            u = u[txt(u["SIT_ATIV"]).str.upper().isin(["AT", ""])]
+        pot = pd.to_numeric(u.get("POT_INST"), errors="coerce").fillna(0)
+        if rot == "BT":
+            pot = pot.where(pot <= 1000, pot / 1000)
+            alt = pot
+        else:
+            dem = pd.to_numeric(u.get("DEM_CONT"), errors="coerce").fillna(0)
+            alt = dem.where(dem > 0, pot)
+        kw = pd.Series(np.nan, index=u.index)
+        if gdmap is not None and "CEG_GD" in u.columns:
+            ceg = txt(u["CEG_GD"])
+            kw = ceg.map(gdmap) / ceg.map(ceg.value_counts())
+        u = u.assign(KW=kw.fillna(alt), CTMT=txt(u["CTMT"]))
+        out[f"GD no alimentador — {rot} (kW)"] = u.groupby("CTMT")["KW"].sum()
+    if not out:
+        return pd.DataFrame(columns=["Alimentador (CTMT)"])
+    d = pd.DataFrame(out).fillna(0)
+    d["GD no alimentador (kW)"] = d.sum(axis=1)
+    return d.rename_axis("Alimentador (CTMT)").reset_index()
+
+
+def calc_alimentadores(gdb, L, curvas, janela, fp, ctmts=None, gd_kw=None):
     """Carregamento estimado de cada alimentador (CTMT).
     Demanda: energia injetada no mês de maior energia (CTMT.ENE_xx) → kW médio, × fator de pico
     da soma das curvas típicas das cargas do alimentador (UCs de BT e MT e iluminação pública).
@@ -308,8 +347,16 @@ def calc_alimentadores(gdb, L, curvas, janela, fp, ctmts=None):
         base = r["Energia mês máx (kWh)"] / (DIAS_MES[mes] * 24)
         fc = (r["Demanda pico estimada (kW)"] / base.where(base > 0)).set_axis(r["TRAFO"])
         pico_cargas = r.set_index("TRAFO")["Demanda pico estimada (kW)"]
+        rr = r.set_index("TRAFO")
+        cmin_cargas = rr["Carga mín. diurna estimada (kW)"]
+        fmin = cmin_cargas / rr["_pmed_min"].where(rr["_pmed_min"] > 0)     # mín. na janela ÷ média
     else:
-        pico_cargas = pd.Series(dtype=float)
+        pico_cargas = cmin_cargas = fmin = pd.Series(dtype=float)
+    # carga mínima diurna: carga bruta = energia medida no alimentador (já líquida da GD) +
+    # geração estimada da GD do alimentador; × forma das curvas (mín. na janela solar ÷ média)
+    gkw = ct["COD_ID"].map(gd_kw).fillna(0).to_numpy() if gd_kw is not None else np.zeros(len(ct))
+    bruta = pmed + gkw[:, None] * GER_FV / (DIAS_MES * 24)
+    ct["CMIN"] = (bruta.min(axis=1) * ct["COD_ID"].map(fmin)).where(ct["PMED"] > 0, ct["COD_ID"].map(cmin_cargas))
     ct["FC"] = ct["COD_ID"].map(fc)
     ct["PICO"] = (ct["PMED"] * ct["FC"]).where(ct["PMED"] > 0, ct["COD_ID"].map(pico_cargas))
 
@@ -339,6 +386,7 @@ def calc_alimentadores(gdb, L, curvas, janela, fp, ctmts=None):
         "Energia injetada mês máx (MWh)": ct[ENE].max(axis=1) / 1000,
         "Demanda pico estimada do alimentador (kW)": ct["PICO"],
         "Carregamento do alimentador (%)": ct["CAR"],
+        "Carga mín. diurna estimada do alimentador (kW)": ct["CMIN"],
     })
 
 
@@ -382,6 +430,8 @@ def _registros(pts):
         "sub": "" if pd.isna(r.get("Subestação")) else str(r.get("Subestação")),
         "ucs": int(r["Nº UCs"]), "ugs": int(r["Nº UGs (GD)"]),
         "ca": n(r.get("Carregamento do alimentador (%)"), 1),
+        "gda": n(r.get("GD no alimentador (kW)"), 0), "cga": n(r.get("Carregamento de GD do alimentador (%)"), 1),
+        "capa": n(r.get("Capacidade disponível p/ GD no alimentador (kW)"), 0),
     } for _, r in pts.iterrows()]
 
 
@@ -500,9 +550,10 @@ def main():
     pct_energia = float((((ug["POT_KW"] - ene_max / 720).abs() < 0.01) & (ene_max > 0)).mean() * 100) \
         if len(ug) else 0.0
     fonte_gd, casadas = "POT_INST da BDGD", 0
+    gdmap = ler_gd_aneel(a.gd_aneel) if a.gd_aneel else None
     if a.gd_aneel:
         ceg = txt(ug["CEG_GD"]) if "CEG_GD" in ug.columns else pd.Series("", index=ug.index)
-        kw = ceg.map(ler_gd_aneel(a.gd_aneel))
+        kw = ceg.map(gdmap)
         kw = kw / ceg.map(ceg.value_counts())          # mesmo CEG em várias UGs: divide
         casadas = int(kw.notna().sum())
         ug["POT_KW"] = kw.fillna(ug["POT_KW"])
@@ -547,9 +598,27 @@ def main():
     carga = agregar_carga(pares, curvas, a.janela)
 
     log("Calculando carregamento dos alimentadores ...")
-    tab_ct = calc_alimentadores(gdb, L, curvas, a.janela, a.fp,
-                                None if todos else set(txt(tr["CTMT"])) - {""})
+    cts = None if todos else set(txt(tr["CTMT"])) - {""}
+    tab_gd = gd_alimentadores(gdb, L, gdmap, cts)
+    tab_ct = calc_alimentadores(gdb, L, curvas, a.janela, a.fp, cts,
+                                tab_gd.set_index("Alimentador (CTMT)")["GD no alimentador (kW)"]
+                                if len(tab_gd) else None)
     if len(tab_ct):
+        tab_ct = tab_ct.merge(tab_gd, on="Alimentador (CTMT)", how="left")
+        for c in [c for c in tab_ct.columns if c.startswith("GD no alimentador")]:
+            tab_ct[c] = tab_ct[c].fillna(0)
+        gda = tab_ct["GD no alimentador (kW)"]
+        cap_kw = tab_ct["Capacidade do alimentador (MVA)"] * 1000
+        cmin_a = tab_ct["Carga mín. diurna estimada do alimentador (kW)"] * a.fator_seg
+        tab_ct["Carregamento de GD do alimentador (%)"] = gda / cap_kw * 100
+        tab_ct["Ocupação GD / carga mín. do alimentador (%)"] = gda / cmin_a.where(cmin_a > 0) * 100
+        tab_ct["Margem p/ GD sem inversão no alimentador (kW)"] = cmin_a - gda
+        tab_ct["Margem térmica p/ GD no alimentador (kW)"] = cap_kw - gda
+        tab_ct["Capacidade disponível p/ GD no alimentador (kW)"] = np.fmin(
+            tab_ct["Margem p/ GD sem inversão no alimentador (kW)"],
+            tab_ct["Margem térmica p/ GD no alimentador (kW)"]).clip(lower=0)
+        log(f"  GD nos alimentadores: {gda.sum() / 1000:,.1f} MW (BT+MT); carregamento de GD mediano "
+            f"{tab_ct['Carregamento de GD do alimentador (%)'].median():.0f}%")
         log(f"  {len(tab_ct):,} alimentadores; {tab_ct['Carregamento do alimentador (%)'].notna().sum():,} "
             f"com carregamento; mediana {tab_ct['Carregamento do alimentador (%)'].median():.0f}%")
 
@@ -569,8 +638,10 @@ def main():
     df["Carregamento estimado (%)"] = df["Demanda pico estimada (kW)"] / a.fp / kva * 100
     df["Situação carregamento"] = df["Carregamento estimado (%)"].map(classe_carreg)
     df["CTMT"] = txt(df["CTMT"]) if "CTMT" in df.columns else ""
-    df["Carregamento do alimentador (%)"] = df["CTMT"].map(
-        tab_ct.set_index("Alimentador (CTMT)")["Carregamento do alimentador (%)"]) if len(tab_ct) else np.nan
+    for c in ("Carregamento do alimentador (%)", "Carregamento de GD do alimentador (%)",
+              "GD no alimentador (kW)", "Capacidade disponível p/ GD no alimentador (kW)"):
+        df[c] = df["CTMT"].map(tab_ct.set_index("Alimentador (CTMT)")[c]) \
+            if len(tab_ct) and c in tab_ct.columns else np.nan
     df["GD / potência do trafo (%)"] = df["GD instalada (kW)"] / kva * 100
     cmin = df["Carga mín. diurna estimada (kW)"] * a.fator_seg
     df["Ocupação GD / carga mín. (%)"] = (df["GD instalada (kW)"] / cmin.where(cmin > 0) * 100) \
@@ -594,6 +665,8 @@ def main():
              "GD / potência do trafo (%)", "Energia média mensal (kWh)", "Energia mês máx (kWh)",
              "Mês de maior consumo", "Demanda pico estimada (kW)", "Hora do pico",
              "Carregamento estimado (%)", "Situação carregamento", "Carregamento do alimentador (%)",
+             "GD no alimentador (kW)", "Carregamento de GD do alimentador (%)",
+             "Capacidade disponível p/ GD no alimentador (kW)",
              "Carga mín. diurna estimada (kW)",
              "Mês de menor consumo", "Ocupação GD / carga mín. (%)", "Margem p/ nova GD sem inversão (kW)",
              "Situação inversão de fluxo", "Capacidade disponível estimada (kW)", "UCs sem curva típica", "POT_NOM (bruto)", "lat", "lon",
@@ -673,6 +746,7 @@ def main():
         "GD INSTALADA: soma da potência instalada das unidades geradoras de BT ativas no trafo. Com --gd-aneel, vem da base oficial de GD da ANEEL (MdaPotenciaInstaladaKW, cruzada pelo CEG_GD); sem ela, do POT_INST da BDGD (valores > 1000 tratados como W).",
         "DEMANDA: energia mensal de cada UC (ENE_01..12) → kW médio → multiplicada pela curva típica da UC (CRVCRG via TIP_CC).",
         "ALIMENTADOR: demanda de pico = energia injetada no mês de maior energia (CTMT) em kW médio × fator de pico da soma das curvas típicas das cargas do alimentador; capacidade = √3 × tensão nominal (TEN_NOM) × corrente nominal (SEGCON.CNOM) do condutor do trecho de saída; carregamento = pico ÷ fp ÷ capacidade. Não considera limites de proteção/disjuntor nem manobras.",
+        "GD NO ALIMENTADOR: soma das UGs de BT (UGBT) e MT (UGMT) ativas no alimentador; potência pela base de GD da ANEEL (CEG_GD); sem casamento, MT usa DEM_CONT (usinas como PCH/UHE/UTE). CARREGAMENTO DE GD (%) = GD ÷ capacidade do alimentador. CARGA MÍN. DO ALIMENTADOR = (energia medida no alimentador, que já vem líquida da GD, + geração estimada da GD com perfil FV típico do RS de ~1.150 kWh/kWp·ano) no mês de menor carga, × razão mínimo-na-janela-solar/média das curvas típicas das cargas. CAPACIDADE P/ GD NO ALIMENTADOR = menor entre (carga mín. × fator de segurança − GD) e (capacidade − GD).",
         "PICO: maior valor da soma das curvas no mês de maior consumo do trafo, entre dia útil, sábado e domingo.",
         "CARREGAMENTO (%) = pico estimado (kW) ÷ fp ÷ potência nominal (kVA) × 100.",
         "CARGA MÍN. DIURNA: menor valor da soma das curvas dentro da janela solar, no mês de menor consumo.",
@@ -839,6 +913,7 @@ dt{color:var(--muted)} dd{margin:0;font-family:var(--mono);font-variant-numeric:
       <select id="alim"><option value="">Todos</option></select>
     </div>
     <label class="chk"><input type="checkbox" id="uc1"> Só trafos com 1 unidade consumidora</label>
+    <label class="chk"><input type="checkbox" id="limAlim" checked> Considerar também o limite do alimentador</label>
     <label class="chk" id="filtraRow" hidden><input type="checkbox" id="filtra" checked> Mostrar só os trafos que comportam a GD pretendida</label>
   </header>
   <div class="scroll" id="info"></div>
@@ -857,8 +932,11 @@ const esc=s=>String(s??"").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&g
 function preparar(){D.forEach(t=>{
   const inv=t.cmin==null?null:t.cmin*META.fs-t.gd;
   const lim=t.kva==null?null:t.kva-t.gd;
-  t.cap=(inv==null&&lim==null)?null:Math.max(0,Math.min(inv??Infinity,lim??Infinity));
-  t.lim=inv==null?"sem dado":(lim!=null&&lim<inv?"potência do trafo":"inversão de fluxo");
+  t.capt=(inv==null&&lim==null)?null:Math.max(0,Math.min(inv??Infinity,lim??Infinity));
+  t.limt=inv==null?"sem dado":(lim!=null&&lim<inv?"potência do trafo":"inversão de fluxo");
+  // com a opção marcada, a capacidade também fica limitada pela do alimentador
+  const ua=document.getElementById("limAlim").checked&&t.capa!=null;
+  if(ua&&(t.capt==null||t.capa<t.capt)){t.cap=t.capa;t.lim="alimentador"}else{t.cap=t.capt;t.lim=t.limt}
 });}
 preparar();
 function classe(t,pot){
@@ -901,13 +979,14 @@ function resumo(){
   <div class="stats"><div class="stat"><b>${v.length.toLocaleString("pt-BR")}</b><span>trafos</span></div>
   <div class="stat"><b>${fmt(gd/1000,2)}</b><span>MW de GD</span></div>
   <div class="stat"><b>${fmt(kva/1000,2)}</b><span>MVA instalado</span></div></div>
-  ${alimEl.value?`<p class="hint">Carregamento estimado do alimentador: <b>${fmt(ca)} %</b></p>`:""}
+  ${alimEl.value&&v.length?`<dl><dt>Carregamento do alimentador</dt><dd>${fmt(ca)} %</dd><dt>GD no alimentador</dt><dd>${fmt(v[0].gda,0)} kW</dd>
+  <dt>Carregamento de GD do alimentador</dt><dd>${fmt(v[0].cga)} %</dd><dt>Capacidade p/ nova GD no alimentador</dt><dd>${fmt(v[0].capa,0)} kW</dd></dl>`:""}
   ${uc1El.checked?`<p class="hint">Mostrando só trafos com 1 unidade consumidora.</p>`:""}</section>
   <section><h2>${pot>0?"Para "+fmt(pot)+" kW":"Capacidade disponível"}</h2><div class="legend">
   ${Object.keys(r).map(k=>`<div><span class="dot" style="background:${COR[k]}"></span>${r[k]} <span class="base">(${n[k]})</span></div>`).join("")}</div>
   ${oc?`<p class="hint">${oc.toLocaleString("pt-BR")} trafos com capacidade abaixo de ${fmt(pot)} kW estão ocultos no mapa.</p>`:""}</section>`;
 }
-function rodape(){return `<p class="note">Estimativa feita a partir da BDGD/ANEEL (data-base ${esc(META.base)}): carga das UCs pela energia mensal e curvas típicas, GD pela potência instalada cadastrada. Capacidade = menor valor entre a carga mínima diurna (×${META.fs}) e a potência do trafo, descontada a GD existente. Serve para triagem; a viabilidade de conexão é definida pela distribuidora.</p>`}
+function rodape(){return `<p class="note">Estimativa feita a partir da BDGD/ANEEL (data-base ${esc(META.base)}): carga das UCs pela energia mensal e curvas típicas, GD pela potência instalada cadastrada. Capacidade = menor valor entre a carga mínima diurna (×${META.fs}) e a potência do trafo, descontada a GD existente; com a opção marcada, limitada também pela capacidade do alimentador (carga mínima diurna do alimentador e capacidade do condutor de saída, descontada a GD em BT e MT). Serve para triagem; a viabilidade de conexão é definida pela distribuidora.</p>`}
 function ficha(t){
   const pot=+potEl.value||0,k=classe(t,pot),r=pot>0?ROTP:ROT;
   return `<div class="card"><div class="top"><span class="id">${esc(t.id)}</span><span class="pill" style="background:${COR[k]}">${r[k]}</span></div>
@@ -916,7 +995,11 @@ function ficha(t){
   <dt>Potência do trafo</dt><dd>${fmt(t.kva,1)} kVA</dd><dt>GD instalada</dt><dd>${fmt(t.gd,2)} kW</dd>
   <dt>Unidades geradoras</dt><dd>${t.ugs}</dd><dt>Unidades consumidoras</dt><dd>${t.ucs}</dd>
   <dt>Carga mín. diurna</dt><dd>${fmt(t.cmin,2)} kW</dd><dt>Demanda de pico</dt><dd>${fmt(t.pico,2)} kW</dd>
-  <dt>Carregamento do trafo</dt><dd>${fmt(t.car)} %</dd><dt>Carregamento do alimentador</dt><dd>${fmt(t.ca)} %</dd><dt>GD / trafo</dt><dd>${fmt(t.kva?t.gd/t.kva*100:null)} %</dd></dl>
+  <dt>Carregamento do trafo</dt><dd>${fmt(t.car)} %</dd><dt>GD / trafo</dt><dd>${fmt(t.kva?t.gd/t.kva*100:null)} %</dd>
+  <dt>Capacidade só do trafo</dt><dd>${fmt(t.capt)} kW</dd></dl>
+  <div class="base">Alimentador ${esc(t.alim||"–")}</div>
+  <dl><dt>Carregamento do alimentador</dt><dd>${fmt(t.ca)} %</dd><dt>GD no alimentador</dt><dd>${fmt(t.gda,0)} kW</dd>
+  <dt>Carregamento de GD do alimentador</dt><dd>${fmt(t.cga)} %</dd><dt>Capacidade p/ nova GD no alimentador</dt><dd>${fmt(t.capa,0)} kW</dd></dl>
   <div class="links"><a href="https://www.google.com/maps?q=${t.lat},${t.lon}" target="_blank" rel="noopener">Abrir no Google Maps</a>
   <span class="base">${t.lat.toFixed(6)}, ${t.lon.toFixed(6)}</span></div></div>`;
 }
@@ -989,7 +1072,8 @@ document.getElementById("f").addEventListener("submit",async e=>{
 });
 const uc1El=document.getElementById("uc1"),filtraEl=document.getElementById("filtra"),filtraRow=document.getElementById("filtraRow");
 function aoMudarPot(){filtraRow.hidden=!((+potEl.value||0)>0);if(ponto){const p=proximos(ponto[0],ponto[1],1)[0];if(sel&&!visiveis().includes(sel))sel=p?p.t:null}desenhar();render()}
-potEl.addEventListener("input",aoMudarPot);uc1El.addEventListener("change",aoMudarPot);filtraEl.addEventListener("change",aoMudarPot);
+potEl.addEventListener("input",aoMudarPot);uc1El.addEventListener("change",aoMudarPot);
+document.getElementById("limAlim").addEventListener("change",()=>{preparar();aoMudarPot()});filtraEl.addEventListener("change",aoMudarPot);
 alimEl.addEventListener("change",()=>{sel=null;desenhar();render();ajustar()});
 const side=document.getElementById("side"),tog=document.getElementById("tog");
 tog.onclick=()=>{side.classList.toggle("min");tog.setAttribute("aria-expanded",!side.classList.contains("min"));setTimeout(()=>map.invalidateSize(),50)};
