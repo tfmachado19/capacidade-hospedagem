@@ -20,8 +20,8 @@ Para GD, cada alimentador mostra: GD ligada (BT + MT, pela base da ANEEL), carre
 de GD (GD ÷ capacidade do condutor de saída) e capacidade para nova GD = menor entre
 (carga mínima diurna do alimentador − GD) e (capacidade − GD). A carga mínima do
 alimentador usa a energia medida na saída (já líquida da GD) somada à geração estimada
-da GD. Com "Considerar também o limite do alimentador" marcado, a capacidade de cada
-trafo fica limitada também pela do seu alimentador.
+da GD. A opção "Só trafos cujo alimentador comporta a GD pretendida" mostra só os trafos
+cujo alimentador tem capacidade para nova GD maior ou igual à GD informada.
 
 Site: https://tfmachado19.github.io/capacidade-hospedagem
 
