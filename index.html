@@ -106,6 +106,7 @@ dt{color:var(--muted)} dd{margin:0;font-family:var(--mono);font-variant-numeric:
       <label for="alim">Alimentador</label>
       <select id="alim"><option value="">Todos</option></select>
     </div>
+    <label class="chk"><input type="checkbox" id="uc1"> Só trafos com 1 unidade consumidora</label>
     <label class="chk" id="filtraRow" hidden><input type="checkbox" id="filtra" checked> Mostrar só os trafos que comportam a GD pretendida</label>
   </header>
   <div class="scroll" id="info"></div>
@@ -147,7 +148,7 @@ function preencherAlim(){alimEl.length=1;[...new Set(D.map(t=>t.alim).filter(Boo
 preencherAlim();
 
 // base(): filtro de alimentador; visiveis(): base + (se marcado) só trafos com capacidade ≥ GD pretendida
-function base(){const a=alimEl.value;return a?D.filter(t=>t.alim===a):D}
+function base(){const a=alimEl.value,u=uc1El.checked;return (a||u)?D.filter(t=>(!a||t.alim===a)&&(!u||t.ucs===1)):D}
 function filtrando(){return (+potEl.value||0)>0&&filtraEl.checked}
 function visiveis(){const v=base(),pot=+potEl.value||0;return filtrando()?v.filter(t=>t.cap!=null&&t.cap>=pot):v}
 function desenhar(){
@@ -161,12 +162,15 @@ function desenhar(){
 function resumo(){
   const v=base(),pot=+potEl.value||0;const n={ok:0,mid:0,low:0,none:0,nd:0};v.forEach(t=>n[classe(t,pot)]++);
   const oc=filtrando()?v.length-visiveis().length:0;
+  const ca=alimEl.value&&v.length?v[0].ca:null;
   const gd=v.reduce((s,t)=>s+t.gd,0),kva=v.reduce((s,t)=>s+(t.kva||0),0);
   const r=pot>0?ROTP:ROT;
   return `<section><h2>${alimEl.value?"Alimentador "+esc(alimEl.value):(META.muns?esc(META.munNome.split(",")[0]):"Município")}</h2>
   <div class="stats"><div class="stat"><b>${v.length.toLocaleString("pt-BR")}</b><span>trafos</span></div>
   <div class="stat"><b>${fmt(gd/1000,2)}</b><span>MW de GD</span></div>
-  <div class="stat"><b>${fmt(kva/1000,2)}</b><span>MVA instalado</span></div></div></section>
+  <div class="stat"><b>${fmt(kva/1000,2)}</b><span>MVA instalado</span></div></div>
+  ${alimEl.value?`<p class="hint">Carregamento estimado do alimentador: <b>${fmt(ca)} %</b></p>`:""}
+  ${uc1El.checked?`<p class="hint">Mostrando só trafos com 1 unidade consumidora.</p>`:""}</section>
   <section><h2>${pot>0?"Para "+fmt(pot)+" kW":"Capacidade disponível"}</h2><div class="legend">
   ${Object.keys(r).map(k=>`<div><span class="dot" style="background:${COR[k]}"></span>${r[k]} <span class="base">(${n[k]})</span></div>`).join("")}</div>
   ${oc?`<p class="hint">${oc.toLocaleString("pt-BR")} trafos com capacidade abaixo de ${fmt(pot)} kW estão ocultos no mapa.</p>`:""}</section>`;
@@ -180,7 +184,7 @@ function ficha(t){
   <dt>Potência do trafo</dt><dd>${fmt(t.kva,1)} kVA</dd><dt>GD instalada</dt><dd>${fmt(t.gd,2)} kW</dd>
   <dt>Unidades geradoras</dt><dd>${t.ugs}</dd><dt>Unidades consumidoras</dt><dd>${t.ucs}</dd>
   <dt>Carga mín. diurna</dt><dd>${fmt(t.cmin,2)} kW</dd><dt>Demanda de pico</dt><dd>${fmt(t.pico,2)} kW</dd>
-  <dt>Carregamento</dt><dd>${fmt(t.car)} %</dd><dt>GD / trafo</dt><dd>${fmt(t.kva?t.gd/t.kva*100:null)} %</dd></dl>
+  <dt>Carregamento do trafo</dt><dd>${fmt(t.car)} %</dd><dt>Carregamento do alimentador</dt><dd>${fmt(t.ca)} %</dd><dt>GD / trafo</dt><dd>${fmt(t.kva?t.gd/t.kva*100:null)} %</dd></dl>
   <div class="links"><a href="https://www.google.com/maps?q=${t.lat},${t.lon}" target="_blank" rel="noopener">Abrir no Google Maps</a>
   <span class="base">${t.lat.toFixed(6)}, ${t.lon.toFixed(6)}</span></div></div>`;
 }
@@ -251,9 +255,9 @@ document.getElementById("f").addEventListener("submit",async e=>{
     else{msg="Endereço não encontrado. Tente rua e número, ou cole a coordenada (ex.: -29.6842, -53.8069).";render()}
   }catch(err){msg="Não consegui buscar o endereço agora (sem internet?). Cole a coordenada ou clique no mapa.";render()}
 });
-const filtraEl=document.getElementById("filtra"),filtraRow=document.getElementById("filtraRow");
+const uc1El=document.getElementById("uc1"),filtraEl=document.getElementById("filtra"),filtraRow=document.getElementById("filtraRow");
 function aoMudarPot(){filtraRow.hidden=!((+potEl.value||0)>0);if(ponto){const p=proximos(ponto[0],ponto[1],1)[0];if(sel&&!visiveis().includes(sel))sel=p?p.t:null}desenhar();render()}
-potEl.addEventListener("input",aoMudarPot);filtraEl.addEventListener("change",aoMudarPot);
+potEl.addEventListener("input",aoMudarPot);uc1El.addEventListener("change",aoMudarPot);filtraEl.addEventListener("change",aoMudarPot);
 alimEl.addEventListener("change",()=>{sel=null;desenhar();render();ajustar()});
 const side=document.getElementById("side"),tog=document.getElementById("tog");
 tog.onclick=()=>{side.classList.toggle("min");tog.setAttribute("aria-expanded",!side.classList.contains("min"));setTimeout(()=>map.invalidateSize(),50)};
