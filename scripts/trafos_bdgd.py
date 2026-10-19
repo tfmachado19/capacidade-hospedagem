@@ -14,7 +14,9 @@ COMO USAR
   3. Rode (pode passar o .zip direto, sem descompactar):
        py trafos_bdgd.py "C:\\Downloads\\RGE_xxx.zip"
      Opções:
-       --mun 4316907      código IBGE do município (padrão: Santa Maria/RS)
+       --mun 4316907      código IBGE do município (padrão: Santa Maria/RS);
+                          "todos" processa toda a área da distribuidora e gera um
+                          site com seletor de município (pasta site_todos/)
        --fp 0.92          fator de potência p/ converter kW em kVA
        --janela 9 15      janela solar (h) p/ a carga mínima diurna
        --fator-seg 1.0    fator de segurança sobre a carga mínima
@@ -34,10 +36,13 @@ a partir da energia mensal das UCs e das curvas típicas (CRVCRG) da própria
 BDGD. Não são medição do transformador e não substituem a análise da RGE.
 """
 import argparse
+import gzip
 import json
 import re
 import sys
 import time
+import unicodedata
+import urllib.request
 import zipfile
 from pathlib import Path
 
@@ -124,7 +129,10 @@ def txt(s):
 
 
 def ler_por_municipio(gdb, camada, cols, mun):
-    """Tenta filtrar MUN direto no arquivo (rápido); se não der, filtra em memória."""
+    """Tenta filtrar MUN direto no arquivo (rápido); se não der, filtra em memória.
+    mun=None lê a área inteira."""
+    if mun is None:
+        return ler(gdb, camada, cols)
     _, tipos = campos(gdb, camada)
     if "MUN" in tipos:
         q = f"MUN = '{mun}'" if tipos["MUN"] == "object" else f"MUN = {int(mun)}"
@@ -169,7 +177,20 @@ def montar_curvas(gdb, camada_crv):
 
 
 # ---------------------------------------------------------------- cálculo
-def agregar_carga(pares, curvas, janela):
+def agregar_carga(pares, curvas, janela, lote=20000):
+    """Processa em lotes de trafos para não estourar a memória em áreas grandes."""
+    trafos = pares["TRAFO"].unique()
+    if len(trafos) <= lote:
+        return _agregar_carga(pares, curvas, janela)
+    pares = pares.sort_values("TRAFO", kind="stable").reset_index(drop=True)
+    corte = np.searchsorted(pares["TRAFO"].to_numpy(), np.sort(trafos)[::lote][1:])
+    limites = [0, *corte.tolist(), len(pares)]
+    partes = [_agregar_carga(pares.iloc[i:j].reset_index(drop=True), curvas, janela)
+              for i, j in zip(limites[:-1], limites[1:]) if j > i]
+    return pd.concat(partes, ignore_index=True)
+
+
+def _agregar_carga(pares, curvas, janela):
     """pares: DataFrame com TRAFO, TIP_CC, P_01..P_12 (kW médio por mês).
     Retorna por trafo: pico estimado (mês de maior energia) e carga mínima
     na janela solar (mês de menor energia)."""
@@ -221,6 +242,20 @@ def ler_gd_aneel(arq):
     return d.dropna().drop_duplicates("CodEmpreendimento").set_index("CodEmpreendimento")["MdaPotenciaInstaladaKW"]
 
 
+def nomes_ibge():
+    """Código IBGE → (nome, UF) pela API do IBGE. Sem internet, devolve {}."""
+    try:
+        url = "https://servicodados.ibge.gov.br/api/v1/localidades/municipios?view=nivelado"
+        with urllib.request.urlopen(url, timeout=30) as r:
+            bruto = r.read()
+        if bruto[:2] == b"\x1f\x8b":                    # a API responde em gzip
+            bruto = gzip.decompress(bruto)
+        return {str(m["municipio-id"]): (m["municipio-nome"], m["UF-sigla"]) for m in json.loads(bruto)}
+    except Exception as e:
+        log(f"  (nomes dos municípios indisponíveis: {e})")
+        return {}
+
+
 def classe_carreg(x):
     if pd.isna(x):
         return "sem dado"
@@ -237,12 +272,22 @@ def classe_inv(gd, cmin, atencao):
 
 
 # ---------------------------------------------------------------- mapa
-def salvar_plataforma(df, arq, meta):
-    """Gera a plataforma de consulta (HTML único) com os dados embutidos."""
-    def n(v, d=4):
-        return None if pd.isna(v) else round(float(v), d)
-    pts = df.dropna(subset=["lat", "lon"])
-    dados = [{
+def _n(v, d=4):
+    return None if pd.isna(v) else round(float(v), d)
+
+
+def _js(o):
+    return json.dumps(o, ensure_ascii=False, separators=(",", ":")).replace("</", "<\\/")
+
+
+def _bbox(pts):
+    return [round(pts["lat"].min() - 0.02, 4), round(pts["lon"].min() - 0.02, 4),
+            round(pts["lat"].max() + 0.02, 4), round(pts["lon"].max() + 0.02, 4)]
+
+
+def _registros(pts):
+    n = _n
+    return [{
         "id": str(r["Transformador (COD_ID)"]), "lat": round(r["lat"], 6), "lon": round(r["lon"], 6),
         "kva": n(r["Potência nominal (kVA)"]), "gd": n(r["GD instalada (kW)"]) or 0.0,
         "cmin": n(r["Carga mín. diurna estimada (kW)"]), "pico": n(r["Demanda pico estimada (kW)"]),
@@ -251,13 +296,39 @@ def salvar_plataforma(df, arq, meta):
         "sub": "" if pd.isna(r.get("Subestação")) else str(r.get("Subestação")),
         "ucs": int(r["Nº UCs"]), "ugs": int(r["Nº UGs (GD)"]),
     } for _, r in pts.iterrows()]
+
+
+def _html(dados_js, meta, titulo):
+    return (TEMPLATE.replace("__DATA__", dados_js).replace("__META__", _js(meta))
+            .replace("__MUNNOME__", titulo).replace("__BASE__", meta["base"]))
+
+
+def salvar_plataforma(df, arq, meta):
+    """Gera a plataforma de consulta (HTML único) com os dados embutidos."""
+    pts = df.dropna(subset=["lat", "lon"])
     if len(pts):
-        meta["bbox"] = [round(pts["lat"].min() - 0.02, 4), round(pts["lon"].min() - 0.02, 4),
-                        round(pts["lat"].max() + 0.02, 4), round(pts["lon"].max() + 0.02, 4)]
-    js = lambda o: json.dumps(o, ensure_ascii=False, separators=(",", ":")).replace("</", "<\\/")
-    html = (TEMPLATE.replace("__DATA__", js(dados)).replace("__META__", js(meta))
-            .replace("__MUNNOME__", meta["munNome"].split(",")[0]).replace("__BASE__", meta["base"]))
-    Path(arq).write_text(html, encoding="utf-8")
+        meta["bbox"] = _bbox(pts)
+    Path(arq).write_text(_html(_js(_registros(pts)), meta, meta["munNome"].split(",")[0]), encoding="utf-8")
+
+
+def salvar_site(df, pasta, meta, padrao="4316907"):
+    """Área inteira: index.html + dados/<código IBGE>.json (carregado sob demanda por município).
+    Precisa ser servido por HTTP (GitHub Pages); aberto direto do disco o navegador bloqueia o fetch."""
+    pasta = Path(pasta)
+    (pasta / "dados").mkdir(parents=True, exist_ok=True)
+    pts = df.dropna(subset=["lat", "lon"])
+    muns = []
+    for (cod, nome), g in pts.groupby(["Município (IBGE)", "Município"]):
+        (pasta / "dados" / f"{cod}.json").write_text(_js(_registros(g)), encoding="utf-8")
+        muns.append({"c": str(cod), "n": str(nome), "b": _bbox(g), "t": len(g),
+                     "gd": round(float(g["GD instalada (kW)"].sum()), 1)})
+    chave = lambda m: unicodedata.normalize("NFKD", m["n"]).encode("ascii", "ignore").decode().lower()
+    muns.sort(key=chave)
+    meta.update(muns=muns, bboxAll=_bbox(pts), bbox=None, mun=None,
+                default=padrao if any(m["c"] == padrao for m in muns) else muns[0]["c"])
+    (pasta / "index.html").write_text(_html("null", meta, meta.get("titulo", "Área de concessão")),
+                                      encoding="utf-8")
+    return len(muns)
 
 
 # ---------------------------------------------------------------- principal
@@ -272,8 +343,12 @@ def main():
     ap.add_argument("--saida", default=None, help="pasta de saída")
     ap.add_argument("--gd-aneel", default=None,
                     help="base de GD da ANEEL (.parquet/.csv) p/ potência instalada via CEG_GD")
-    ap.add_argument("--mun-nome", default=None, help="nome do município p/ busca de endereço (ex.: \"Itaara, RS\")")
+    ap.add_argument("--mun-nome", default=None, help="nome do município p/ busca de endereço (ex.: \"Itaara, RS\"); "
+                    "com --mun todos, título do site (ex.: \"RGE\")")
     a = ap.parse_args()
+    todos = a.mun.strip().lower() in ("todos", "all", "*")
+    mun = None if todos else a.mun.strip()
+    nomes = nomes_ibge()
 
     gdb, nome_gdb = abrir_gdb(a.bdgd)
     saida = Path(a.saida) if a.saida else Path(a.bdgd).resolve().parent
@@ -284,9 +359,9 @@ def main():
         f"pip={L['pip']} curvas={L['crv']}")
 
     # 1) Unidades consumidoras BT do município
-    log(f"Lendo UCs de BT do município {a.mun} ...")
+    log(f"Lendo UCs de BT {'de toda a área' if todos else 'do município ' + a.mun} ...")
     uc = ler_por_municipio(gdb, L["uc"], ["COD_ID", "MUN", "SIT_ATIV", "UNI_TR_MT", "UNI_TR_D",
-                                          "CTMT", "TIP_CC", "CEG_GD"] + ENE, a.mun)
+                                          "CTMT", "TIP_CC", "CEG_GD"] + ENE, mun)
     ct = col_trafo(uc)
     if uc.empty or not ct:
         sys.exit("Nenhuma UC encontrada para esse município (confira o código IBGE em --mun).")
@@ -326,7 +401,8 @@ def main():
     ug["TRAFO"] = txt(ug[cg]) if cg else ""
     if "SIT_ATIV" in ug.columns:
         ug = ug[txt(ug["SIT_ATIV"]).str.upper().isin(["AT", ""])]
-    no_mun = txt(ug["MUN"]).str.lstrip("0") == a.mun.lstrip("0") if "MUN" in ug.columns else False
+    no_mun = True if todos else (txt(ug["MUN"]).str.lstrip("0") == mun.lstrip("0")
+                                 if "MUN" in ug.columns else False)
     ug = ug[ug["TRAFO"].isin(trafos_mun) | no_mun].copy()
     ug["POT_KW"] = pd.to_numeric(ug["POT_INST"], errors="coerce").fillna(0)
     corrigidas = int((ug["POT_KW"] > 1000).sum())
@@ -367,6 +443,8 @@ def main():
     except Exception:
         tr["lon"] = tr["lat"] = np.nan
     tr["KVA"] = pd.to_numeric(tr["POT_NOM"], errors="coerce")
+    tr["MUN_TR"] = txt(tr["MUN"]).str.lstrip("0") if "MUN" in tr.columns else (mun or "")
+    tr["NOME_MUN"] = tr["MUN_TR"].map(lambda c: nomes.get(c, (c, ""))[0])
     pct_padrao = tr["KVA"].isin(KVA_PADRAO).mean() * 100 if len(tr) else 0
     log(f"  {len(tr):,} transformadores; {pct_padrao:.0f}% com potência em valores comerciais de kVA")
 
@@ -403,19 +481,24 @@ def main():
     df["Margem p/ nova GD sem inversão (kW)"] = cmin - df["GD instalada (kW)"]
     df["Situação inversão de fluxo"] = [classe_inv(g, c, a.atencao)
                                        for g, c in zip(df["GD instalada (kW)"], cmin)]
+    # mesma regra da plataforma: menor entre (carga mín. × fs − GD) e (kVA − GD), nunca negativa
+    df["Capacidade disponível estimada (kW)"] = np.fmin(cmin - df["GD instalada (kW)"],
+                                                        kva - df["GD instalada (kW)"]).clip(lower=0)
     df["Google Maps"] = [f"https://www.google.com/maps?q={la:.6f},{lo:.6f}" if pd.notna(la) else ""
                          for la, lo in zip(df["lat"], df["lon"])]
 
     ren = {"TRAFO": "Transformador (COD_ID)", "CTMT": "Alimentador (CTMT)", "SUB": "Subestação",
-           "KVA": "Potência nominal (kVA)", "FAS_CON_P": "Fases primário", "POT_NOM": "POT_NOM (bruto)"}
+           "KVA": "Potência nominal (kVA)", "FAS_CON_P": "Fases primário", "POT_NOM": "POT_NOM (bruto)",
+           "MUN_TR": "Município (IBGE)", "NOME_MUN": "Município"}
     df = df.rename(columns=ren)
-    ordem = ["Transformador (COD_ID)", "Alimentador (CTMT)", "Subestação", "Potência nominal (kVA)",
+    ordem = ["Transformador (COD_ID)", "Município (IBGE)", "Município", "Alimentador (CTMT)", "Subestação",
+             "Potência nominal (kVA)",
              "Fases primário", "Nº UCs", "Nº UCs com GD", "Nº UGs (GD)", "GD instalada (kW)",
              "GD / potência do trafo (%)", "Energia média mensal (kWh)", "Energia mês máx (kWh)",
              "Mês de maior consumo", "Demanda pico estimada (kW)", "Hora do pico",
              "Carregamento estimado (%)", "Situação carregamento", "Carga mín. diurna estimada (kW)",
              "Mês de menor consumo", "Ocupação GD / carga mín. (%)", "Margem p/ nova GD sem inversão (kW)",
-             "Situação inversão de fluxo", "UCs sem curva típica", "POT_NOM (bruto)", "lat", "lon",
+             "Situação inversão de fluxo", "Capacidade disponível estimada (kW)", "UCs sem curva típica", "POT_NOM (bruto)", "lat", "lon",
              "Google Maps"]
     df = df[[c for c in ordem if c in df.columns]].sort_values(
         "GD / potência do trafo (%)", ascending=False)
@@ -434,13 +517,34 @@ def main():
     alim["GD / kVA trafos (%)"] = alim["GD instalada (kW)"] / alim["Potência instalada trafos (kVA)"] * 100
     alim = alim.sort_values("GD instalada (kW)", ascending=False)
 
+    # Municípios
+    conta = lambda v: (lambda s: (s == v).sum())
+    tab_mun = df.groupby(["Município (IBGE)", "Município"]).agg(**{
+        "Nº trafos": ("Transformador (COD_ID)", "size"),
+        "Potência instalada trafos (kVA)": ("Potência nominal (kVA)", "sum"),
+        "Nº UCs": ("Nº UCs", "sum"),
+        "Nº UGs (GD)": ("Nº UGs (GD)", "sum"),
+        "GD instalada (kW)": ("GD instalada (kW)", "sum"),
+        "Capacidade disponível estimada (kW)": ("Capacidade disponível estimada (kW)", "sum"),
+        "Trafos com capacidade ≥ 10 kW": ("Capacidade disponível estimada (kW)", lambda s: (s >= 10).sum()),
+        "Trafos — risco de inversão": ("Situação inversão de fluxo", conta("risco")),
+        "Trafos — atenção": ("Situação inversão de fluxo", conta("atenção")),
+        "Trafos — folga": ("Situação inversão de fluxo", conta("folga")),
+        "Trafos — sem GD": ("Situação inversão de fluxo", conta("sem GD")),
+        "Trafos em sobrecarga": ("Situação carregamento", conta("sobrecarga")),
+    }).reset_index()
+    tab_mun["GD / kVA trafos (%)"] = tab_mun["GD instalada (kW)"] / tab_mun["Potência instalada trafos (kVA)"] * 100
+    tab_mun = tab_mun.sort_values("GD instalada (kW)", ascending=False)
+
     # Resumo
     cont_inv = df["Situação inversão de fluxo"].value_counts()
     cont_car = df["Situação carregamento"].value_counts()
     resumo = pd.DataFrame([
         ("Arquivo BDGD", nome_gdb),
-        ("Município (IBGE)", a.mun),
+        ("Município (IBGE)", f"todos ({len(tab_mun)} municípios)" if todos else a.mun),
         ("Transformadores analisados", len(df)),
+        ("Capacidade disponível estimada total (kW)", round(df["Capacidade disponível estimada (kW)"].sum(), 1)),
+        ("Trafos com capacidade ≥ 10 kW", int((df["Capacidade disponível estimada (kW)"] >= 10).sum())),
         ("UCs de BT ativas", int(df["Nº UCs"].sum())),
         ("Unidades geradoras (GD BT)", int(df["Nº UGs (GD)"].sum())),
         ("GD instalada total (kW)", round(df["GD instalada (kW)"].sum(), 4)),
@@ -479,21 +583,27 @@ def main():
         "USO: estimativa de engenharia para triagem. Não é medição nem substitui a análise de inversão de fluxo da distribuidora (REN 1.000/2021).",
     ]})
 
-    xlsx = saida / f"BDGD_trafos_{a.mun}.xlsx"
+    rotulo = "todos" if todos else a.mun
+    xlsx = saida / f"BDGD_trafos_{rotulo}.xlsx"
     log(f"Salvando {xlsx} ...")
+    abas = [("Transformadores", df), ("Municípios", tab_mun), ("Alimentadores", alim),
+            ("Resumo", resumo), ("Leia-me", leiame)]
+    if not todos:
+        abas.pop(1)
     with pd.ExcelWriter(xlsx, engine="openpyxl") as w:
-        df.to_excel(w, sheet_name="Transformadores", index=False)
-        alim.to_excel(w, sheet_name="Alimentadores", index=False)
-        resumo.to_excel(w, sheet_name="Resumo", index=False)
-        leiame.to_excel(w, sheet_name="Leia-me", index=False)
-        for nome, tab in (("Transformadores", df), ("Alimentadores", alim), ("Resumo", resumo), ("Leia-me", leiame)):
+        for nome, tab in abas:
+            grande = len(tab) > 50000          # formatar célula a célula fica lento demais
+            if grande:
+                tab = tab.round({c: 4 for c in tab.columns
+                                 if pd.api.types.is_float_dtype(tab[c]) and c not in ("lat", "lon")})
+            tab.to_excel(w, sheet_name=nome, index=False)
             ws = w.sheets[nome]
             ws.freeze_panes = "B2"
             for j, col in enumerate(tab.columns, start=1):
                 letra = ws.cell(1, j).column_letter
                 larg = max(len(str(col)), *(len(str(v)) for v in tab[col].head(200))) if len(tab) else len(col)
                 ws.column_dimensions[letra].width = min(60 if nome == "Leia-me" else 34, larg + 2)
-                if pd.api.types.is_float_dtype(tab[col]) and col not in ("lat", "lon"):
+                if not grande and pd.api.types.is_float_dtype(tab[col]) and col not in ("lat", "lon"):
                     for cel in ws.iter_rows(min_row=2, min_col=j, max_col=j):
                         cel[0].number_format = "#,##0.0000"
             if nome == "Leia-me":
@@ -502,10 +612,18 @@ def main():
 
     m = re.search(r"(\d{4})-(\d{2})-(\d{2})", nome_gdb)
     base = f"{m.group(3)}/{m.group(2)}/{m.group(1)}" if m else nome_gdb
-    nome_mun = a.mun_nome or ("Santa Maria, RS" if a.mun == "4316907" else a.mun)
-    html = saida / f"Capacidade_Hospedagem_{a.mun}.html"
-    salvar_plataforma(df, html, {"base": base, "munNome": nome_mun, "fs": a.fator_seg, "fp": a.fp})
-    log(f"Plataforma de consulta salva em {html}")
+    meta = {"base": base, "fs": a.fator_seg, "fp": a.fp}
+    if todos:
+        site = saida / "site_todos"
+        meta.update(munNome="Rio Grande do Sul", titulo=a.mun_nome or "Área de concessão")
+        n_mun = salvar_site(df, site, meta)
+        log(f"Site com {n_mun} municípios salvo em {site} (publique o conteúdo da pasta)")
+    else:
+        nm, uf = nomes.get(mun.lstrip("0"), (mun, ""))
+        nome_mun = a.mun_nome or (f"{nm}, {uf}" if uf else nm)
+        html = saida / f"Capacidade_Hospedagem_{a.mun}.html"
+        salvar_plataforma(df, html, dict(meta, munNome=nome_mun))
+        log(f"Plataforma de consulta salva em {html}")
     log(f"Pronto: {len(df):,} trafos | GD {df['GD instalada (kW)'].sum():,.1f} kW | "
         f"risco {cont_inv.get('risco', 0)} | atenção {cont_inv.get('atenção', 0)} | "
         f"sobrecarga {cont_car.get('sobrecarga', 0)}")
@@ -553,7 +671,10 @@ button:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid 
 .row label{font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em}
 .row input,.row select{padding:7px 9px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--ink);font:inherit;min-width:0}
 #pot{width:90px;font-family:var(--mono)}
-#alim{flex:1}
+#alim,#mun{flex:1}
+.chk{display:flex;gap:8px;align-items:center;font-size:13px;color:var(--muted)}
+.chk[hidden]{display:none}
+.chk input{width:18px;height:18px;accent-color:var(--accent)}
 .scroll{overflow:auto;flex:1;padding:14px 18px 24px;display:grid;gap:16px;align-content:start}
 .stats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
 .stat{background:var(--chip);border-radius:8px;padding:8px 10px}
@@ -597,7 +718,7 @@ dt{color:var(--muted)} dd{margin:0;font-family:var(--mono);font-variant-numeric:
 <aside id="side">
   <header>
     <div class="brand">
-      <h1>Capacidade de Hospedagem · __MUNNOME__</h1>
+      <h1>Capacidade de Hospedagem · <span id="titulo">__MUNNOME__</span></h1>
       <button class="ghost toggle" id="tog" aria-expanded="true">Painel</button>
     </div>
     <div class="base">BDGD __BASE__</div>
@@ -606,18 +727,23 @@ dt{color:var(--muted)} dd{margin:0;font-family:var(--mono);font-variant-numeric:
       <button type="submit">Buscar</button>
     </form>
     <p class="hint">Ou clique no mapa para ver os transformadores mais próximos do ponto.</p>
+    <div class="row" id="munRow" style="display:none">
+      <label for="mun">Município</label>
+      <select id="mun"></select>
+    </div>
     <div class="row">
       <label for="pot">GD pretendida</label>
       <input id="pot" type="number" min="0" step="0.1" placeholder="kW">
       <label for="alim">Alimentador</label>
       <select id="alim"><option value="">Todos</option></select>
     </div>
+    <label class="chk" id="filtraRow" hidden><input type="checkbox" id="filtra" checked> Mostrar só os trafos que comportam a GD pretendida</label>
   </header>
   <div class="scroll" id="info"></div>
 </aside>
 <div id="map"></div>
 <script>
-const D=__DATA__;
+let D=__DATA__||[];
 const META=__META__;
 const COR={ok:"var(--ok)",mid:"var(--mid)",low:"var(--low)",none:"var(--none)",nd:"var(--nodata)"};
 const HEX={};function cssVar(n){return getComputedStyle(document.documentElement).getPropertyValue(n).trim()}
@@ -626,12 +752,13 @@ const fmt=(v,d=1)=>v==null||isNaN(v)?"–":Number(v).toLocaleString("pt-BR",{min
 const esc=s=>String(s??"").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
 
 // capacidade disponível estimada = menor entre (carga mín. diurna × fs − GD) e (kVA − GD)
-D.forEach(t=>{
+function preparar(){D.forEach(t=>{
   const inv=t.cmin==null?null:t.cmin*META.fs-t.gd;
   const lim=t.kva==null?null:t.kva-t.gd;
   t.cap=(inv==null&&lim==null)?null:Math.max(0,Math.min(inv??Infinity,lim??Infinity));
   t.lim=inv==null?"sem dado":(lim!=null&&lim<inv?"potência do trafo":"inversão de fluxo");
-});
+});}
+preparar();
 function classe(t,pot){
   if(t.cap==null) return "nd";
   if(pot>0) return t.cap>=pot?"ok":(t.cap>0?"low":"none");
@@ -647,9 +774,13 @@ osm.addTo(map);L.control.layers({"Mapa":osm,"Satélite":sat},null,{position:"top
 
 const capa=L.layerGroup().addTo(map);let marcas=new Map(),pino=null,sel=null;
 const potEl=document.getElementById("pot"),alimEl=document.getElementById("alim"),info=document.getElementById("info");
-[...new Set(D.map(t=>t.alim).filter(Boolean))].sort().forEach(a=>{const o=document.createElement("option");o.value=o.textContent=a;alimEl.append(o)});
+function preencherAlim(){alimEl.length=1;[...new Set(D.map(t=>t.alim).filter(Boolean))].sort().forEach(a=>{const o=document.createElement("option");o.value=o.textContent=a;alimEl.append(o)})}
+preencherAlim();
 
-function visiveis(){const a=alimEl.value;return a?D.filter(t=>t.alim===a):D}
+// base(): filtro de alimentador; visiveis(): base + (se marcado) só trafos com capacidade ≥ GD pretendida
+function base(){const a=alimEl.value;return a?D.filter(t=>t.alim===a):D}
+function filtrando(){return (+potEl.value||0)>0&&filtraEl.checked}
+function visiveis(){const v=base(),pot=+potEl.value||0;return filtrando()?v.filter(t=>t.cap!=null&&t.cap>=pot):v}
 function desenhar(){
   capa.clearLayers();marcas.clear();const pot=+potEl.value||0;
   visiveis().forEach(t=>{
@@ -659,15 +790,17 @@ function desenhar(){
   });
 }
 function resumo(){
-  const v=visiveis(),pot=+potEl.value||0;const n={ok:0,mid:0,low:0,none:0,nd:0};v.forEach(t=>n[classe(t,pot)]++);
+  const v=base(),pot=+potEl.value||0;const n={ok:0,mid:0,low:0,none:0,nd:0};v.forEach(t=>n[classe(t,pot)]++);
+  const oc=filtrando()?v.length-visiveis().length:0;
   const gd=v.reduce((s,t)=>s+t.gd,0),kva=v.reduce((s,t)=>s+(t.kva||0),0);
   const r=pot>0?ROTP:ROT;
-  return `<section><h2>${alimEl.value?"Alimentador "+esc(alimEl.value):"Município"}</h2>
+  return `<section><h2>${alimEl.value?"Alimentador "+esc(alimEl.value):(META.muns?esc(META.munNome.split(",")[0]):"Município")}</h2>
   <div class="stats"><div class="stat"><b>${v.length.toLocaleString("pt-BR")}</b><span>trafos</span></div>
   <div class="stat"><b>${fmt(gd/1000,2)}</b><span>MW de GD</span></div>
   <div class="stat"><b>${fmt(kva/1000,2)}</b><span>MVA instalado</span></div></div></section>
   <section><h2>${pot>0?"Para "+fmt(pot)+" kW":"Capacidade disponível"}</h2><div class="legend">
-  ${Object.keys(r).map(k=>`<div><span class="dot" style="background:${COR[k]}"></span>${r[k]} <span class="base">(${n[k]})</span></div>`).join("")}</div></section>`;
+  ${Object.keys(r).map(k=>`<div><span class="dot" style="background:${COR[k]}"></span>${r[k]} <span class="base">(${n[k]})</span></div>`).join("")}</div>
+  ${oc?`<p class="hint">${oc.toLocaleString("pt-BR")} trafos com capacidade abaixo de ${fmt(pot)} kW estão ocultos no mapa.</p>`:""}</section>`;
 }
 function rodape(){return `<p class="note">Estimativa feita a partir da BDGD/ANEEL (data-base ${esc(META.base)}): carga das UCs pela energia mensal e curvas típicas, GD pela potência instalada cadastrada. Capacidade = menor valor entre a carga mínima diurna (×${META.fs}) e a potência do trafo, descontada a GD existente. Serve para triagem; a viabilidade de conexão é definida pela distribuidora.</p>`}
 function ficha(t){
@@ -688,7 +821,7 @@ function listaProx(lat,lon){
   const pot=+potEl.value||0;
   return `<section><h2>Trafos mais próximos do ponto</h2><div class="near">${proximos(lat,lon).map(({t,d})=>
    `<button data-id="${esc(t.id)}"><span class="dot" style="background:${COR[classe(t,pot)]}"></span><span><b class="id">${esc(t.id)}</b><br><span class="d">${fmt(t.kva,1)} kVA · GD ${fmt(t.gd,1)} kW</span></span><span><b>${fmt(t.cap)}</b> <span class="d">kW</span><br><span class="d">${d<1000?Math.round(d)+" m":fmt(d/1000,2)+" km"}</span></span></button>`).join("")}</div>
-   <p class="hint">Distância em linha reta. A conexão segue a rede de BT do trafo que atende o local.</p></section>`;
+   <p class="hint">${filtrando()?"Só trafos que comportam "+fmt(+potEl.value)+" kW. ":""}Distância em linha reta. A conexão segue a rede de BT do trafo que atende o local.</p></section>`;
 }
 let ponto=null,msg="";
 function render(){
@@ -704,12 +837,38 @@ function marcarPonto(lat,lon,rotulo){
   pino=L.marker([lat,lon]).addTo(map).bindTooltip(rotulo||"Ponto consultado");
   const p=proximos(lat,lon,1)[0];sel=p?p.t:null;msg="";desenhar();render();map.setView([lat,lon],18);abrirPainel();
 }
-map.on("click",e=>marcarPonto(e.latlng.lat,e.latlng.lng));
+map.on("click",e=>pontoGlobal(e.latlng.lat,e.latlng.lng));
+// Área inteira: troca de município sob demanda (dados/<código>.json)
+function dentro(b,lat,lon){return b&&lat>=b[0]&&lat<=b[2]&&lon>=b[1]&&lon<=b[3]}
+function distC(b,lat,lon){return (lat-(b[0]+b[2])/2)**2+(lon-(b[1]+b[3])/2)**2}
+async function pontoGlobal(lat,lon,rot){
+  if(META.muns&&!dentro(META.bbox,lat,lon)){
+    const m=META.muns.filter(x=>dentro(x.b,lat,lon)).sort((x,y)=>distC(x.b,lat,lon)-distC(y.b,lat,lon))[0];
+    if(m&&m.c!==META.mun)await carregarMun(m.c,false);
+  }
+  marcarPonto(lat,lon,rot);
+}
+async function carregarMun(c,aj=true){
+  const m=META.muns.find(x=>x.c===c)||META.muns[0];
+  msg="Carregando "+m.n+"…";render();
+  try{const r=await fetch(`dados/${m.c}.json`);if(!r.ok)throw 0;D=await r.json()}
+  catch(e){msg="Não consegui carregar os dados de "+m.n+".";render();return}
+  META.mun=m.c;META.bbox=m.b;META.munNome=m.n+", RS";munEl.value=m.c;
+  document.getElementById("titulo").textContent=m.n;document.title="Capacidade de Hospedagem "+m.n;
+  sel=null;ponto=null;msg="";if(pino){map.removeLayer(pino);pino=null}
+  preparar();preencherAlim();desenhar();render();if(aj)ajustar();
+  try{history.replaceState(null,"","#"+m.c)}catch(e){}
+}
+async function geo(texto,bb){
+  const vb=bb?`&viewbox=${bb[1]},${bb[2]},${bb[3]},${bb[0]}&bounded=1`:"";
+  const r=await fetch(`https://nominatim.openstreetmap.org/search?format=jsonv2&limit=1&countrycodes=br${vb}&q=${encodeURIComponent(texto)}`,{headers:{"Accept-Language":"pt-BR"}});
+  return r.json();
+}
 
 document.getElementById("f").addEventListener("submit",async e=>{
   e.preventDefault();const q=document.getElementById("q").value.trim();if(!q)return;
   const c=q.match(/^\s*(-?\d{1,2}[.,]\d+)\s*[,; ]\s*(-?\d{1,3}[.,]\d+)\s*$/);
-  if(c){marcarPonto(+c[1].replace(",","."),+c[2].replace(",","."));return}
+  if(c){pontoGlobal(+c[1].replace(",","."),+c[2].replace(",","."));return}
   const up=q.toUpperCase();
   const t=D.find(x=>String(x.id).toUpperCase()===up)||D.find(x=>String(x.id).toUpperCase().includes(up)&&up.length>=3);
   if(t){abrir(t);return}
@@ -717,21 +876,29 @@ document.getElementById("f").addEventListener("submit",async e=>{
   if(a){alimEl.value=a.value;sel=null;ponto=null;desenhar();render();ajustar();return}
   msg="Buscando endereço…";render();
   try{
-    const vb=META.bbox?`&viewbox=${META.bbox[1]},${META.bbox[2]},${META.bbox[3]},${META.bbox[0]}&bounded=1`:"";
-    const r=await fetch(`https://nominatim.openstreetmap.org/search?format=jsonv2&limit=1&countrycodes=br${vb}&q=${encodeURIComponent(q+", "+META.munNome)}`,{headers:{"Accept-Language":"pt-BR"}});
-    const j=await r.json();
-    if(j.length){marcarPonto(+j[0].lat,+j[0].lon,j[0].display_name)}
+    let j=await geo(q+", "+META.munNome,META.bbox);
+    if(!j.length&&META.muns)j=await geo(q+", RS",META.bboxAll);
+    if(j.length){await pontoGlobal(+j[0].lat,+j[0].lon,j[0].display_name)}
     else{msg="Endereço não encontrado. Tente rua e número, ou cole a coordenada (ex.: -29.6842, -53.8069).";render()}
   }catch(err){msg="Não consegui buscar o endereço agora (sem internet?). Cole a coordenada ou clique no mapa.";render()}
 });
-potEl.addEventListener("input",()=>{desenhar();render()});
+const filtraEl=document.getElementById("filtra"),filtraRow=document.getElementById("filtraRow");
+function aoMudarPot(){filtraRow.hidden=!((+potEl.value||0)>0);if(ponto){const p=proximos(ponto[0],ponto[1],1)[0];if(sel&&!visiveis().includes(sel))sel=p?p.t:null}desenhar();render()}
+potEl.addEventListener("input",aoMudarPot);filtraEl.addEventListener("change",aoMudarPot);
 alimEl.addEventListener("change",()=>{sel=null;desenhar();render();ajustar()});
 const side=document.getElementById("side"),tog=document.getElementById("tog");
 tog.onclick=()=>{side.classList.toggle("min");tog.setAttribute("aria-expanded",!side.classList.contains("min"));setTimeout(()=>map.invalidateSize(),50)};
 function abrirPainel(){if(side.classList.contains("min")){side.classList.remove("min");setTimeout(()=>map.invalidateSize(),50)}}
 function ajustar(){const v=visiveis();if(v.length)map.fitBounds(v.map(t=>[t.lat,t.lon]),{padding:[20,20]})}
 matchMedia("(prefers-color-scheme:dark)").addEventListener?.("change",()=>desenhar());
-desenhar();render();ajustar();
+const munEl=document.getElementById("mun");
+if(META.muns){
+  document.getElementById("munRow").style.display="";
+  META.muns.forEach(m=>{const o=document.createElement("option");o.value=m.c;o.textContent=m.n;munEl.append(o)});
+  munEl.addEventListener("change",()=>carregarMun(munEl.value));
+  const b=META.bboxAll;map.fitBounds([[b[0],b[1]],[b[2],b[3]]]);
+  const h=location.hash.slice(1);carregarMun(META.muns.some(m=>m.c===h)?h:META.default);
+}else{desenhar();render();ajustar()}
 </script>
 </body>
 </html>

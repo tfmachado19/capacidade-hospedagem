@@ -1,7 +1,12 @@
-# Capacidade de Hospedagem de GD — Santa Maria/RS
+# Capacidade de Hospedagem de GD — área da RGE
 
 Plataforma de consulta da capacidade estimada de cada transformador de distribuição
-de Santa Maria/RS (IBGE 4316907) para receber nova geração distribuída (GD).
+da área atendida pela RGE (376 municípios do RS) para receber nova geração distribuída
+(GD). Abre em Santa Maria; troque o município no seletor, pela busca ou pelo link
+`#<código IBGE>` (ex.: `.../capacidade-hospedagem/#4305108` = Caxias do Sul).
+
+Ao informar a "GD pretendida", o mapa mostra só os trafos cuja capacidade disponível
+estimada comporta essa potência (dá para desligar o filtro).
 
 Site: https://tfmachado19.github.io/capacidade-hospedagem
 
@@ -27,16 +32,18 @@ de inversão de fluxo da distribuidora.
    vem como energia do melhor mês ÷ 720 h (geração média), e não como potência
    instalada. O script cruza cada UG pelo código `CEG_GD` e usa a potência oficial.
 
-4. Rode o script (pode passar o .zip direto):
+4. Rode o script para a área inteira (pode passar o .zip direto; leva uns 4 min):
 
-       py scripts/trafos_bdgd.py "C:\caminho\RGE_396_xxxx.zip" --mun 4316907 --gd-aneel "C:\caminho\empreendimento-geracao-distribuida.parquet"
+       py scripts/trafos_bdgd.py "C:\caminho\RGE_396_xxxx.zip" --mun todos --mun-nome RGE --gd-aneel "C:\caminho\empreendimento-geracao-distribuida.parquet"
 
-   Ele gera `BDGD_trafos_4316907.xlsx` e `Capacidade_Hospedagem_4316907.html`.
+   Ele gera `BDGD_trafos_todos.xlsx` (abas Transformadores, Municípios, Alimentadores,
+   Resumo, Leia-me) e a pasta `site_todos/` (`index.html` + `dados/<código IBGE>.json`).
+   Com `--mun 4316907` gera só um município, num HTML único que abre direto do disco.
 
 5. Confira a aba **Resumo** da planilha. Se "POT_NOM em valores comerciais de kVA"
    ficar abaixo de 80%, o campo pode estar codificado: veja a coluna "POT_NOM (bruto)".
    Confira também a linha "Fonte da potência da GD" (deve citar a base da ANEEL).
 
-6. Renomeie `Capacidade_Hospedagem_4316907.html` para `index.html`, substitua o arquivo
-   na raiz do repositório e faça commit/push na `main`. O GitHub Pages publica em
+6. Copie o conteúdo de `site_todos/` (o `index.html` e a pasta `dados/`) para a raiz do
+   repositório, substituindo os atuais, e faça commit/push na `main`. O GitHub Pages publica em
    alguns minutos. Não envie a planilha nem o zip.
