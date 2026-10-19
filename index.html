@@ -41,6 +41,7 @@ button:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid 
 .row input,.row select{padding:7px 9px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--ink);font:inherit;min-width:0}
 #pot{width:90px;font-family:var(--mono)}
 #alim,#mun{flex:1}
+#kvaMin,#kvaMax{flex:1;font-family:var(--mono)}
 .chk{display:flex;gap:8px;align-items:center;font-size:13px;color:var(--muted)}
 .chk[hidden]{display:none}
 .chk input{width:18px;height:18px;accent-color:var(--accent)}
@@ -106,6 +107,13 @@ dt{color:var(--muted)} dd{margin:0;font-family:var(--mono);font-variant-numeric:
       <label for="alim">Alimentador</label>
       <select id="alim"><option value="">Todos</option></select>
     </div>
+    <div class="row">
+      <label for="kvaMin">Trafo de</label>
+      <select id="kvaMin"><option value="">mín.</option></select>
+      <label for="kvaMax">até</label>
+      <select id="kvaMax"><option value="">máx.</option></select>
+      <span class="base">kVA</span>
+    </div>
     <label class="chk"><input type="checkbox" id="uc1"> Só trafos com 1 unidade consumidora</label>
     <label class="chk"><input type="checkbox" id="limAlim" checked> Considerar também o limite do alimentador</label>
     <label class="chk" id="filtraRow" hidden><input type="checkbox" id="filtra" checked> Mostrar só os trafos que comportam a GD pretendida</label>
@@ -123,6 +131,8 @@ const fmt=(v,d=1)=>v==null||isNaN(v)?"–":Number(v).toLocaleString("pt-BR",{min
 const esc=s=>String(s??"").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
 
 // capacidade disponível estimada = menor entre (carga mín. diurna × fs − GD) e (kVA − GD)
+const kvaMinEl=document.getElementById("kvaMin"),kvaMaxEl=document.getElementById("kvaMax");
+const fmtK=v=>fmt(v,v%1?1:0);
 function preparar(){D.forEach(t=>{
   const inv=t.cmin==null?null:t.cmin*META.fs-t.gd;
   const lim=t.kva==null?null:t.kva-t.gd;
@@ -148,11 +158,22 @@ osm.addTo(map);L.control.layers({"Mapa":osm,"Satélite":sat},null,{position:"top
 
 const capa=L.layerGroup().addTo(map);let marcas=new Map(),pino=null,sel=null;
 const potEl=document.getElementById("pot"),alimEl=document.getElementById("alim"),info=document.getElementById("info");
-function preencherAlim(){alimEl.length=1;[...new Set(D.map(t=>t.alim).filter(Boolean))].sort().forEach(a=>{const o=document.createElement("option");o.value=o.textContent=a;alimEl.append(o)})}
+// faixas de potência (kVA) presentes no município; mantém a escolha se o valor existir
+function preencherKva(){
+  const vs=[...new Set(D.map(t=>t.kva).filter(v=>v!=null))].sort((a,b)=>a-b);
+  for(const el of [kvaMinEl,kvaMaxEl]){const ant=el.value;el.length=1;
+    vs.forEach(v=>{const o=document.createElement("option");o.value=v;o.textContent=fmtK(v);el.append(o)});
+    el.value=vs.includes(+ant)?ant:""}
+}
+function preencherAlim(){preencherKva();alimEl.length=1;[...new Set(D.map(t=>t.alim).filter(Boolean))].sort().forEach(a=>{const o=document.createElement("option");o.value=o.textContent=a;alimEl.append(o)})}
 preencherAlim();
 
 // base(): filtro de alimentador; visiveis(): base + (se marcado) só trafos com capacidade ≥ GD pretendida
-function base(){const a=alimEl.value,u=uc1El.checked;return (a||u)?D.filter(t=>(!a||t.alim===a)&&(!u||t.ucs===1)):D}
+function base(){
+  const a=alimEl.value,u=uc1El.checked,k0=kvaMinEl.value===""?null:+kvaMinEl.value,k1=kvaMaxEl.value===""?null:+kvaMaxEl.value;
+  if(!a&&!u&&k0==null&&k1==null)return D;
+  return D.filter(t=>(!a||t.alim===a)&&(!u||t.ucs===1)&&(k0==null||(t.kva!=null&&t.kva>=k0))&&(k1==null||(t.kva!=null&&t.kva<=k1)));
+}
 function filtrando(){return (+potEl.value||0)>0&&filtraEl.checked}
 function visiveis(){const v=base(),pot=+potEl.value||0;return filtrando()?v.filter(t=>t.cap!=null&&t.cap>=pot):v}
 function desenhar(){
@@ -175,7 +196,8 @@ function resumo(){
   <div class="stat"><b>${fmt(kva/1000,2)}</b><span>MVA instalado</span></div></div>
   ${alimEl.value&&v.length?`<dl><dt>Carregamento do alimentador</dt><dd>${fmt(ca)} %</dd><dt>GD no alimentador</dt><dd>${fmt(v[0].gda,0)} kW</dd>
   <dt>Carregamento de GD do alimentador</dt><dd>${fmt(v[0].cga)} %</dd><dt>Capacidade p/ nova GD no alimentador</dt><dd>${fmt(v[0].capa,0)} kW</dd></dl>`:""}
-  ${uc1El.checked?`<p class="hint">Mostrando só trafos com 1 unidade consumidora.</p>`:""}</section>
+  ${uc1El.checked?`<p class="hint">Mostrando só trafos com 1 unidade consumidora.</p>`:""}
+  ${kvaMinEl.value||kvaMaxEl.value?`<p class="hint">Trafos de ${kvaMinEl.value?fmtK(+kvaMinEl.value):"qualquer"} a ${kvaMaxEl.value?fmtK(+kvaMaxEl.value):"qualquer"} kVA.</p>`:""}</section>
   <section><h2>${pot>0?"Para "+fmt(pot)+" kW":"Capacidade disponível"}</h2><div class="legend">
   ${Object.keys(r).map(k=>`<div><span class="dot" style="background:${COR[k]}"></span>${r[k]} <span class="base">(${n[k]})</span></div>`).join("")}</div>
   ${oc?`<p class="hint">${oc.toLocaleString("pt-BR")} trafos com capacidade abaixo de ${fmt(pot)} kW estão ocultos no mapa.</p>`:""}</section>`;
@@ -267,6 +289,7 @@ document.getElementById("f").addEventListener("submit",async e=>{
 const uc1El=document.getElementById("uc1"),filtraEl=document.getElementById("filtra"),filtraRow=document.getElementById("filtraRow");
 function aoMudarPot(){filtraRow.hidden=!((+potEl.value||0)>0);if(ponto){const p=proximos(ponto[0],ponto[1],1)[0];if(sel&&!visiveis().includes(sel))sel=p?p.t:null}desenhar();render()}
 potEl.addEventListener("input",aoMudarPot);uc1El.addEventListener("change",aoMudarPot);
+kvaMinEl.addEventListener("change",aoMudarPot);kvaMaxEl.addEventListener("change",aoMudarPot);
 document.getElementById("limAlim").addEventListener("change",()=>{preparar();aoMudarPot()});filtraEl.addEventListener("change",aoMudarPot);
 alimEl.addEventListener("change",()=>{sel=null;desenhar();render();ajustar()});
 const side=document.getElementById("side"),tog=document.getElementById("tog");

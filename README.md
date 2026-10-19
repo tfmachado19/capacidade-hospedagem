@@ -7,7 +7,8 @@ da área atendida pela RGE (376 municípios do RS) para receber nova geração d
 
 Ao informar a "GD pretendida", o mapa mostra só os trafos cuja capacidade disponível
 estimada comporta essa potência (dá para desligar o filtro).
-A opção "Só trafos com 1 unidade consumidora" restringe o mapa a esses trafos.
+A opção "Só trafos com 1 unidade consumidora" restringe o mapa a esses trafos. O filtro "Trafo de … até … kVA"
+limita o mapa a uma faixa de potência do transformador.
 
 Cada trafo mostra também o carregamento estimado do seu alimentador: demanda de pico
 (energia injetada no mês de maior energia, da BDGD/CTMT, × fator de pico das curvas
