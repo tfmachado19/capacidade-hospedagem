@@ -107,6 +107,7 @@ dt{color:var(--muted)} dd{margin:0;font-family:var(--mono);font-variant-numeric:
       <select id="alim"><option value="">Todos</option></select>
     </div>
     <label class="chk"><input type="checkbox" id="uc1"> Só trafos com 1 unidade consumidora</label>
+    <label class="chk"><input type="checkbox" id="limAlim" checked> Considerar também o limite do alimentador</label>
     <label class="chk" id="filtraRow" hidden><input type="checkbox" id="filtra" checked> Mostrar só os trafos que comportam a GD pretendida</label>
   </header>
   <div class="scroll" id="info"></div>
@@ -125,8 +126,11 @@ const esc=s=>String(s??"").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&g
 function preparar(){D.forEach(t=>{
   const inv=t.cmin==null?null:t.cmin*META.fs-t.gd;
   const lim=t.kva==null?null:t.kva-t.gd;
-  t.cap=(inv==null&&lim==null)?null:Math.max(0,Math.min(inv??Infinity,lim??Infinity));
-  t.lim=inv==null?"sem dado":(lim!=null&&lim<inv?"potência do trafo":"inversão de fluxo");
+  t.capt=(inv==null&&lim==null)?null:Math.max(0,Math.min(inv??Infinity,lim??Infinity));
+  t.limt=inv==null?"sem dado":(lim!=null&&lim<inv?"potência do trafo":"inversão de fluxo");
+  // com a opção marcada, a capacidade também fica limitada pela do alimentador
+  const ua=document.getElementById("limAlim").checked&&t.capa!=null;
+  if(ua&&(t.capt==null||t.capa<t.capt)){t.cap=t.capa;t.lim="alimentador"}else{t.cap=t.capt;t.lim=t.limt}
 });}
 preparar();
 function classe(t,pot){
@@ -169,13 +173,14 @@ function resumo(){
   <div class="stats"><div class="stat"><b>${v.length.toLocaleString("pt-BR")}</b><span>trafos</span></div>
   <div class="stat"><b>${fmt(gd/1000,2)}</b><span>MW de GD</span></div>
   <div class="stat"><b>${fmt(kva/1000,2)}</b><span>MVA instalado</span></div></div>
-  ${alimEl.value?`<p class="hint">Carregamento estimado do alimentador: <b>${fmt(ca)} %</b></p>`:""}
+  ${alimEl.value&&v.length?`<dl><dt>Carregamento do alimentador</dt><dd>${fmt(ca)} %</dd><dt>GD no alimentador</dt><dd>${fmt(v[0].gda,0)} kW</dd>
+  <dt>Carregamento de GD do alimentador</dt><dd>${fmt(v[0].cga)} %</dd><dt>Capacidade p/ nova GD no alimentador</dt><dd>${fmt(v[0].capa,0)} kW</dd></dl>`:""}
   ${uc1El.checked?`<p class="hint">Mostrando só trafos com 1 unidade consumidora.</p>`:""}</section>
   <section><h2>${pot>0?"Para "+fmt(pot)+" kW":"Capacidade disponível"}</h2><div class="legend">
   ${Object.keys(r).map(k=>`<div><span class="dot" style="background:${COR[k]}"></span>${r[k]} <span class="base">(${n[k]})</span></div>`).join("")}</div>
   ${oc?`<p class="hint">${oc.toLocaleString("pt-BR")} trafos com capacidade abaixo de ${fmt(pot)} kW estão ocultos no mapa.</p>`:""}</section>`;
 }
-function rodape(){return `<p class="note">Estimativa feita a partir da BDGD/ANEEL (data-base ${esc(META.base)}): carga das UCs pela energia mensal e curvas típicas, GD pela potência instalada cadastrada. Capacidade = menor valor entre a carga mínima diurna (×${META.fs}) e a potência do trafo, descontada a GD existente. Serve para triagem; a viabilidade de conexão é definida pela distribuidora.</p>`}
+function rodape(){return `<p class="note">Estimativa feita a partir da BDGD/ANEEL (data-base ${esc(META.base)}): carga das UCs pela energia mensal e curvas típicas, GD pela potência instalada cadastrada. Capacidade = menor valor entre a carga mínima diurna (×${META.fs}) e a potência do trafo, descontada a GD existente; com a opção marcada, limitada também pela capacidade do alimentador (carga mínima diurna do alimentador e capacidade do condutor de saída, descontada a GD em BT e MT). Serve para triagem; a viabilidade de conexão é definida pela distribuidora.</p>`}
 function ficha(t){
   const pot=+potEl.value||0,k=classe(t,pot),r=pot>0?ROTP:ROT;
   return `<div class="card"><div class="top"><span class="id">${esc(t.id)}</span><span class="pill" style="background:${COR[k]}">${r[k]}</span></div>
@@ -184,7 +189,11 @@ function ficha(t){
   <dt>Potência do trafo</dt><dd>${fmt(t.kva,1)} kVA</dd><dt>GD instalada</dt><dd>${fmt(t.gd,2)} kW</dd>
   <dt>Unidades geradoras</dt><dd>${t.ugs}</dd><dt>Unidades consumidoras</dt><dd>${t.ucs}</dd>
   <dt>Carga mín. diurna</dt><dd>${fmt(t.cmin,2)} kW</dd><dt>Demanda de pico</dt><dd>${fmt(t.pico,2)} kW</dd>
-  <dt>Carregamento do trafo</dt><dd>${fmt(t.car)} %</dd><dt>Carregamento do alimentador</dt><dd>${fmt(t.ca)} %</dd><dt>GD / trafo</dt><dd>${fmt(t.kva?t.gd/t.kva*100:null)} %</dd></dl>
+  <dt>Carregamento do trafo</dt><dd>${fmt(t.car)} %</dd><dt>GD / trafo</dt><dd>${fmt(t.kva?t.gd/t.kva*100:null)} %</dd>
+  <dt>Capacidade só do trafo</dt><dd>${fmt(t.capt)} kW</dd></dl>
+  <div class="base">Alimentador ${esc(t.alim||"–")}</div>
+  <dl><dt>Carregamento do alimentador</dt><dd>${fmt(t.ca)} %</dd><dt>GD no alimentador</dt><dd>${fmt(t.gda,0)} kW</dd>
+  <dt>Carregamento de GD do alimentador</dt><dd>${fmt(t.cga)} %</dd><dt>Capacidade p/ nova GD no alimentador</dt><dd>${fmt(t.capa,0)} kW</dd></dl>
   <div class="links"><a href="https://www.google.com/maps?q=${t.lat},${t.lon}" target="_blank" rel="noopener">Abrir no Google Maps</a>
   <span class="base">${t.lat.toFixed(6)}, ${t.lon.toFixed(6)}</span></div></div>`;
 }
@@ -257,7 +266,8 @@ document.getElementById("f").addEventListener("submit",async e=>{
 });
 const uc1El=document.getElementById("uc1"),filtraEl=document.getElementById("filtra"),filtraRow=document.getElementById("filtraRow");
 function aoMudarPot(){filtraRow.hidden=!((+potEl.value||0)>0);if(ponto){const p=proximos(ponto[0],ponto[1],1)[0];if(sel&&!visiveis().includes(sel))sel=p?p.t:null}desenhar();render()}
-potEl.addEventListener("input",aoMudarPot);uc1El.addEventListener("change",aoMudarPot);filtraEl.addEventListener("change",aoMudarPot);
+potEl.addEventListener("input",aoMudarPot);uc1El.addEventListener("change",aoMudarPot);
+document.getElementById("limAlim").addEventListener("change",()=>{preparar();aoMudarPot()});filtraEl.addEventListener("change",aoMudarPot);
 alimEl.addEventListener("change",()=>{sel=null;desenhar();render();ajustar()});
 const side=document.getElementById("side"),tog=document.getElementById("tog");
 tog.onclick=()=>{side.classList.toggle("min");tog.setAttribute("aria-expanded",!side.classList.contains("min"));setTimeout(()=>map.invalidateSize(),50)};
