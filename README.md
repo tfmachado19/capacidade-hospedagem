@@ -23,6 +23,11 @@ alimentador usa a energia medida na saída (já líquida da GD) somada à geraç
 da GD. A opção "Só trafos cujo alimentador comporta a GD pretendida" mostra só os trafos
 cujo alimentador tem capacidade para nova GD maior ou igual à GD informada.
 
+Ao abrir um trafo, o mapa desenha a rede BT dele (camada SSDBT da BDGD) e marca em
+amarelo os postes com GD (UGBT ligadas pelo ponto de conexão PN_CON → PONNOT), com a
+potência somada por poste. A posição é a do poste, não a da unidade. Esses dados ficam em
+`dados/bt/<alimentador>.json` e são baixados só quando um trafo é aberto.
+
 Site: https://tfmachado19.github.io/capacidade-hospedagem
 
 Os dados vêm da BDGD (Base de Dados Geográfica da Distribuidora) da RGE, publicada
