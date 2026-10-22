@@ -65,6 +65,8 @@ CAND = {
     "ugmt": ["UGMT_tab", "UGMT"],
     "ssdmt": ["SSDMT"],
     "segcon": ["SEGCON"],
+    "ssdbt": ["SSDBT"],
+    "ponnot": ["PONNOT"],
 }
 # Tabela TTEN da ANEEL (só as tensões de MT usadas nos alimentadores)
 TTEN_KV = {"49": 13.8, "63": 23.0}
@@ -448,6 +450,58 @@ def salvar_plataforma(df, arq, meta):
     Path(arq).write_text(_html(_js(_registros(pts)), meta, meta["munNome"].split(",")[0]), encoding="utf-8")
 
 
+def nome_arq(c):
+    return re.sub(r"[^\w.-]", "_", str(c)) or "_"
+
+
+def salvar_redes_bt(gdb, L, pasta, df, ug):
+    """dados/bt/<alimentador>.json: para cada trafo, a rede BT (SSDBT) e os postes com GD (UGBT → PONNOT).
+    Linhas: [x0, y0, dx1, dy1, ...] em graus × 1e5 (≈ 1 m), com diferenças entre pontos para encolher.
+    GD: [lat, lon, kW, nº de UGs] por poste."""
+    import shapely
+    if not L.get("ssdbt"):
+        log("  (sem camada SSDBT: rede BT não gerada)")
+        return 0
+    pasta = Path(pasta) / "dados" / "bt"
+    pasta.mkdir(parents=True, exist_ok=True)
+    alim_de = dict(zip(df["Transformador (COD_ID)"].astype(str), df["Alimentador (CTMT)"].fillna("").astype(str)))
+    redes = {}
+    sd = ler(gdb, L["ssdbt"], ["UNI_TR_MT", "COMP"], geom=True)
+    sd["UNI_TR_MT"] = txt(sd["UNI_TR_MT"])
+    sd = sd[sd["UNI_TR_MT"].isin(alim_de.keys())]
+    if sd.crs is not None and sd.crs.to_epsg() != 4326:
+        sd = sd.to_crs(4326)
+    sd = sd.explode(index_parts=False).reset_index(drop=True)
+    xy, idx = shapely.get_coordinates(sd.geometry.values, return_index=True)
+    q = np.round(xy * 1e5).astype(np.int64)
+    corte = np.flatnonzero(np.diff(idx)) + 1
+    for tr_id, pts in zip(sd["UNI_TR_MT"].to_numpy()[idx[np.r_[0, corte]]] if len(idx) else [], np.split(q, corte)):
+        d = np.diff(pts, axis=0)
+        redes.setdefault(tr_id, {"l": [], "g": [], "km": 0.0})["l"].append(
+            [int(pts[0, 0]), int(pts[0, 1])] + d.ravel().tolist())
+    km = pd.to_numeric(sd["COMP"], errors="coerce").groupby(sd["UNI_TR_MT"]).sum() / 1000
+    for k, v in km.items():
+        redes[k]["km"] = round(float(v), 2)
+    if L.get("ponnot") and "PN_CON" in ug.columns:
+        pn = ler(gdb, L["ponnot"], ["COD_ID"], geom=True)
+        if pn.crs is not None and pn.crs.to_epsg() != 4326:
+            pn = pn.to_crs(4326)
+        pn = pd.DataFrame({"PN": txt(pn["COD_ID"]), "lat": pn.geometry.y, "lon": pn.geometry.x})
+        g = ug.assign(PN=txt(ug["PN_CON"])).merge(pn, on="PN", how="inner")
+        g = g[g["TRAFO"].isin(alim_de.keys())]
+        g = g.groupby(["TRAFO", "PN"]).agg(lat=("lat", "first"), lon=("lon", "first"),
+                                           kw=("POT_KW", "sum"), n=("POT_KW", "size")).reset_index()
+        for r in g.itertuples(index=False):
+            redes.setdefault(r.TRAFO, {"l": [], "g": [], "km": 0.0})["g"].append(
+                [round(r.lat, 6), round(r.lon, 6), round(float(r.kw), 2), int(r.n)])
+    por_alim = {}
+    for tr_id, v in redes.items():
+        por_alim.setdefault(nome_arq(alim_de.get(tr_id, "")), {})[tr_id] = v
+    for a, d in por_alim.items():
+        (pasta / f"{a}.json").write_text(_js(d), encoding="utf-8")
+    return len(redes)
+
+
 def salvar_site(df, pasta, meta, padrao="4316907"):
     """Área inteira: index.html + dados/<código IBGE>.json (carregado sob demanda por município).
     Precisa ser servido por HTTP (GitHub Pages); aberto direto do disco o navegador bloqueia o fetch."""
@@ -486,6 +540,16 @@ def main():
     todos = a.mun.strip().lower() in ("todos", "all", "*")
     mun = None if todos else a.mun.strip()
     nomes = nomes_ibge()
+    if not nomes and a.gd_aneel:                       # sem IBGE: nomes da base de GD da ANEEL
+        try:
+            cols = ["CodMunicipioIbge", "NomMunicipio", "SigUF"]
+            d = pd.read_parquet(a.gd_aneel, columns=cols) if str(a.gd_aneel).lower().endswith(".parquet") \
+                else pd.read_csv(a.gd_aneel, sep=";", usecols=cols, encoding="latin-1", dtype=str)
+            d = d.dropna().drop_duplicates("CodMunicipioIbge")
+            nomes = {str(int(c)): (n, u) for c, n, u in zip(d["CodMunicipioIbge"], d["NomMunicipio"], d["SigUF"])}
+            log(f"  nomes de {len(nomes):,} municípios pela base de GD da ANEEL")
+        except Exception as e:
+            log(f"  (nomes pela base ANEEL indisponíveis: {e})")
 
     gdb, nome_gdb = abrir_gdb(a.bdgd)
     saida = Path(a.saida) if a.saida else Path(a.bdgd).resolve().parent
@@ -533,7 +597,7 @@ def main():
     # 3) Geração distribuída em BT
     log("Lendo unidades geradoras (GD) de BT ...")
     ug = ler(gdb, L["ug"], ["COD_ID", "MUN", "SIT_ATIV", "UNI_TR_MT", "UNI_TR_D", "CTMT",
-                            "POT_INST", "CEG_GD", "DAT_CON"] + ENE)
+                            "POT_INST", "CEG_GD", "DAT_CON", "PN_CON"] + ENE)
     cg = col_trafo(ug)
     ug["TRAFO"] = txt(ug[cg]) if cg else ""
     if "SIT_ATIV" in ug.columns:
@@ -792,6 +856,8 @@ def main():
         site = saida / "site_todos"
         meta.update(munNome="Rio Grande do Sul", titulo=a.mun_nome or "Área de concessão")
         n_mun = salvar_site(df, site, meta)
+        log("Gerando rede BT e postes com GD por trafo ...")
+        log(f"  rede BT de {salvar_redes_bt(gdb, L, site, df, ug):,} trafos em {site / 'dados' / 'bt'}")
         log(f"Site com {n_mun} municípios salvo em {site} (publique o conteúdo da pasta)")
     else:
         nm, uf = nomes.get(mun.lstrip("0"), (mun, ""))
@@ -961,6 +1027,24 @@ const sat=L.tileLayer("https://server.arcgisonline.com/ArcGIS/rest/services/Worl
 osm.addTo(map);L.control.layers({"Mapa":osm,"Satélite":sat},null,{position:"topright"}).addTo(map);
 
 const capa=L.layerGroup().addTo(map);let marcas=new Map(),pino=null,sel=null;
+// Rede BT do trafo selecionado + postes com GD (dados/bt/<alimentador>.json, sob demanda)
+const rede=L.layerGroup().addTo(map),btCache={};
+async function mostrarRede(t){
+  rede.clearLayers();
+  if(!t||!META.muns||!t.alim)return;
+  const f=String(t.alim).replace(/[^\w.-]/g,"_");
+  try{if(!(f in btCache)){const r=await fetch(`dados/bt/${f}.json`);btCache[f]=r.ok?await r.json():{}}}catch(e){return}
+  const d=btCache[f][t.id];if(sel!==t)return;
+  t.bt=d?{km:d.km,np:d.g.length,kw:d.g.reduce((s,p)=>s+p[2],0)}:{km:0,np:0,kw:0};
+  if(d){
+    const cor=cssVar("--accent");
+    d.l.forEach(a=>{let x=a[0],y=a[1];const pts=[[y/1e5,x/1e5]];for(let i=2;i<a.length;i+=2){x+=a[i];y+=a[i+1];pts.push([y/1e5,x/1e5])}
+      L.polyline(pts,{color:cor,weight:4,opacity:.8,interactive:false}).addTo(rede)});
+    d.g.forEach(p=>L.circleMarker([p[0],p[1]],{radius:7,color:"#5a2d00",weight:2,fillColor:"#ffcc00",fillOpacity:1})
+      .bindTooltip(`GD ${fmt(p[2])} kW · ${p[3]} UG${p[3]>1?"s":""} neste poste`).addTo(rede));
+  }
+  render();
+}
 const potEl=document.getElementById("pot"),alimEl=document.getElementById("alim"),info=document.getElementById("info");
 // faixas de potência (kVA) presentes no município; mantém a escolha se o valor existir
 function preencherKva(){
@@ -983,6 +1067,7 @@ function base(){
 function filtrando(){return (+potEl.value||0)>0&&filtraEl.checked}
 function visiveis(){const v=base(),pot=+potEl.value||0;return filtrando()?v.filter(t=>t.cap!=null&&t.cap>=pot):v}
 function desenhar(){
+  if(!sel)rede.clearLayers();
   capa.clearLayers();marcas.clear();const pot=+potEl.value||0;
   visiveis().forEach(t=>{
     const k=classe(t,pot),c=hex(k);
@@ -1023,6 +1108,7 @@ function ficha(t){
   <div class="base">Alimentador ${esc(t.alim||"–")}</div>
   <dl><dt>Carregamento do alimentador</dt><dd>${fmt(t.ca)} %</dd><dt>GD no alimentador</dt><dd>${fmt(t.gda,0)} kW</dd>
   <dt>Carregamento de GD do alimentador</dt><dd>${fmt(t.cga)} %</dd><dt>Capacidade p/ nova GD no alimentador</dt><dd>${fmt(t.capa,0)} kW</dd></dl>
+  ${t.bt?`<div class="base">Rede BT no mapa: ${fmt(t.bt.km,2)} km · ${t.bt.np} poste${t.bt.np===1?"":"s"} com GD (${fmt(t.bt.kw)} kW) <span class="dot" style="display:inline-block;vertical-align:middle;background:#ffcc00"></span></div>`:(META.muns?`<div class="base">Carregando rede BT…</div>`:"")}
   <div class="links"><a href="https://www.google.com/maps?q=${t.lat},${t.lon}" target="_blank" rel="noopener">Abrir no Google Maps</a>
   <span class="base">${t.lat.toFixed(6)}, ${t.lon.toFixed(6)}</span></div></div>`;
 }
@@ -1042,11 +1128,11 @@ function render(){
   h+=resumo()+rodape();info.innerHTML=h;
   info.querySelectorAll(".near button").forEach(b=>b.onclick=()=>abrir(D.find(t=>t.id===b.dataset.id)));
 }
-function abrir(t,voar=true){sel=t;msg="";desenhar();render();if(voar)map.setView([t.lat,t.lon],Math.max(map.getZoom(),17));info.scrollTop=0;abrirPainel()}
+function abrir(t,voar=true){sel=t;msg="";desenhar();render();mostrarRede(t);if(voar)map.setView([t.lat,t.lon],Math.max(map.getZoom(),17));info.scrollTop=0;abrirPainel()}
 function marcarPonto(lat,lon,rotulo){
   ponto=[lat,lon];if(pino)map.removeLayer(pino);
   pino=L.marker([lat,lon]).addTo(map).bindTooltip(rotulo||"Ponto consultado");
-  const p=proximos(lat,lon,1)[0];sel=p?p.t:null;msg="";desenhar();render();map.setView([lat,lon],18);abrirPainel();
+  const p=proximos(lat,lon,1)[0];sel=p?p.t:null;msg="";desenhar();render();mostrarRede(sel);map.setView([lat,lon],18);abrirPainel();
 }
 map.on("click",e=>pontoGlobal(e.latlng.lat,e.latlng.lng));
 // Área inteira: troca de município sob demanda (dados/<código>.json)
