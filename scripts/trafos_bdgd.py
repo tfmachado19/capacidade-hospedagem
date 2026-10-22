@@ -1108,7 +1108,7 @@ function ficha(t){
   <div class="base">Alimentador ${esc(t.alim||"–")}</div>
   <dl><dt>Carregamento do alimentador</dt><dd>${fmt(t.ca)} %</dd><dt>GD no alimentador</dt><dd>${fmt(t.gda,0)} kW</dd>
   <dt>Carregamento de GD do alimentador</dt><dd>${fmt(t.cga)} %</dd><dt>Capacidade p/ nova GD no alimentador</dt><dd>${fmt(t.capa,0)} kW</dd></dl>
-  ${t.bt?`<div class="base">Rede BT no mapa: ${fmt(t.bt.km,2)} km · ${t.bt.np} poste${t.bt.np===1?"":"s"} com GD (${fmt(t.bt.kw)} kW) <span class="dot" style="display:inline-block;vertical-align:middle;background:#ffcc00"></span></div>`:(META.muns?`<div class="base">Carregando rede BT…</div>`:"")}
+  ${t.bt&&!t.bt.km&&!t.bt.np?`<div class="base">Sem rede BT nem GD cadastradas para este trafo na BDGD.</div>`:t.bt?`<div class="base">Rede BT no mapa: ${fmt(t.bt.km,2)} km · ${t.bt.np} poste${t.bt.np===1?"":"s"} com GD (${fmt(t.bt.kw)} kW) <span class="dot" style="display:inline-block;vertical-align:middle;background:#ffcc00"></span></div>`:(META.muns?`<div class="base">Carregando rede BT…</div>`:"")}
   <div class="links"><a href="https://www.google.com/maps?q=${t.lat},${t.lon}" target="_blank" rel="noopener">Abrir no Google Maps</a>
   <span class="base">${t.lat.toFixed(6)}, ${t.lon.toFixed(6)}</span></div></div>`;
 }
