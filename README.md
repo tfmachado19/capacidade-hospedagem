@@ -81,5 +81,10 @@ UCMT_PJ da ANEEL (página da BDGD no portal de dados abertos), a BDGD e a planil
 Com `--site .` (raiz do repositório) ele grava também `dados/emp/<código IBGE>.json`, usado
 pela seção "Prospecção de empresas" do site: filtros por atividade, consumo mínimo, BT/MT,
 GD e se a rede comporta, ficha da empresa e botão para baixar a lista filtrada em CSV.
+Cada empresa traz o consumo médio dos 12 meses e o Pg para afastamento da análise de
+inversão de fluxo: Pg = consumo médio ÷ (16% × 24 h × 30 dias) × FA da classe (Anexo II:
+residencial 46%, industrial 69%, comercial 63%, rural 53%, serviço/poder público 57%),
+arredondado para cima (REN 1.000, arts. 73-A e 655-B; Manual de Inversão de Fluxo, item 8.12).
+Passar o mouse (ou tocar) num trafo ou numa empresa mostra o resumo direto no mapa.
 
 Não envie as planilhas de prospecção ao repositório.

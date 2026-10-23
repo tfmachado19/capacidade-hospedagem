@@ -38,6 +38,11 @@ DIC = [f"DIC_{i:02d}" for i in range(1, 13)]
 FIC = [f"FIC_{i:02d}" for i in range(1, 13)]
 DEM = [f"DEM_{i:02d}" for i in range(1, 13)]
 KWH_KWP = 1150          # geração FV anual típica no RS (kWh por kWp)
+# Pg para afastamento da análise de inversão de fluxo (REN 1.000 art. 73-A, II; Manual item 8.12):
+# Pg = C / (FC × 24 × 30) × FA, FC = 16% (art. 655-B), FA do Anexo II por classe, arredondado para cima
+FC_SOLAR = 0.16
+FA_CLASSE = {"RE": 0.46, "IN": 0.69, "CO": 0.63, "RU": 0.53, "SP": 0.57, "PP": 0.57, "IP": 0.57,
+             "CP": 0.63, "CS": 0.63}
 T0 = time.time()
 
 CLASSE = {"RE": "Residencial", "CO": "Comercial", "IN": "Industrial", "RU": "Rural",
@@ -131,7 +136,7 @@ def ler_pj(caminho, dist, mun):
 
 def salvar_site_emp(emp, site):
     """dados/emp/<código IBGE>.json: {"a": {divisão: nome}, "e": [[lat, lon, kWh/mês, kWp, divisão, classe,
-    gd, rede, endereço, bairro, grupo, mt, DIC, trafo, alimentador, demanda contratada, CNAE], ...]}
+    gd, rede, endereço, bairro, grupo, mt, DIC, trafo, alimentador, demanda contratada, CNAE, Pg], ...]}
     gd: 0 sem GD, 1 talvez, 2 provável, 3 sim · rede: 0 sem dado, 1 não, 2 parcial, 3 sim"""
     pasta = Path(site) / "dados" / "emp"
     pasta.mkdir(parents=True, exist_ok=True)
@@ -142,7 +147,7 @@ def salvar_site_emp(emp, site):
     r1 = lambda v, d=1: None if pd.isna(v) else round(float(v), d)
     linhas = pd.DataFrame({
         "mun": emp["Município (IBGE)"], "lat": emp["Latitude"].round(6), "lon": emp["Longitude"].round(6),
-        "kwh": emp["Consumo médio mensal (kWh)"].round(0), "kwp": emp["Sistema FV sugerido (kWp)"].round(1),
+        "kwh": emp["Consumo médio 12 meses (kWh)"].round(0), "pg": emp["Pg sem análise de inversão (kW)"], "kwp": emp["Sistema FV sugerido (kWp)"].round(1),
         "div": emp["CNAE"].str[:2], "cls": emp["Classe"], "gd": gd, "rede": rede, "end": emp["Endereço"],
         "brr": emp["Bairro"], "gru": emp["Grupo tarifário"], "mt": emp["_mt"],
         "dic": emp["Horas sem energia no ano (DIC)"].round(1),
@@ -152,7 +157,7 @@ def salvar_site_emp(emp, site):
     for mun, g in linhas.groupby("mun"):
         divs = sorted(set(g["div"]) - {""})
         e = [[r.lat, r.lon, int(r.kwh), r.kwp, r.div, r.cls, int(r.gd), int(r.rede), r.end, r.brr, r.gru,
-              int(r.mt), r1(r.dic), r.tr, r.al, r1(r.dem, 0), r.cnae] for r in g.itertuples(index=False)]
+              int(r.mt), r1(r.dic), r.tr, r.al, r1(r.dem, 0), r.cnae, int(r.pg)] for r in g.itertuples(index=False)]
         d = {"a": {k: CNAE_DIV.get(k, k) for k in divs}, "e": e}
         (pasta / f"{mun}.json").write_text(json.dumps(d, ensure_ascii=False, separators=(",", ":")), encoding="utf-8")
         n += 1
@@ -220,6 +225,7 @@ def main():
     def empresas(d, mt):
         E = num(d, ENE)
         anual = E.sum(axis=1)
+        fa = txt(d["CLAS_SUB"]).str[:2].map(FA_CLASSE).fillna(0.63)
         out = pd.DataFrame({
             "Município (IBGE)": txt(d["MUN"]),
             "Município": nome_mun(d["MUN"]),
@@ -232,7 +238,9 @@ def main():
             "Atividade (divisão CNAE)": txt(d["CNAE"]).str[:2].map(CNAE_DIV).fillna(""),
             "Grupo tarifário": txt(d["GRU_TAR"]),
             "Fases": txt(d["FAS_CON"]),
-            "Consumo médio mensal (kWh)": anual / 12,
+            "Consumo médio 12 meses (kWh)": anual / 12,
+            "FA (Anexo II, %)": (fa * 100).round(0),
+            "Pg sem análise de inversão (kW)": np.ceil(anual / 12 / (FC_SOLAR * 24 * 30) * fa - 1e-9).clip(lower=0),
             "Consumo anual (kWh)": anual,
             "Sistema FV sugerido (kWp)": (anual / KWH_KWP).clip(upper=3000 if mt else 75),
             "GD": info_gd(d),
@@ -242,8 +250,8 @@ def main():
         })
         if mt:
             dem = pd.to_numeric(d["DEM_CONT"], errors="coerce")
-            out.insert(out.columns.get_loc("Consumo médio mensal (kWh)"), "Demanda contratada (kW)", dem)
-            out.insert(out.columns.get_loc("Consumo médio mensal (kWh)"), "Demanda máx. medida (kW)",
+            out.insert(out.columns.get_loc("Consumo médio 12 meses (kWh)"), "Demanda contratada (kW)", dem)
+            out.insert(out.columns.get_loc("Consumo médio 12 meses (kWh)"), "Demanda máx. medida (kW)",
                        num(d, DEM).max(axis=1))
             out["Alimentador"] = txt(d["CTMT"])
         else:
@@ -271,7 +279,7 @@ def main():
     log(f"  {len(bt):,} UCs PJ em BT e {len(mt):,} em MT")
     e_bt_todas = empresas(bt, False)
     e_mt = empresas(mt, True)
-    e_bt = e_bt_todas[e_bt_todas["Consumo médio mensal (kWh)"] >= a.min_kwh]
+    e_bt = e_bt_todas[e_bt_todas["Consumo médio 12 meses (kWh)"] >= a.min_kwh]
 
     # Bairros (todas as UCs de BT, PF + PJ)
     log("Agregando bairros e municípios ...")
@@ -309,7 +317,7 @@ def main():
     atv = emp.groupby(emp["CNAE"].str[:2]).agg(**{
         "Empresas": ("Endereço", "size"), "Sem GD": ("sem_gd", "sum"),
         "Consumo anual total (MWh)": ("Consumo anual (kWh)", lambda s: s.sum() / 1000),
-        "Consumo médio mensal (kWh)": ("Consumo médio mensal (kWh)", "mean"),
+        "Consumo médio 12 meses (kWh)": ("Consumo médio 12 meses (kWh)", "mean"),
         "Potencial FV das sem GD (kWp)": ("Sistema FV sugerido (kWp)", lambda s: s[emp.loc[s.index, "sem_gd"]].sum()),
     }).reset_index().rename(columns={"CNAE": "Divisão CNAE"})
     atv.insert(1, "Atividade", atv["Divisão CNAE"].map(CNAE_DIV).fillna(""))
@@ -322,7 +330,7 @@ def main():
         "Potencial FV restante (kWp)": ("Potencial FV restante (kWp)", "sum"),
         "Trafos com capacidade ≥ 10 kW": ("Trafos com capacidade ≥ 10 kW", "sum")}).reset_index()
     mun["Penetração de GD (%)"] = mun["GDs em BT"] / mun["UCs de BT"] * 100
-    eg = emp[emp["sem_gd"] & (emp["Consumo médio mensal (kWh)"] >= 1000)].groupby("Município (IBGE)").size()
+    eg = emp[emp["sem_gd"] & (emp["Consumo médio 12 meses (kWh)"] >= 1000)].groupby("Município (IBGE)").size()
     mun["Empresas sem GD ≥ 1.000 kWh/mês"] = mun["Município (IBGE)"].map(eg).fillna(0).astype(int)
     mun = mun.sort_values("Potencial FV restante (kWp)", ascending=False)
 
@@ -330,7 +338,8 @@ def main():
         "FONTE: BDGD da distribuidora e bases UCBT_PJ/UCMT_PJ da ANEEL (data-base 31/12/2025). O CNPJ vem criptografado pela ANEEL; não há nome nem CNPJ.",
         "EMPRESAS: unidades consumidoras de pessoa jurídica ativas, com endereço, CNAE, consumo e coordenada informados pela distribuidora. Em BT, só as com consumo médio ≥ " + f"{a.min_kwh:g} kWh/mês.",
         "GD: 'sim' = GD cadastrada na própria UC (CEG_GD); 'provável' = todas as UCs do ponto de conexão têm GD; 'talvez' = há GD no mesmo ponto de conexão, que pode ser de um vizinho; 'não' = sem GD no ponto.",
-        "CONSUMO: soma de ENE_01..12 da BDGD. Para quem já tem GD é o consumo líquido (o autoconsumo não aparece).",
+        "CONSUMO MÉDIO 12 MESES: média de ENE_01..12 da BDGD (jan–dez/2025). Para quem já tem GD é o consumo líquido (o autoconsumo não aparece).",
+        "Pg SEM ANÁLISE DE INVERSÃO (kW) = consumo médio 12 meses ÷ (16% × 24 h × 30 dias) × FA, arredondado para cima (Manual de Inversão de Fluxo, itens 8.12–8.15; REN 1.000 arts. 73-A, II e 655-B). FA do Anexo II: residencial 46%, industrial 69%, comercial/serviços 63%, rural 53%, serviço e poder público 57%. A hipótese de afastamento vale para microgeração (até 75 kW) dentro da potência disponibilizada; acima disso o Pg é só referência. Na fatura, o C é o consumo faturado dos 12 últimos ciclos, que pode diferir da BDGD.",
         f"SISTEMA FV SUGERIDO (kWp) = consumo anual ÷ {KWH_KWP} kWh/kWp (geração típica no RS), limitado a 75 kW na BT (microgeração) e 3.000 kW na MT (minigeração solar, Lei 14.300). Não considera custo de disponibilidade.",
         "REDE COMPORTA? compara o sistema sugerido com a capacidade estimada do trafo e do alimentador (BT) ou só do alimentador (MT), do trafos_bdgd.py. 'não' indica que provavelmente precisará de estudo de inversão de fluxo.",
         "DIC/FIC: horas e número de interrupções no ano — argumento para baterias / backup.",
