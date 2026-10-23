@@ -196,8 +196,7 @@ async function mostrarAlim(x){
   try{if(!(f in mtCache)){const r=await fetch(`dados/mt/${f}.json`);mtCache[f]=r.ok?await r.json():null}}catch(e){mtCache[f]=null}
   if(empSel!==x)return;
   const d=mtCache[f];x._km=d?d.km:0;
-  if(d){const ls=linhas(d,{color:"#1f5fbf",weight:4,opacity:.9,interactive:false,renderer:rTopo},redeMt);
-    if(ls.length)map.fitBounds(L.featureGroup(ls).getBounds(),{padding:[20,20]})}
+  if(d)linhas(d,{color:"#1f5fbf",weight:4,opacity:.9,interactive:false,renderer:rTopo},redeMt);
   render();
 }
 function selEmp(x){
@@ -208,8 +207,7 @@ function selEmp(x){
     if(t){mostrarRede(t);
       L.circleMarker([t.lat,t.lon],{radius:11,color:cssVar("--ink"),weight:3,fillColor:hex(classe(t,+potEl.value||0)),fillOpacity:1})
         .bindTooltip(()=>dicaTrafo(t),{direction:"top",offset:[0,-8]}).addTo(redeMt);
-      L.polyline([[x[0],x[1]],[t.lat,t.lon]],{color:"#8e44ec",weight:2.5,dashArray:"5 5",interactive:false,renderer:rTopo}).addTo(redeMt);
-      map.fitBounds(L.latLngBounds([[x[0],x[1]],[t.lat,t.lon]]).pad(.6),{maxZoom:18})}
+      L.polyline([[x[0],x[1]],[t.lat,t.lon]],{color:"#8e44ec",weight:2.5,dashArray:"5 5",interactive:false,renderer:rTopo}).addTo(redeMt)}
   }
   abrirPainel();topoPainel();
 }
