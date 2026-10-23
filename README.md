@@ -42,8 +42,8 @@ Site: https://tfmachado19.github.io/capacidade-hospedagem
    `www.arcgis.com`, `*.arcgis.com` e `dadosabertos.aneel.gov.br` (menu do ambiente → Edit →
    Network access). As bibliotecas Python são instaladas sozinhas ao abrir a sessão.
 5. Peça as mudanças em português. O Claude lê o `CLAUDE.md` (regras e premissas do projeto),
-   testa e publica. Para colaboradores, a `main` exige Pull Request: o Claude abre o PR e o
-   dono do repositório aprova antes de ir para o site.
+   testa e publica direto na `main` (o site atualiza em 1–2 minutos). Todos os colaboradores
+   podem publicar; o histórico de mudanças fica em Commits, no GitHub, e dá para desfazer.
 
 Pedidos e problemas: aba **Issues** do GitHub (há um modelo pronto).
 
