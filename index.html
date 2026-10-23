@@ -56,6 +56,9 @@ header,aside,details.menu{min-width:0}
 .scroll{overflow:visible;flex:none;padding:14px 18px 24px;display:grid;gap:16px;align-content:start}
 aside::-webkit-scrollbar{width:10px}aside::-webkit-scrollbar-thumb{background:var(--line);border-radius:6px}
 .leaflet-tooltip{font:13px/1.4 var(--body)}
+.selo{background:var(--panel);color:var(--ink);border:1px solid var(--line);border-radius:6px;padding:4px 8px;font-size:12px;box-shadow:0 1px 4px rgba(0,0,0,.2);max-width:70vw}
+.selo .velha{color:var(--low);font-weight:600}
+.links a.gsat{display:inline-block;background:var(--accent);color:var(--accent-ink);padding:4px 10px;border-radius:6px;text-decoration:none;font-weight:600}
 .stats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
 .stat{background:var(--chip);border-radius:8px;padding:8px 10px}
 .stat b{display:block;font:600 17px var(--mono);font-variant-numeric:tabular-nums}
@@ -180,6 +183,34 @@ const map=L.map("map",{preferCanvas:true,zoomControl:true});
 const osm=L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",{maxZoom:20,maxNativeZoom:19,attribution:"© OpenStreetMap · BDGD/ANEEL"});
 const sat=L.tileLayer("https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",{maxZoom:20,maxNativeZoom:19,attribution:"Imagens © Esri · BDGD/ANEEL"});
 osm.addTo(map);L.control.layers({"Mapa":osm,"Satélite":sat},null,{position:"topright"}).addTo(map);
+// Data da imagem de satélite no centro do mapa (metadados públicos da Esri / World Imagery)
+let metaUrl="https://metadata.maptiles.arcgis.com/arcgis/rest/services/World_Imagery_Metadata_2026_r09/MapServer";
+fetch("https://s3-us-west-2.amazonaws.com/config.maptiles.arcgis.com/waybackconfig.json").then(r=>r.json()).then(d=>{
+  const v=Object.values(d).filter(x=>x.metadataLayerUrl&&x.itemTitle).sort((a,b)=>a.itemTitle<b.itemTitle?1:-1)[0];
+  if(v)metaUrl=v.metadataLayerUrl;}).catch(()=>{});
+const selo=L.control({position:"bottomleft"});
+selo.onAdd=()=>{const d=L.DomUtil.create("div","selo");d.style.display="none";L.DomEvent.disableClickPropagation(d);return d};
+selo.addTo(map);let tSelo=null,nSelo=0;
+async function dataImagem(){
+  const el=selo.getContainer();
+  if(!map.hasLayer(sat)){el.style.display="none";return}
+  el.style.display="";
+  if(map.getZoom()<12){el.textContent="Aproxime o mapa para ver a data da imagem de satélite";return}
+  const c=map.getCenter(),b=map.getBounds(),s=map.getSize(),n=++nSelo;
+  const u=`${metaUrl}/identify?geometry=${c.lng},${c.lat}&geometryType=esriGeometryPoint&sr=4326&layers=all&tolerance=1`+
+    `&mapExtent=${b.getWest()},${b.getSouth()},${b.getEast()},${b.getNorth()}&imageDisplay=${s.x},${s.y},96&returnGeometry=false&f=json`;
+  try{
+    const j=await (await fetch(u)).json();if(n!==nSelo)return;
+    const a=((j.results||[])[0]||{}).attributes;
+    if(!a){el.textContent="Data da imagem indisponível neste ponto";return}
+    const d=String(a.SRC_DATE||""),dt=d.length===8?`${d.slice(6)}/${d.slice(4,6)}/${d.slice(0,4)}`:(a.SRC_DATE2||"?");
+    const anos=d.length===8?(Date.now()-new Date(+d.slice(0,4),+d.slice(4,6)-1,+d.slice(6)))/3.156e10:0;
+    const res=a.SRC_RES?`${Math.round(+a.SRC_RES*100)} cm`:"";
+    el.innerHTML=`Imagem de satélite: <b>${dt}</b>${anos>=2?` <span class="velha">(${Math.floor(anos)} anos)</span>`:""}${res?` · ${res}`:""}${a.NICE_DESC?` · ${esc(a.NICE_DESC)}`:""}`;
+  }catch(e){if(n===nSelo)el.textContent="Data da imagem indisponível agora"}
+}
+map.on("moveend baselayerchange",()=>{clearTimeout(tSelo);tSelo=setTimeout(dataImagem,350)});
+const gSat=(la,lo)=>`https://www.google.com/maps/@?api=1&map_action=map&center=${la},${lo}&zoom=20&basemap=satellite`;
 
 const capa=L.layerGroup().addTo(map);let marcas=new Map(),pino=null,sel=null;
 // Rede BT do trafo selecionado + postes com GD (dados/bt/<alimentador>.json, sob demanda)
@@ -294,6 +325,7 @@ function ficha(t){
   <dt>Carregamento de GD do alimentador</dt><dd>${fmt(t.cga)} %</dd><dt>Capacidade p/ nova GD no alimentador</dt><dd>${fmt(t.capa,0)} kW</dd></dl>
   ${t.bt&&!t.bt.km&&!t.bt.np?`<div class="base">Sem rede BT nem GD cadastradas para este trafo na BDGD.</div>`:t.bt?`<div class="base">Rede BT no mapa: ${fmt(t.bt.km,2)} km · ${t.bt.np} poste${t.bt.np===1?"":"s"} com GD (${fmt(t.bt.kw)} kW) <span class="dot" style="display:inline-block;vertical-align:middle;background:#ffcc00"></span></div>`:(META.muns?`<div class="base">Carregando rede BT…</div>`:"")}
   <div class="links"><a href="https://www.google.com/maps?q=${t.lat},${t.lon}" target="_blank" rel="noopener">Abrir no Google Maps</a>
+  <a class="gsat" href="${gSat(t.lat,t.lon)}" target="_blank" rel="noopener">Satélite no Google</a>
   <span class="base">${t.lat.toFixed(6)}, ${t.lon.toFixed(6)}</span></div></div>`;
 }
 function dist(a,b,c,d){const R=6371e3,r=Math.PI/180,x=(d-b)*r*Math.cos((a+c)/2*r),y=(c-a)*r;return Math.sqrt(x*x+y*y)}
@@ -402,6 +434,7 @@ function fichaEmp(x){
   <dt>GD</dt><dd>${GDR[x[6]]}</dd><dt>Rede comporta o sistema</dt><dd>${RED[x[7]]}</dd>
   <dt>Horas sem energia no ano</dt><dd>${fmt(x[12])} h</dd><dt>Trafo · alimentador</dt><dd>${esc(x[13]||"–")} · ${esc(x[14]||"–")}</dd></dl>
   <div class="links"><a href="https://www.google.com/maps?q=${x[0]},${x[1]}" target="_blank" rel="noopener">Abrir no Google Maps</a>
+  <a class="gsat" href="${gSat(x[0],x[1])}" target="_blank" rel="noopener">Satélite no Google</a>
   ${temTr?`<button class="ghost" data-tr="${esc(x[13])}">Ver trafo</button>`:""}</div>
   <div class="base">${x[11]?`Alimentador ${esc(x[14]||"–")} desenhado em azul no mapa${x._km?` (${fmt(x._km)} km de rede MT)`:""}.`
     :temTr?`Trafo ${esc(x[13])} destacado no mapa, com a rede BT em verde e a ligação até a empresa tracejada.`:"Trafo desta empresa não encontrado no mapa."}</div></div></section>`;
