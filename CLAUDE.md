@@ -20,8 +20,10 @@ nem sempre programadores: explique resultados em linguagem simples.
 
 ## Regras de trabalho
 
-- Trabalhe numa branch e abra Pull Request para a `main`. Tudo que entra na `main` é publicado
-  automaticamente pelo GitHub Pages.
+- Tudo que entra na `main` é publicado automaticamente pelo GitHub Pages.
+- **Publicação:** depois de testar, envie direto para a `main`. Se o GitHub recusar o push
+  (a `main` tem regra exigindo Pull Request para quem não é administrador), envie para uma
+  branch e abra um Pull Request para a `main`, explicando a mudança em português simples.
 - **Mudança no visual/JS do site:** altere o `TEMPLATE` em `scripts/trafos_bdgd.py` **e** o
   `index.html` da mesma forma (ou regenere o site). Se mudar só um, a próxima atualização de
   dados desfaz a mudança.
