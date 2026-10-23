@@ -106,6 +106,14 @@ Passar o mouse (ou tocar) num trafo ou numa empresa mostra o resumo direto no ma
 Com a camada "Satélite" ligada, um selo no canto do mapa mostra a data, a resolução e o
 fornecedor da imagem no centro da tela (metadados públicos da Esri). As fichas do trafo e da
 empresa têm o botão "Satélite no Google", que abre o Google Maps na visão satélite no ponto.
+
+### Camada "Satélite Google"
+
+Usa a Map Tiles API oficial do Google (100 mil carregamentos grátis por mês; depois ~US$ 0,60
+por mil). Para ligar, coloque uma chave em `dados/config.json`: `{"googleMapsKey": "SUA_CHAVE"}`.
+A chave fica visível no site, por isso **restrinja-a** no Google Cloud a sites
+`https://tfmachado19.github.io/*` e só à "Map Tiles API", e defina um limite de cota diária.
+Sem chave, a camada simplesmente não aparece.
 Ao clicar numa empresa de BT, o site destaca o trafo dela, desenha a rede BT desse trafo e
 traceja a ligação até a empresa. Numa empresa de MT, desenha o alimentador inteiro em azul
 (traçado da camada SSDMT, simplificado, em `dados/mt/<alimentador>.json`).

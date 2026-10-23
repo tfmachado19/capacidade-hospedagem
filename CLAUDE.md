@@ -75,6 +75,9 @@ A área inteira leva ~8 min (trafos) + ~5 min (prospecção) e usa ~5 GB de RAM.
   que trata isso.
 - Consumo de quem já tem GD é o líquido medido (subestima a carga).
 - A API do IBGE às vezes cai; o script pega os nomes dos municípios da base de GD da ANEEL.
+- `dados/config.json` guarda a chave da Map Tiles API do Google (camada "Satélite Google").
+  Não apague nem sobrescreva ao copiar `site_todos/dados/`. Nunca use os endereços não oficiais
+  de imagens do Google (mt*.google.com): violam os termos de uso.
 
 ## Cuidados
 

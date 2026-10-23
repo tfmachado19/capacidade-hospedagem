@@ -58,6 +58,7 @@ aside::-webkit-scrollbar{width:10px}aside::-webkit-scrollbar-thumb{background:va
 .leaflet-tooltip{font:13px/1.4 var(--body)}
 .selo{background:var(--panel);color:var(--ink);border:1px solid var(--line);border-radius:6px;padding:4px 8px;font-size:12px;box-shadow:0 1px 4px rgba(0,0,0,.2);max-width:70vw}
 .selo .velha{color:var(--low);font-weight:600}
+.glogo img{display:block;height:18px;filter:drop-shadow(0 0 1px rgba(0,0,0,.6))}
 .links a.gsat{display:inline-block;background:var(--accent);color:var(--accent-ink);padding:4px 10px;border-radius:6px;text-decoration:none;font-weight:600}
 .stats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
 .stat{background:var(--chip);border-radius:8px;padding:8px 10px}
@@ -182,7 +183,44 @@ const ROTP={ok:"comporta a GD pretendida",low:"capacidade insuficiente",none:"se
 const map=L.map("map",{preferCanvas:true,zoomControl:true});
 const osm=L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",{maxZoom:20,maxNativeZoom:19,attribution:"© OpenStreetMap · BDGD/ANEEL"});
 const sat=L.tileLayer("https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",{maxZoom:20,maxNativeZoom:19,attribution:"Imagens © Esri · BDGD/ANEEL"});
-osm.addTo(map);L.control.layers({"Mapa":osm,"Satélite":sat},null,{position:"topright"}).addTo(map);
+osm.addTo(map);const camadas=L.control.layers({"Mapa":osm,"Satélite":sat},null,{position:"topright"}).addTo(map);
+// ---- Satélite Google (Map Tiles API oficial). A chave fica em dados/config.json:
+// {"googleMapsKey": "..."} — chave restrita ao domínio do site e à Map Tiles API.
+let gTiles=null,gKey="",gSessao="";
+const gLogo=L.control({position:"bottomright"});
+gLogo.onAdd=()=>{const d=L.DomUtil.create("div","glogo");
+  d.innerHTML='<img alt="Google" src="https://maps.gstatic.com/mapfiles/api-3/images/google_white5.png">';return d};
+async function iniciarGoogle(){
+  try{const c=await (await fetch("dados/config.json",{cache:"no-store"})).json();gKey=(c.googleMapsKey||"").trim()}catch(e){return}
+  if(!gKey)return;
+  try{
+    const ant=JSON.parse(localStorage.getItem("gSessao")||"null");
+    if(ant&&ant.k===gKey&&ant.exp*1000>Date.now()+864e5)gSessao=ant.s;
+  }catch(e){}
+  if(!gSessao){
+    try{const r=await fetch(`https://tile.googleapis.com/v1/createSession?key=${gKey}`,{method:"POST",headers:{"Content-Type":"application/json"},
+        body:JSON.stringify({mapType:"satellite",language:"pt-BR",region:"BR"})});
+      const j=await r.json();if(!j.session)throw new Error(JSON.stringify(j.error||j));
+      gSessao=j.session;try{localStorage.setItem("gSessao",JSON.stringify({s:j.session,exp:+j.expiry,k:gKey}))}catch(e){}
+    }catch(e){console.warn("Google Map Tiles:",e);return}
+  }
+  gTiles=L.tileLayer(`https://tile.googleapis.com/v1/2dtiles/{z}/{x}/{y}?session=${gSessao}&key=${gKey}`,
+    {maxZoom:21,maxNativeZoom:21,attribution:"Imagens © Google"});
+  camadas.addBaseLayer(gTiles,"Satélite Google");
+}
+iniciarGoogle();
+let tAtrib=null;
+async function atribGoogle(){
+  if(!gTiles||!map.hasLayer(gTiles)){if(gLogo._map)gLogo.remove();return}
+  if(!gLogo._map)gLogo.addTo(map);
+  const b=map.getBounds();
+  try{const j=await (await fetch(`https://tile.googleapis.com/tile/v1/viewport?session=${gSessao}&key=${gKey}&zoom=${map.getZoom()}`+
+      `&north=${b.getNorth()}&south=${b.getSouth()}&east=${b.getEast()}&west=${b.getWest()}`)).json();
+    const t="Imagens © Google"+(j.copyright?" · "+esc(j.copyright):"");
+    if(gTiles.options.attribution!==t){map.attributionControl.removeAttribution(gTiles.options.attribution);gTiles.options.attribution=t;map.attributionControl.addAttribution(t)}
+  }catch(e){}
+}
+map.on("moveend baselayerchange",()=>{clearTimeout(tAtrib);tAtrib=setTimeout(atribGoogle,400)});
 // Data da imagem de satélite no centro do mapa (metadados públicos da Esri / World Imagery)
 let metaUrl="https://metadata.maptiles.arcgis.com/arcgis/rest/services/World_Imagery_Metadata_2026_r09/MapServer";
 fetch("https://s3-us-west-2.amazonaws.com/config.maptiles.arcgis.com/waybackconfig.json").then(r=>r.json()).then(d=>{
@@ -193,6 +231,7 @@ selo.onAdd=()=>{const d=L.DomUtil.create("div","selo");d.style.display="none";L.
 selo.addTo(map);let tSelo=null,nSelo=0;
 async function dataImagem(){
   const el=selo.getContainer();
+  if(gTiles&&map.hasLayer(gTiles)){el.style.display="";el.textContent="Satélite Google · o Google não informa a data da imagem";return}
   if(!map.hasLayer(sat)){el.style.display="none";return}
   el.style.display="";
   if(map.getZoom()<12){el.textContent="Aproxime o mapa para ver a data da imagem de satélite";return}
