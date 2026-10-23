@@ -30,6 +30,22 @@ potência somada por poste. A posição é a do poste, não a da unidade. Esses 
 
 Site: https://tfmachado19.github.io/capacidade-hospedagem
 
+## Trabalho em equipe com Claude Code
+
+1. Peça ao dono do repositório para te convidar como colaborador (GitHub → Settings →
+   Collaborators).
+2. Conecte seu GitHub ao Claude em https://claude.ai/connect-github e, se pedir, instale o app
+   Claude no repositório.
+3. Abra o Claude Code (web em https://claude.ai/code, app ou terminal) e escolha o repositório
+   `tfmachado19/capacidade-hospedagem`.
+4. Para baixar a BDGD e as bases da ANEEL, o ambiente de nuvem precisa liberar os domínios
+   `www.arcgis.com`, `*.arcgis.com` e `dadosabertos.aneel.gov.br` (menu do ambiente → Edit →
+   Network access). As bibliotecas Python são instaladas sozinhas ao abrir a sessão.
+5. Peça as mudanças em português. O Claude lê o `CLAUDE.md` (regras e premissas do projeto),
+   trabalha numa branch e abre um Pull Request; outra pessoa revisa antes de ir para a `main`.
+
+Pedidos e problemas: aba **Issues** do GitHub (há um modelo pronto).
+
 Os dados vêm da BDGD (Base de Dados Geográfica da Distribuidora) da RGE, publicada
 pela ANEEL. São estimativas para triagem: não são medição e não substituem a análise
 de inversão de fluxo da distribuidora.

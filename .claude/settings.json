@@ -1,0 +1,15 @@
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "if [ \"$CLAUDE_CODE_REMOTE\" = \"true\" ]; then pip install -q geopandas pyogrio openpyxl pyarrow >/dev/null 2>&1 || true; fi",
+            "timeout": 300
+          }
+        ]
+      }
+    ]
+  }
+}
