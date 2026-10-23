@@ -78,4 +78,8 @@ UCMT_PJ da ANEEL (página da BDGD no portal de dados abertos), a BDGD e a planil
 
     py scripts/prospeccao.py --bdgd RGE_396_xxxx.zip --ucbt-pj ucbt_pj.zip --ucmt-pj ucmt_pj.csv --trafos BDGD_trafos_todos.xlsx --nomes empreendimento-geracao-distribuida.parquet
 
+Com `--site .` (raiz do repositório) ele grava também `dados/emp/<código IBGE>.json`, usado
+pela seção "Prospecção de empresas" do site: filtros por atividade, consumo mínimo, BT/MT,
+GD e se a rede comporta, ficha da empresa e botão para baixar a lista filtrada em CSV.
+
 Não envie as planilhas de prospecção ao repositório.
