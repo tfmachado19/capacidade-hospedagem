@@ -23,7 +23,7 @@
   --accent:#4fc3a8; --accent-ink:#06261f; --chip:#22302c; --nodata:#8a9894; color-scheme:dark}}
 *{box-sizing:border-box}
 html,body{height:100%;margin:0}
-body{background:var(--bg);color:var(--ink);font:15px/1.45 var(--body);display:grid;grid-template-columns:400px 1fr;overflow:hidden}
+body{background:var(--bg);color:var(--ink);font:15px/1.45 var(--body);display:grid;grid-template-columns:400px minmax(0,1fr);overflow:hidden}
 #map{height:100%;width:100%;background:var(--bg)}
 aside{background:var(--panel);border-right:1px solid var(--line);display:flex;flex-direction:column;min-width:0;height:100%;overflow:hidden}
 header{padding:16px 18px 12px;border-bottom:1px solid var(--line);display:grid;gap:10px}
@@ -41,6 +41,13 @@ button:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid 
 .row input,.row select{padding:7px 9px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--ink);font:inherit;min-width:0}
 #pot{width:90px;font-family:var(--mono)}
 #alim,#mun{flex:1}
+details#prosp{border:1px solid var(--line);border-radius:8px;padding:8px 10px;display:grid;gap:8px}
+details#prosp[open]{gap:8px}
+details#prosp summary{cursor:pointer;font:700 14px var(--display);text-transform:uppercase;letter-spacing:.06em;color:var(--accent)}
+details#prosp > *:not(summary){margin-top:8px}
+#empKwh{width:90px;font-family:var(--mono)}
+header,aside,details#prosp{min-width:0}
+.row select{max-width:100%}#empAtv,#alim,#mun,#empTen,#empGd,#empRede{flex:1 1 0;width:0;min-width:110px}
 #kvaMin,#kvaMax{flex:1;font-family:var(--mono)}
 .chk{display:flex;gap:8px;align-items:center;font-size:13px;color:var(--muted)}
 .chk[hidden]{display:none}
@@ -74,8 +81,11 @@ dt{color:var(--muted)} dd{margin:0;font-family:var(--mono);font-variant-numeric:
 @media (max-width:760px){
   body{grid-template-columns:1fr;grid-template-rows:1fr auto}
   #map{grid-row:1}
+  body{grid-template-columns:minmax(0,1fr)}
   aside{grid-row:2;height:auto;max-height:58vh;border-right:0;border-top:1px solid var(--line);
-        padding-bottom:env(safe-area-inset-bottom,0px)}
+        padding-bottom:env(safe-area-inset-bottom,0px);overflow-y:auto}
+  aside .scroll{overflow:visible;flex:none}
+  aside.min{overflow:hidden}aside.min header>*:not(.brand){display:none}
   aside.min .scroll{display:none}
   .toggle{display:inline-block}
   header{padding:12px max(16px,env(safe-area-inset-left,0px)) 10px max(16px,env(safe-area-inset-right,0px))}
@@ -116,6 +126,17 @@ dt{color:var(--muted)} dd{margin:0;font-family:var(--mono);font-variant-numeric:
     </div>
     <label class="chk"><input type="checkbox" id="uc1"> Só trafos com 1 unidade consumidora</label>
     <label class="chk"><input type="checkbox" id="alimOk"> Só trafos cujo alimentador comporta a GD pretendida</label>
+    <details id="prosp" hidden>
+      <summary>Prospecção de empresas</summary>
+      <label class="chk"><input type="checkbox" id="empOn"> Mostrar empresas no mapa</label>
+      <label class="chk"><input type="checkbox" id="empHideTr"> Esconder os trafos do mapa</label>
+      <div class="row"><label for="empAtv">Atividade</label><select id="empAtv"><option value="">Todas</option></select></div>
+      <div class="row"><label for="empKwh">Consumo mín.</label><input id="empKwh" type="number" min="0" step="100" value="1000"><span class="base">kWh/mês</span>
+        <label for="empTen">Rede</label><select id="empTen"><option value="">BT e MT</option><option value="0">BT</option><option value="1">MT</option></select></div>
+      <div class="row"><label for="empGd">GD</label><select id="empGd"><option value="0">Sem GD</option><option value="1">Sem GD ou talvez</option><option value="">Todas</option></select>
+        <label for="empRede">Rede comporta</label><select id="empRede"><option value="">Qualquer</option><option value="3">Sim</option><option value="2">Sim ou parcial</option></select></div>
+      <button type="button" class="ghost" id="empCsv">Baixar lista (CSV)</button>
+    </details>
     <label class="chk" id="filtraRow" hidden><input type="checkbox" id="filtra" checked> Mostrar só os trafos que comportam a GD pretendida</label>
   </header>
   <div class="scroll" id="info"></div>
@@ -251,14 +272,16 @@ function listaProx(lat,lon){
 let ponto=null,msg="";
 function render(){
   let h="";if(msg)h+=`<p class="msg">${esc(msg)}</p>`;
+  if(empSel)h+=fichaEmp(empSel);
   if(sel)h+=`<section><h2>Transformador</h2>${ficha(sel)}</section>`;
   if(ponto)h+=listaProx(ponto[0],ponto[1]);
-  h+=resumo()+rodape();info.innerHTML=h;
+  h+=resumoEmp()+resumo()+rodape();info.innerHTML=h;
+  info.querySelectorAll("button[data-tr]").forEach(b=>b.onclick=()=>{const t=D.find(x=>x.id===b.dataset.tr);if(t){empSel=null;abrir(t)}});
   info.querySelectorAll(".near button").forEach(b=>b.onclick=()=>abrir(D.find(t=>t.id===b.dataset.id)));
 }
-function abrir(t,voar=true){sel=t;msg="";desenhar();render();mostrarRede(t);if(voar)map.setView([t.lat,t.lon],Math.max(map.getZoom(),17));info.scrollTop=0;abrirPainel()}
+function abrir(t,voar=true){sel=t;msg="";empSel=null;desenhar();render();mostrarRede(t);if(voar)map.setView([t.lat,t.lon],Math.max(map.getZoom(),17));info.scrollTop=0;abrirPainel()}
 function marcarPonto(lat,lon,rotulo){
-  ponto=[lat,lon];if(pino)map.removeLayer(pino);
+  ponto=[lat,lon];empSel=null;if(pino)map.removeLayer(pino);
   pino=L.marker([lat,lon]).addTo(map).bindTooltip(rotulo||"Ponto consultado");
   const p=proximos(lat,lon,1)[0];sel=p?p.t:null;msg="";desenhar();render();mostrarRede(sel);map.setView([lat,lon],18);abrirPainel();
 }
@@ -281,8 +304,60 @@ async function carregarMun(c,aj=true){
   META.mun=m.c;META.bbox=m.b;META.munNome=m.n+", RS";munEl.value=m.c;
   document.getElementById("titulo").textContent=m.n;document.title="Capacidade de Hospedagem "+m.n;
   sel=null;ponto=null;msg="";if(pino){map.removeLayer(pino);pino=null}
-  preparar();preencherAlim();desenhar();render();if(aj)ajustar();
+  empSel=null;preparar();preencherAlim();desenhar();render();if(aj)ajustar();desenharEmp();
   try{history.replaceState(null,"","#"+m.c)}catch(e){}
+}
+// ---- Prospecção de empresas (dados/emp/<município>.json, sob demanda)
+// linha: [lat,lon,kWh/mês,kWp,divisão,classe,gd,rede,endereço,bairro,grupo,mt,DIC,trafo,alimentador,demanda,CNAE]
+const empLayer=L.layerGroup().addTo(map),empCache={};let empSel=null,empVis=[];
+const GDR=["sem GD","talvez (GD no mesmo ponto de conexão)","provável","sim"],RED=["sem dado","não (precisa de estudo)","parcial","sim"];
+const $=id=>document.getElementById(id);
+async function dadosEmp(){
+  const c=META.mun;if(!c)return null;
+  if(!(c in empCache)){try{const r=await fetch(`dados/emp/${c}.json`);empCache[c]=r.ok?await r.json():{a:{},e:[]}}catch(e){empCache[c]={a:{},e:[]}}}
+  return empCache[c];
+}
+function empFiltro(d){
+  const atv=$("empAtv").value,kmin=+$("empKwh").value||0,ten=$("empTen").value,gd=$("empGd").value,rd=$("empRede").value;
+  return d.e.filter(x=>x[2]>=kmin&&(!atv||x[4]===atv)&&(ten===""||x[11]===+ten)&&(gd===""||x[6]<=+gd)&&(rd===""||x[7]>=+rd));
+}
+async function desenharEmp(){
+  empLayer.clearLayers();empVis=[];
+  if(!META.muns||!$("empOn").checked){render();return}
+  const d=await dadosEmp();if(!d)return;
+  const sa=$("empAtv");
+  if(sa.dataset.mun!==META.mun){const ant=sa.value;sa.length=1;
+    Object.entries(d.a).sort((x,y)=>x[1].localeCompare(y[1],"pt")).forEach(([k,v])=>{const o=document.createElement("option");o.value=k;o.textContent=v;sa.append(o)});
+    sa.value=ant in d.a?ant:"";sa.dataset.mun=META.mun}
+  empVis=empFiltro(d);
+  empVis.forEach(x=>{const m=L.circleMarker([x[0],x[1]],{radius:x[11]?8:6,color:"#3d1a78",weight:1.5,fillColor:x[6]>=2?"#b9a6d9":"#8e44ec",fillOpacity:.95});
+    m.on("click",e=>{L.DomEvent.stopPropagation(e);empSel=x;render();abrirPainel();info.scrollTop=0});empLayer.addLayer(m)});
+  render();
+}
+function resumoEmp(){
+  if(!META.muns||!$("empOn").checked)return "";
+  const kwp=empVis.reduce((s,x)=>s+x[3],0),kwh=empVis.reduce((s,x)=>s+x[2],0);
+  return `<section><h2>Prospecção</h2><div class="stats"><div class="stat"><b>${empVis.length.toLocaleString("pt-BR")}</b><span>empresas</span></div>
+  <div class="stat"><b>${fmt(kwh/1000,1)}</b><span>MWh/mês</span></div><div class="stat"><b>${fmt(kwp/1000,2)}</b><span>MWp sugerido</span></div></div>
+  <p class="hint">Círculos roxos = empresas (maiores = MT; claros = já têm GD provável). Toque numa empresa para ver os dados.</p></section>`;
+}
+function fichaEmp(x){
+  const a=(empCache[META.mun]||{a:{}}).a,temTr=x[13]&&D.some(t=>t.id===x[13]);
+  return `<section><h2>Empresa</h2><div class="card"><div class="top"><span class="id">${esc(x[8]||"–")}</span><span class="pill" style="background:#8e44ec">${x[11]?"MT":"BT"}</span></div>
+  <div class="base">${esc(x[9])} · ${esc(a[x[4]]||"")} (CNAE ${esc(x[16])})</div>
+  <dl><dt>Consumo médio</dt><dd>${fmt(x[2],0)} kWh/mês</dd><dt>Sistema FV sugerido</dt><dd>${fmt(x[3])} kWp</dd>
+  <dt>Classe · grupo</dt><dd>${esc(x[5])} · ${esc(x[10])}</dd>${x[15]!=null?`<dt>Demanda contratada</dt><dd>${fmt(x[15],0)} kW</dd>`:""}
+  <dt>GD</dt><dd>${GDR[x[6]]}</dd><dt>Rede comporta o sistema</dt><dd>${RED[x[7]]}</dd>
+  <dt>Horas sem energia no ano</dt><dd>${fmt(x[12])} h</dd><dt>Trafo · alimentador</dt><dd>${esc(x[13]||"–")} · ${esc(x[14]||"–")}</dd></dl>
+  <div class="links"><a href="https://www.google.com/maps?q=${x[0]},${x[1]}" target="_blank" rel="noopener">Abrir no Google Maps</a>
+  ${temTr?`<button class="ghost" data-tr="${esc(x[13])}">Ver trafo</button>`:""}</div></div></section>`;
+}
+function baixarCsv(){
+  const a=(empCache[META.mun]||{a:{}}).a,q=v=>`"${String(v??"").replace(/"/g,'""')}"`;
+  const cab=["Endereço","Bairro","Município","Atividade","CNAE","Classe","Grupo","Rede","Consumo médio (kWh/mês)","Sistema sugerido (kWp)","Demanda contratada (kW)","GD","Rede comporta","Horas sem energia/ano","Trafo","Alimentador","Latitude","Longitude","Google Maps"];
+  const lin=empVis.map(x=>[x[8],x[9],META.munNome.split(",")[0],a[x[4]]||"",x[16],x[5],x[10],x[11]?"MT":"BT",x[2],String(x[3]).replace(".",","),x[15]??"",GDR[x[6]],RED[x[7]],String(x[12]??"").replace(".",","),x[13],x[14],x[0],x[1],`https://www.google.com/maps?q=${x[0]},${x[1]}`].map(q).join(";"));
+  const blob=new Blob(["\ufeff"+[cab.map(q).join(";"),...lin].join("\r\n")],{type:"text/csv;charset=utf-8"});
+  const l=document.createElement("a");l.href=URL.createObjectURL(blob);l.download=`prospeccao_${META.munNome.split(",")[0].replace(/\W+/g,"_")}.csv`;l.click();setTimeout(()=>URL.revokeObjectURL(l.href),2000);
 }
 async function geo(texto,bb){
   const vb=bb?`&viewbox=${bb[1]},${bb[2]},${bb[3]},${bb[0]}&bounded=1`:"";
@@ -320,6 +395,11 @@ function ajustar(){const v=visiveis();if(v.length)map.fitBounds(v.map(t=>[t.lat,
 matchMedia("(prefers-color-scheme:dark)").addEventListener?.("change",()=>desenhar());
 const munEl=document.getElementById("mun");
 if(META.muns){
+  $("prosp").hidden=false;
+  ["empOn","empAtv","empTen","empGd","empRede"].forEach(i=>$(i).addEventListener("change",()=>{empSel=null;desenharEmp()}));
+  $("empKwh").addEventListener("input",()=>{empSel=null;desenharEmp()});
+  $("empHideTr").addEventListener("change",()=>{if($("empHideTr").checked)map.removeLayer(capa);else capa.addTo(map)});
+  $("empCsv").addEventListener("click",()=>{if(!$("empOn").checked){$("empOn").checked=true;desenharEmp().then(baixarCsv)}else baixarCsv()});
   document.getElementById("munRow").style.display="";
   META.muns.forEach(m=>{const o=document.createElement("option");o.value=m.c;o.textContent=m.n;munEl.append(o)});
   munEl.addEventListener("change",()=>carregarMun(munEl.value));

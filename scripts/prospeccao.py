@@ -22,6 +22,7 @@ indica GD cadastrada na própria UC (CEG_GD) ou no mesmo ponto de conexão (PAC)
 ser de um vizinho. Estimativa para triagem comercial.
 """
 import argparse
+import json
 import io
 import sys
 import time
@@ -128,6 +129,36 @@ def ler_pj(caminho, dist, mun):
     return d.reset_index(drop=True)
 
 
+def salvar_site_emp(emp, site):
+    """dados/emp/<código IBGE>.json: {"a": {divisão: nome}, "e": [[lat, lon, kWh/mês, kWp, divisão, classe,
+    gd, rede, endereço, bairro, grupo, mt, DIC, trafo, alimentador, demanda contratada, CNAE], ...]}
+    gd: 0 sem GD, 1 talvez, 2 provável, 3 sim · rede: 0 sem dado, 1 não, 2 parcial, 3 sim"""
+    pasta = Path(site) / "dados" / "emp"
+    pasta.mkdir(parents=True, exist_ok=True)
+    emp = emp.dropna(subset=["Latitude", "Longitude"])
+    gd = emp["GD"].str.split(" ").str[0].map({"não": 0, "talvez": 1, "provável": 2, "sim": 3}).fillna(0).astype(int)
+    rede = emp["Rede comporta o sistema?"].str.split(" ").str[0].map(
+        {"sem": 0, "não": 1, "parcial": 2, "sim": 3}).fillna(0).astype(int)
+    r1 = lambda v, d=1: None if pd.isna(v) else round(float(v), d)
+    linhas = pd.DataFrame({
+        "mun": emp["Município (IBGE)"], "lat": emp["Latitude"].round(6), "lon": emp["Longitude"].round(6),
+        "kwh": emp["Consumo médio mensal (kWh)"].round(0), "kwp": emp["Sistema FV sugerido (kWp)"].round(1),
+        "div": emp["CNAE"].str[:2], "cls": emp["Classe"], "gd": gd, "rede": rede, "end": emp["Endereço"],
+        "brr": emp["Bairro"], "gru": emp["Grupo tarifário"], "mt": emp["_mt"],
+        "dic": emp["Horas sem energia no ano (DIC)"].round(1),
+        "tr": emp.get("Trafo", pd.Series("", index=emp.index)).fillna(""), "al": emp["Alimentador"].fillna(""),
+        "dem": emp.get("Demanda contratada (kW)", pd.Series(np.nan, index=emp.index)), "cnae": emp["CNAE"]})
+    n = 0
+    for mun, g in linhas.groupby("mun"):
+        divs = sorted(set(g["div"]) - {""})
+        e = [[r.lat, r.lon, int(r.kwh), r.kwp, r.div, r.cls, int(r.gd), int(r.rede), r.end, r.brr, r.gru,
+              int(r.mt), r1(r.dic), r.tr, r.al, r1(r.dem, 0), r.cnae] for r in g.itertuples(index=False)]
+        d = {"a": {k: CNAE_DIV.get(k, k) for k in divs}, "e": e}
+        (pasta / f"{mun}.json").write_text(json.dumps(d, ensure_ascii=False, separators=(",", ":")), encoding="utf-8")
+        n += 1
+    return n
+
+
 def main():
     ap = argparse.ArgumentParser(description="Prospecção comercial de GD (dados abertos ANEEL)")
     ap.add_argument("--bdgd", required=True)
@@ -139,6 +170,8 @@ def main():
     ap.add_argument("--min-kwh", type=float, default=300, help="consumo médio mensal mínimo das empresas BT")
     ap.add_argument("--nomes", default=None, help="base de GD da ANEEL (.parquet) p/ nomes dos municípios")
     ap.add_argument("--saida", default=".")
+    ap.add_argument("--site", default=None,
+                    help="pasta do site (site_todos/) para gravar dados/emp/<município>.json da camada de prospecção")
     a = ap.parse_args()
     gdb = abrir_gdb(a.bdgd)
     filtro = f"MUN = '{a.mun}'" if a.mun else None
@@ -305,6 +338,10 @@ def main():
         "BAIRROS: todas as UCs de BT (pessoa física e jurídica). GD do bairro = GDs dos trafos cujo bairro predominante é aquele. Potencial = consumo × (1 − penetração) ÷ 1150.",
         "USO: triagem comercial. Respeite a LGPD e as regras de contato (Não Perturbe) na abordagem.",
     ]})
+
+    if a.site:
+        n = salvar_site_emp(pd.concat([e_bt.assign(_mt=0), e_mt.assign(_mt=1)], ignore_index=True), a.site)
+        log(f"Camada de prospecção do site: {n} municípios em {Path(a.site) / 'dados' / 'emp'}")
 
     saida = Path(a.saida)
     saida.mkdir(parents=True, exist_ok=True)
