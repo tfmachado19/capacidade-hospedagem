@@ -25,7 +25,7 @@
 html,body{height:100%;margin:0}
 body{background:var(--bg);color:var(--ink);font:15px/1.45 var(--body);display:grid;grid-template-columns:400px minmax(0,1fr);overflow:hidden}
 #map{height:100%;width:100%;background:var(--bg)}
-aside{background:var(--panel);border-right:1px solid var(--line);display:flex;flex-direction:column;min-width:0;height:100%;overflow:hidden}
+aside{background:var(--panel);border-right:1px solid var(--line);display:flex;flex-direction:column;min-width:0;height:100%;overflow-y:auto;scrollbar-gutter:stable;scrollbar-width:thin}
 header{padding:16px 18px 12px;border-bottom:1px solid var(--line);display:grid;gap:10px}
 .brand{display:flex;align-items:baseline;justify-content:space-between;gap:8px}
 h1{font:700 22px/1.1 var(--display);letter-spacing:.02em;text-transform:uppercase;margin:0;text-wrap:balance}
@@ -52,7 +52,9 @@ header,aside,details#prosp{min-width:0}
 .chk{display:flex;gap:8px;align-items:center;font-size:13px;color:var(--muted)}
 .chk[hidden]{display:none}
 .chk input{width:18px;height:18px;accent-color:var(--accent)}
-.scroll{overflow:auto;flex:1;padding:14px 18px 24px;display:grid;gap:16px;align-content:start}
+.scroll{overflow:visible;flex:none;padding:14px 18px 24px;display:grid;gap:16px;align-content:start}
+aside::-webkit-scrollbar{width:10px}aside::-webkit-scrollbar-thumb{background:var(--line);border-radius:6px}
+.leaflet-tooltip{font:13px/1.4 var(--body)}
 .stats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
 .stat{background:var(--chip);border-radius:8px;padding:8px 10px}
 .stat b{display:block;font:600 17px var(--mono);font-variant-numeric:tabular-nums}
@@ -221,6 +223,7 @@ function desenhar(){
   visiveis().forEach(t=>{
     const k=classe(t,pot),c=hex(k);
     const m=L.circleMarker([t.lat,t.lon],{radius:t===sel?9:5,color:t===sel?cssVar("--ink"):c,weight:t===sel?3:1,fillColor:c,fillOpacity:.85});
+    m.bindTooltip(()=>dicaTrafo(t),{direction:"top",offset:[0,-6]});
     m.on("click",e=>{L.DomEvent.stopPropagation(e);abrir(t)});capa.addLayer(m);marcas.set(t.id,m);
   });
 }
@@ -279,7 +282,7 @@ function render(){
   info.querySelectorAll("button[data-tr]").forEach(b=>b.onclick=()=>{const t=D.find(x=>x.id===b.dataset.tr);if(t){empSel=null;abrir(t)}});
   info.querySelectorAll(".near button").forEach(b=>b.onclick=()=>abrir(D.find(t=>t.id===b.dataset.id)));
 }
-function abrir(t,voar=true){sel=t;msg="";empSel=null;desenhar();render();mostrarRede(t);if(voar)map.setView([t.lat,t.lon],Math.max(map.getZoom(),17));info.scrollTop=0;abrirPainel()}
+function abrir(t,voar=true){sel=t;msg="";empSel=null;desenhar();render();mostrarRede(t);if(voar)map.setView([t.lat,t.lon],Math.max(map.getZoom(),17));topoPainel();abrirPainel()}
 function marcarPonto(lat,lon,rotulo){
   ponto=[lat,lon];empSel=null;if(pino)map.removeLayer(pino);
   pino=L.marker([lat,lon]).addTo(map).bindTooltip(rotulo||"Ponto consultado");
@@ -331,21 +334,38 @@ async function desenharEmp(){
     sa.value=ant in d.a?ant:"";sa.dataset.mun=META.mun}
   empVis=empFiltro(d);
   empVis.forEach(x=>{const m=L.circleMarker([x[0],x[1]],{radius:x[11]?8:6,color:"#3d1a78",weight:1.5,fillColor:x[6]>=2?"#b9a6d9":"#8e44ec",fillOpacity:.95});
-    m.on("click",e=>{L.DomEvent.stopPropagation(e);empSel=x;render();abrirPainel();info.scrollTop=0});empLayer.addLayer(m)});
+    m.bindTooltip(()=>dicaEmp(x),{direction:"top",offset:[0,-6]});
+    m.on("click",e=>{L.DomEvent.stopPropagation(e);empSel=x;render();abrirPainel();topoPainel()});empLayer.addLayer(m)});
   render();
 }
+// Informações ao passar o mouse (ou tocar) no mapa
+function dicaTrafo(t){
+  const pot=+potEl.value||0,k=classe(t,pot);
+  return `<b>Trafo ${esc(t.id)}</b> · ${fmt(t.kva,1)} kVA<br>Capacidade p/ GD: <b>${fmt(t.cap)} kW</b> (${esc(t.lim)})<br>
+  GD instalada: ${fmt(t.gd,1)} kW · ${t.ugs} UG · ${t.ucs} UCs<br>Carregamento: ${fmt(t.car)} %<br>
+  Alimentador ${esc(t.alim||"–")}: cap. p/ GD ${fmt(t.capa,0)} kW · carreg. ${fmt(t.ca)} %`;
+}
+function dicaEmp(x){
+  const a=(empCache[META.mun]||{a:{}}).a;
+  return `<b>${esc(x[8]||"–")}</b> (${x[11]?"MT":"BT"})<br>${esc(x[9])} · ${esc(a[x[4]]||"")}<br>
+  Consumo médio 12 meses: <b>${fmt(x[2],0)} kWh</b><br>Pg sem análise de inversão: <b>${fmt(x[17],0)} kW</b><br>
+  GD: ${GDR[x[6]]} · Rede comporta: ${RED[x[7]]}`;
+}
+function topoPainel(){info.scrollTop=0;side.scrollTop=0}
 function resumoEmp(){
   if(!META.muns||!$("empOn").checked)return "";
   const kwp=empVis.reduce((s,x)=>s+x[3],0),kwh=empVis.reduce((s,x)=>s+x[2],0);
   return `<section><h2>Prospecção</h2><div class="stats"><div class="stat"><b>${empVis.length.toLocaleString("pt-BR")}</b><span>empresas</span></div>
   <div class="stat"><b>${fmt(kwh/1000,1)}</b><span>MWh/mês</span></div><div class="stat"><b>${fmt(kwp/1000,2)}</b><span>MWp sugerido</span></div></div>
-  <p class="hint">Círculos roxos = empresas (maiores = MT; claros = já têm GD provável). Toque numa empresa para ver os dados.</p></section>`;
+  <p class="hint">Círculos roxos = empresas (maiores = MT; claros = já têm GD provável). Toque numa empresa para ver os dados.
+  Pg = consumo médio 12 meses ÷ (16% × 24 × 30) × FA da classe, arredondado para cima (REN 1.000, art. 73-A, II; Manual de Inversão de Fluxo, item 8.12). Vale para microgeração até 75 kW.</p></section>`;
 }
 function fichaEmp(x){
   const a=(empCache[META.mun]||{a:{}}).a,temTr=x[13]&&D.some(t=>t.id===x[13]);
   return `<section><h2>Empresa</h2><div class="card"><div class="top"><span class="id">${esc(x[8]||"–")}</span><span class="pill" style="background:#8e44ec">${x[11]?"MT":"BT"}</span></div>
   <div class="base">${esc(x[9])} · ${esc(a[x[4]]||"")} (CNAE ${esc(x[16])})</div>
-  <dl><dt>Consumo médio</dt><dd>${fmt(x[2],0)} kWh/mês</dd><dt>Sistema FV sugerido</dt><dd>${fmt(x[3])} kWp</dd>
+  <dl><dt>Consumo médio (12 meses)</dt><dd>${fmt(x[2],0)} kWh/mês</dd><dt>Pg sem análise de inversão</dt><dd><b>${fmt(x[17],0)} kW</b></dd>
+  <dt>Sistema FV p/ zerar consumo</dt><dd>${fmt(x[3])} kWp</dd>
   <dt>Classe · grupo</dt><dd>${esc(x[5])} · ${esc(x[10])}</dd>${x[15]!=null?`<dt>Demanda contratada</dt><dd>${fmt(x[15],0)} kW</dd>`:""}
   <dt>GD</dt><dd>${GDR[x[6]]}</dd><dt>Rede comporta o sistema</dt><dd>${RED[x[7]]}</dd>
   <dt>Horas sem energia no ano</dt><dd>${fmt(x[12])} h</dd><dt>Trafo · alimentador</dt><dd>${esc(x[13]||"–")} · ${esc(x[14]||"–")}</dd></dl>
@@ -354,8 +374,8 @@ function fichaEmp(x){
 }
 function baixarCsv(){
   const a=(empCache[META.mun]||{a:{}}).a,q=v=>`"${String(v??"").replace(/"/g,'""')}"`;
-  const cab=["Endereço","Bairro","Município","Atividade","CNAE","Classe","Grupo","Rede","Consumo médio (kWh/mês)","Sistema sugerido (kWp)","Demanda contratada (kW)","GD","Rede comporta","Horas sem energia/ano","Trafo","Alimentador","Latitude","Longitude","Google Maps"];
-  const lin=empVis.map(x=>[x[8],x[9],META.munNome.split(",")[0],a[x[4]]||"",x[16],x[5],x[10],x[11]?"MT":"BT",x[2],String(x[3]).replace(".",","),x[15]??"",GDR[x[6]],RED[x[7]],String(x[12]??"").replace(".",","),x[13],x[14],x[0],x[1],`https://www.google.com/maps?q=${x[0]},${x[1]}`].map(q).join(";"));
+  const cab=["Endereço","Bairro","Município","Atividade","CNAE","Classe","Grupo","Rede","Consumo médio 12 meses (kWh/mês)","Pg sem análise de inversão (kW)","Sistema sugerido (kWp)","Demanda contratada (kW)","GD","Rede comporta","Horas sem energia/ano","Trafo","Alimentador","Latitude","Longitude","Google Maps"];
+  const lin=empVis.map(x=>[x[8],x[9],META.munNome.split(",")[0],a[x[4]]||"",x[16],x[5],x[10],x[11]?"MT":"BT",x[2],x[17],String(x[3]).replace(".",","),x[15]??"",GDR[x[6]],RED[x[7]],String(x[12]??"").replace(".",","),x[13],x[14],x[0],x[1],`https://www.google.com/maps?q=${x[0]},${x[1]}`].map(q).join(";"));
   const blob=new Blob(["\ufeff"+[cab.map(q).join(";"),...lin].join("\r\n")],{type:"text/csv;charset=utf-8"});
   const l=document.createElement("a");l.href=URL.createObjectURL(blob);l.download=`prospeccao_${META.munNome.split(",")[0].replace(/\W+/g,"_")}.csv`;l.click();setTimeout(()=>URL.revokeObjectURL(l.href),2000);
 }
