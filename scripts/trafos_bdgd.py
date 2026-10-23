@@ -913,12 +913,13 @@ button:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid 
 .row input,.row select{padding:7px 9px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--ink);font:inherit;min-width:0}
 #pot{width:90px;font-family:var(--mono)}
 #alim,#mun{flex:1}
-details#prosp{border:1px solid var(--line);border-radius:8px;padding:8px 10px;display:grid;gap:8px}
-details#prosp[open]{gap:8px}
-details#prosp summary{cursor:pointer;font:700 14px var(--display);text-transform:uppercase;letter-spacing:.06em;color:var(--accent)}
-details#prosp > *:not(summary){margin-top:8px}
+details.menu{border:1px solid var(--line);border-radius:8px;padding:8px 10px;display:grid;gap:8px}
+details.menu[open]{gap:8px}
+details.menu summary{cursor:pointer;font:700 14px var(--display);text-transform:uppercase;letter-spacing:.06em;color:var(--accent)}
+details.menu > *:not(summary){margin-top:8px}
+details.menu summary .base{text-transform:none;letter-spacing:0;font-weight:400}
 #empKwh{width:90px;font-family:var(--mono)}
-header,aside,details#prosp{min-width:0}
+header,aside,details.menu{min-width:0}
 .row select{max-width:100%}#empAtv,#alim,#mun,#empTen,#empGd,#empRede{flex:1 1 0;width:0;min-width:110px}
 #kvaMin,#kvaMax{flex:1;font-family:var(--mono)}
 .chk{display:flex;gap:8px;align-items:center;font-size:13px;color:var(--muted)}
@@ -985,6 +986,8 @@ dt{color:var(--muted)} dd{margin:0;font-family:var(--mono);font-variant-numeric:
       <label for="mun">Município</label>
       <select id="mun"></select>
     </div>
+    <details id="ftr" class="menu" open>
+    <summary>Filtros de transformadores <span class="base" id="ftrN"></span></summary>
     <div class="row">
       <label for="pot">GD pretendida</label>
       <input id="pot" type="number" min="0" step="0.1" placeholder="kW">
@@ -1000,7 +1003,9 @@ dt{color:var(--muted)} dd{margin:0;font-family:var(--mono);font-variant-numeric:
     </div>
     <label class="chk"><input type="checkbox" id="uc1"> Só trafos com 1 unidade consumidora</label>
     <label class="chk"><input type="checkbox" id="alimOk"> Só trafos cujo alimentador comporta a GD pretendida</label>
-    <details id="prosp" hidden>
+    <label class="chk" id="filtraRow" hidden><input type="checkbox" id="filtra" checked> Mostrar só os trafos que comportam a GD pretendida</label>
+    </details>
+    <details id="prosp" class="menu" hidden>
       <summary>Prospecção de empresas</summary>
       <label class="chk"><input type="checkbox" id="empOn"> Mostrar empresas no mapa</label>
       <label class="chk"><input type="checkbox" id="empHideTr"> Esconder os trafos do mapa</label>
@@ -1011,7 +1016,6 @@ dt{color:var(--muted)} dd{margin:0;font-family:var(--mono);font-variant-numeric:
         <label for="empRede">Rede comporta</label><select id="empRede"><option value="">Qualquer</option><option value="3">Sim</option><option value="2">Sim ou parcial</option></select></div>
       <button type="button" class="ghost" id="empCsv">Baixar lista (CSV)</button>
     </details>
-    <label class="chk" id="filtraRow" hidden><input type="checkbox" id="filtra" checked> Mostrar só os trafos que comportam a GD pretendida</label>
   </header>
   <div class="scroll" id="info"></div>
 </aside>
@@ -1275,11 +1279,19 @@ document.getElementById("f").addEventListener("submit",async e=>{
   }catch(err){msg="Não consegui buscar o endereço agora (sem internet?). Cole a coordenada ou clique no mapa.";render()}
 });
 const uc1El=document.getElementById("uc1"),filtraEl=document.getElementById("filtra"),filtraRow=document.getElementById("filtraRow");
-function aoMudarPot(){filtraRow.hidden=!((+potEl.value||0)>0);if(ponto){const p=proximos(ponto[0],ponto[1],1)[0];if(sel&&!visiveis().includes(sel))sel=p?p.t:null}desenhar();render()}
+// resumo dos filtros ativos no título do menu (útil com o menu recolhido)
+function resumoFiltros(){
+  const f=[],pot=+potEl.value||0;
+  if(pot>0)f.push(`GD ${fmt(pot)} kW`);if(alimEl.value)f.push(alimEl.value);
+  if(kvaMinEl.value||kvaMaxEl.value)f.push(`${kvaMinEl.value?fmtK(+kvaMinEl.value):"…"}–${kvaMaxEl.value?fmtK(+kvaMaxEl.value):"…"} kVA`);
+  if(uc1El.checked)f.push("1 UC");if(document.getElementById("alimOk").checked)f.push("alim. comporta");
+  document.getElementById("ftrN").textContent=f.length?"· "+f.join(" · "):"";
+}
+function aoMudarPot(){resumoFiltros();filtraRow.hidden=!((+potEl.value||0)>0);if(ponto){const p=proximos(ponto[0],ponto[1],1)[0];if(sel&&!visiveis().includes(sel))sel=p?p.t:null}desenhar();render()}
 potEl.addEventListener("input",aoMudarPot);uc1El.addEventListener("change",aoMudarPot);
 kvaMinEl.addEventListener("change",aoMudarPot);kvaMaxEl.addEventListener("change",aoMudarPot);
 document.getElementById("alimOk").addEventListener("change",aoMudarPot);filtraEl.addEventListener("change",aoMudarPot);
-alimEl.addEventListener("change",()=>{sel=null;desenhar();render();ajustar()});
+alimEl.addEventListener("change",()=>{sel=null;resumoFiltros();desenhar();render();ajustar()});
 const side=document.getElementById("side"),tog=document.getElementById("tog");
 tog.onclick=()=>{side.classList.toggle("min");tog.setAttribute("aria-expanded",!side.classList.contains("min"));setTimeout(()=>map.invalidateSize(),50)};
 function abrirPainel(){if(side.classList.contains("min")){side.classList.remove("min");setTimeout(()=>map.invalidateSize(),50)}}
