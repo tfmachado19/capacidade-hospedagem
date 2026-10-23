@@ -86,5 +86,8 @@ inversão de fluxo: Pg = consumo médio ÷ (16% × 24 h × 30 dias) × FA da cla
 residencial 46%, industrial 69%, comercial 63%, rural 53%, serviço/poder público 57%),
 arredondado para cima (REN 1.000, arts. 73-A e 655-B; Manual de Inversão de Fluxo, item 8.12).
 Passar o mouse (ou tocar) num trafo ou numa empresa mostra o resumo direto no mapa.
+Ao clicar numa empresa de BT, o site destaca o trafo dela, desenha a rede BT desse trafo e
+traceja a ligação até a empresa. Numa empresa de MT, desenha o alimentador inteiro em azul
+(traçado da camada SSDMT, simplificado, em `dados/mt/<alimentador>.json`).
 
 Não envie as planilhas de prospecção ao repositório.

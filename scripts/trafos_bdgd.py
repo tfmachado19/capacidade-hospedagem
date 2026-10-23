@@ -502,6 +502,35 @@ def salvar_redes_bt(gdb, L, pasta, df, ug):
     return len(redes)
 
 
+def salvar_redes_mt(gdb, L, pasta, tol=0.00003):
+    """dados/mt/<alimentador>.json: traçado da rede MT (SSDMT) de cada alimentador, simplificado (~3 m),
+    no mesmo formato compacto da rede BT: {"l": [[x0, y0, dx1, dy1, ...], ...], "km": comprimento}."""
+    import shapely
+    if not L.get("ssdmt"):
+        return 0
+    pasta = Path(pasta) / "dados" / "mt"
+    pasta.mkdir(parents=True, exist_ok=True)
+    sd = ler(gdb, L["ssdmt"], ["CTMT", "COMP"], geom=True)
+    sd["CTMT"] = txt(sd["CTMT"])
+    sd = sd[sd["CTMT"] != ""]
+    if sd.crs is not None and sd.crs.to_epsg() != 4326:
+        sd = sd.to_crs(4326)
+    km = pd.to_numeric(sd["COMP"], errors="coerce").groupby(sd["CTMT"]).sum() / 1000
+    sd = sd.explode(index_parts=False).reset_index(drop=True)
+    geo = shapely.simplify(sd.geometry.values, tol)
+    xy, idx = shapely.get_coordinates(geo, return_index=True)
+    q = np.round(xy * 1e5).astype(np.int64)
+    corte = np.flatnonzero(np.diff(idx)) + 1
+    redes = {}
+    if len(idx):
+        for ct, pts in zip(sd["CTMT"].to_numpy()[idx[np.r_[0, corte]]], np.split(q, corte)):
+            redes.setdefault(ct, []).append([int(pts[0, 0]), int(pts[0, 1])] + np.diff(pts, axis=0).ravel().tolist())
+    for ct, linhas in redes.items():
+        (pasta / f"{nome_arq(ct)}.json").write_text(
+            _js({"l": linhas, "km": round(float(km.get(ct, 0)), 1)}), encoding="utf-8")
+    return len(redes)
+
+
 def salvar_site(df, pasta, meta, padrao="4316907"):
     """Área inteira: index.html + dados/<código IBGE>.json (carregado sob demanda por município).
     Precisa ser servido por HTTP (GitHub Pages); aberto direto do disco o navegador bloqueia o fetch."""
@@ -858,6 +887,7 @@ def main():
         n_mun = salvar_site(df, site, meta)
         log("Gerando rede BT e postes com GD por trafo ...")
         log(f"  rede BT de {salvar_redes_bt(gdb, L, site, df, ug):,} trafos em {site / 'dados' / 'bt'}")
+        log(f"  traçado de {salvar_redes_mt(gdb, L, site):,} alimentadores em {site / 'dados' / 'mt'}")
         log(f"Site com {n_mun} municípios salvo em {site} (publique o conteúdo da pasta)")
     else:
         nm, uf = nomes.get(mun.lstrip("0"), (mun, ""))
@@ -1056,6 +1086,35 @@ osm.addTo(map);L.control.layers({"Mapa":osm,"Satélite":sat},null,{position:"top
 const capa=L.layerGroup().addTo(map);let marcas=new Map(),pino=null,sel=null;
 // Rede BT do trafo selecionado + postes com GD (dados/bt/<alimentador>.json, sob demanda)
 const rede=L.layerGroup().addTo(map),btCache={};
+// Ao clicar numa empresa: BT → destaca o trafo e desenha a rede BT dele; MT → desenha o alimentador inteiro
+const redeMt=L.layerGroup().addTo(map),mtCache={};
+map.createPane("topo");map.getPane("topo").style.zIndex=450;map.getPane("topo").style.pointerEvents="none";
+const rTopo=L.canvas({pane:"topo"});
+function linhas(d,estilo,grupo){const ls=[];d.l.forEach(a=>{let x=a[0],y=a[1];const pts=[[y/1e5,x/1e5]];
+  for(let i=2;i<a.length;i+=2){x+=a[i];y+=a[i+1];pts.push([y/1e5,x/1e5])}ls.push(L.polyline(pts,estilo).addTo(grupo))});return ls}
+async function mostrarAlim(x){
+  const al=x[14];if(!al)return;
+  const f=String(al).replace(/[^\w.-]/g,"_");
+  try{if(!(f in mtCache)){const r=await fetch(`dados/mt/${f}.json`);mtCache[f]=r.ok?await r.json():null}}catch(e){mtCache[f]=null}
+  if(empSel!==x)return;
+  const d=mtCache[f];x._km=d?d.km:0;
+  if(d){const ls=linhas(d,{color:"#1f5fbf",weight:4,opacity:.9,interactive:false,renderer:rTopo},redeMt);
+    if(ls.length)map.fitBounds(L.featureGroup(ls).getBounds(),{padding:[20,20]})}
+  render();
+}
+function selEmp(x){
+  empSel=x;redeMt.clearLayers();rede.clearLayers();ponto=null;if(pino){map.removeLayer(pino);pino=null}
+  if(x[11]){sel=null;desenhar();render();mostrarAlim(x)}
+  else{
+    const t=D.find(t=>t.id===x[13]);sel=t||null;desenhar();render();
+    if(t){mostrarRede(t);
+      L.circleMarker([t.lat,t.lon],{radius:11,color:cssVar("--ink"),weight:3,fillColor:hex(classe(t,+potEl.value||0)),fillOpacity:1})
+        .bindTooltip(()=>dicaTrafo(t),{direction:"top",offset:[0,-8]}).addTo(redeMt);
+      L.polyline([[x[0],x[1]],[t.lat,t.lon]],{color:"#8e44ec",weight:2.5,dashArray:"5 5",interactive:false,renderer:rTopo}).addTo(redeMt);
+      map.fitBounds(L.latLngBounds([[x[0],x[1]],[t.lat,t.lon]]).pad(.6),{maxZoom:18})}
+  }
+  abrirPainel();topoPainel();
+}
 async function mostrarRede(t){
   rede.clearLayers();
   if(!t||!META.muns||!t.alim)return;
@@ -1095,6 +1154,7 @@ function filtrando(){return (+potEl.value||0)>0&&filtraEl.checked}
 function visiveis(){const v=base(),pot=+potEl.value||0;return filtrando()?v.filter(t=>t.cap!=null&&t.cap>=pot):v}
 function desenhar(){
   if(!sel)rede.clearLayers();
+  if(!empSel)redeMt.clearLayers();
   capa.clearLayers();marcas.clear();const pot=+potEl.value||0;
   visiveis().forEach(t=>{
     const k=classe(t,pot),c=hex(k);
@@ -1211,7 +1271,7 @@ async function desenharEmp(){
   empVis=empFiltro(d);
   empVis.forEach(x=>{const m=L.circleMarker([x[0],x[1]],{radius:x[11]?8:6,color:"#3d1a78",weight:1.5,fillColor:x[6]>=2?"#b9a6d9":"#8e44ec",fillOpacity:.95});
     m.bindTooltip(()=>dicaEmp(x),{direction:"top",offset:[0,-6]});
-    m.on("click",e=>{L.DomEvent.stopPropagation(e);empSel=x;render();abrirPainel();topoPainel()});empLayer.addLayer(m)});
+    m.on("click",e=>{L.DomEvent.stopPropagation(e);selEmp(x)});empLayer.addLayer(m)});
   render();
 }
 // Informações ao passar o mouse (ou tocar) no mapa
@@ -1246,7 +1306,9 @@ function fichaEmp(x){
   <dt>GD</dt><dd>${GDR[x[6]]}</dd><dt>Rede comporta o sistema</dt><dd>${RED[x[7]]}</dd>
   <dt>Horas sem energia no ano</dt><dd>${fmt(x[12])} h</dd><dt>Trafo · alimentador</dt><dd>${esc(x[13]||"–")} · ${esc(x[14]||"–")}</dd></dl>
   <div class="links"><a href="https://www.google.com/maps?q=${x[0]},${x[1]}" target="_blank" rel="noopener">Abrir no Google Maps</a>
-  ${temTr?`<button class="ghost" data-tr="${esc(x[13])}">Ver trafo</button>`:""}</div></div></section>`;
+  ${temTr?`<button class="ghost" data-tr="${esc(x[13])}">Ver trafo</button>`:""}</div>
+  <div class="base">${x[11]?`Alimentador ${esc(x[14]||"–")} desenhado em azul no mapa${x._km?` (${fmt(x._km)} km de rede MT)`:""}.`
+    :temTr?`Trafo ${esc(x[13])} destacado no mapa, com a rede BT em verde e a ligação até a empresa tracejada.`:"Trafo desta empresa não encontrado no mapa."}</div></div></section>`;
 }
 function baixarCsv(){
   const a=(empCache[META.mun]||{a:{}}).a,q=v=>`"${String(v??"").replace(/"/g,'""')}"`;
