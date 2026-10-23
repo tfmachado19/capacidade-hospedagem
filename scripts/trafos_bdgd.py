@@ -135,7 +135,7 @@ def col_trafo(df):
 
 
 def txt(s):
-    return s.astype(str).str.strip().replace({"None": "", "nan": "", "<NA>": ""})
+    return s.astype(object).where(s.notna(), "").astype(str).str.strip().replace({"None": "", "nan": "", "<NA>": ""})
 
 
 def ler_por_municipio(gdb, camada, cols, mun):

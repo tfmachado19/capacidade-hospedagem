@@ -67,3 +67,15 @@ de inversão de fluxo da distribuidora.
 6. Copie o conteúdo de `site_todos/` (o `index.html` e a pasta `dados/`) para a raiz do
    repositório, substituindo os atuais, e faça commit/push na `main`. O GitHub Pages publica em
    alguns minutos. Não envie a planilha nem o zip.
+
+## Prospecção comercial
+
+`scripts/prospeccao.py` gera `Prospeccao_<município|todos>.xlsx` com empresas (endereço,
+bairro, CNAE, consumo, coordenada, se já tem GD e se a rede comporta o sistema),
+bairros (penetração de GD e potencial), atividades e municípios. Usa as bases UCBT_PJ e
+UCMT_PJ da ANEEL (página da BDGD no portal de dados abertos), a BDGD e a planilha do
+`trafos_bdgd.py`:
+
+    py scripts/prospeccao.py --bdgd RGE_396_xxxx.zip --ucbt-pj ucbt_pj.zip --ucmt-pj ucmt_pj.csv --trafos BDGD_trafos_todos.xlsx --nomes empreendimento-geracao-distribuida.parquet
+
+Não envie as planilhas de prospecção ao repositório.
