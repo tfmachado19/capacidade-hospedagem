@@ -987,6 +987,54 @@ dt{color:var(--muted)} dd{margin:0;font-family:var(--mono);font-variant-numeric:
 .msg{font-size:13px;color:var(--low)}
 .toggle{display:none}
 .leaflet-container{font:inherit}
+/* Abas: Consultar · Prospectar · Sobre os dados */
+header{padding-bottom:0}
+.tabs{display:flex;gap:2px;margin:0 -6px;flex-wrap:wrap}
+.tabs button{background:none;color:var(--muted);border-radius:0;border-bottom:3px solid transparent;padding:10px 10px 9px;min-height:44px;
+  font:700 14px var(--display);letter-spacing:.06em;text-transform:uppercase}
+.tabs button[aria-selected="true"]{color:var(--accent);border-bottom-color:var(--accent)}
+.tabs button[hidden]{display:none}
+.aba{display:flex;flex-direction:column;min-width:0}
+.aba[hidden]{display:none}
+.aba>.consulta,.aba>details.menu,.aba>.painel{margin:14px 18px 0}
+.consulta{background:var(--chip);border-radius:12px;padding:14px;display:grid;gap:10px}
+.painel{display:grid;gap:10px}
+.pergunta{margin:0;font:700 19px/1.2 var(--display);text-transform:uppercase;letter-spacing:.03em}
+.campo{display:grid;gap:4px;font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;min-width:0}
+.campo input{padding:10px 12px;border:1px solid var(--line);border-radius:8px;background:var(--panel);color:var(--ink);font:15px var(--body);text-transform:none;letter-spacing:0;min-width:0}
+.linha{display:flex;gap:10px;align-items:flex-end}.linha .campo{flex:1}
+.linha button{min-height:44px;padding:0 18px;font-size:15px}
+#pot{width:100%;font:600 16px var(--mono)}
+.sobre p{margin:0;font-size:14px}.sobre h2{margin:6px 0 0}.sobre a{color:var(--accent)}
+.sobre dl{grid-template-columns:auto 1fr}.sobre dd{text-align:left;font-family:var(--body)}
+/* Resposta da consulta (sinal: cor + forma) */
+.ico{flex:none;vertical-align:middle}
+.ver{display:flex;gap:12px;align-items:center;border:2px solid var(--c);border-radius:12px;padding:12px 14px;
+  background:color-mix(in srgb,var(--c) 12%,var(--panel))}
+.ver strong{display:block;font:700 22px/1.1 var(--display);text-transform:uppercase}
+.ver span{font-size:14px}
+.duo{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin-top:8px}
+.pill{display:inline-flex;align-items:center;gap:5px}.pill .ico{stroke:#fff!important}
+.near button{grid-template-columns:16px 1fr auto}
+.acoes{display:flex;gap:8px;flex-wrap:wrap}.acoes button{min-height:40px}
+details.mais summary{cursor:pointer;color:var(--accent);font-weight:600;font-size:13px}
+details.mais[open] summary{margin-bottom:6px}
+/* Ficha do trafo flutuando sobre o mapa (computador) */
+.fichaPop .leaflet-popup-content-wrapper{background:var(--panel);color:var(--ink);border-radius:12px;box-shadow:0 8px 28px rgba(0,0,0,.25)}
+.fichaPop .leaflet-popup-tip{background:var(--panel)}
+.fichaPop .leaflet-popup-content{margin:0;width:330px!important;max-height:calc(100vh - 150px);overflow-y:auto;font:15px/1.45 var(--body)}
+.fichaPop .card{border:0;padding:14px 16px}
+.fichaPop a.leaflet-popup-close-button{width:32px;height:32px;font:22px/30px var(--body);color:var(--muted)}
+.fichaPop .card .top{padding-right:22px;flex-wrap:wrap;justify-content:flex-start}
+.fichaPop .card .id{word-break:normal;overflow-wrap:anywhere}
+/* Controles sobre o mapa: data dos dados, legenda, dica de primeiro acesso */
+.mapbox{background:var(--panel);color:var(--ink);border:1px solid var(--line);border-radius:8px;padding:6px 10px;font-size:13px;box-shadow:0 1px 4px rgba(0,0,0,.2)}
+.legenda{display:grid;gap:3px}.legenda b{font:700 13px var(--display);text-transform:uppercase;letter-spacing:.06em}
+.legenda div{display:flex;gap:7px;align-items:center}.legenda .base{font-size:11px}
+.legenda.soCel{display:none;font-size:13px}
+.dica{max-width:270px;background:var(--ink);color:var(--panel);border-radius:12px;padding:12px 14px;display:grid;gap:8px;box-shadow:0 8px 24px rgba(0,0,0,.25);font-size:14px}
+.dica .base{color:inherit;opacity:.8}.dica .acoes{justify-content:flex-end}
+.dica button.ghost{background:transparent;color:inherit;border:1px solid currentColor}
 @media (max-width:760px){
   body{grid-template-columns:1fr;grid-template-rows:1fr auto}
   #map{grid-row:1}
@@ -995,7 +1043,10 @@ dt{color:var(--muted)} dd{margin:0;font-family:var(--mono);font-variant-numeric:
         padding-bottom:env(safe-area-inset-bottom,0px);overflow-y:auto}
   aside .scroll{overflow:visible;flex:none}
   aside.min{overflow:hidden}aside.min header>*:not(.brand){display:none}
-  aside.min .scroll{display:none}
+  aside.min .scroll,aside.min .aba{display:none}
+  .aba>.consulta,.aba>details.menu,.aba>.painel{margin:12px 16px 0}
+  .leaflet-control.legenda{display:none}.legenda.soCel{display:grid}
+  .dica{max-width:220px;font-size:13px}
   .toggle{display:inline-block}
   header{padding:12px max(16px,env(safe-area-inset-left,0px)) 10px max(16px,env(safe-area-inset-right,0px))}
   .scroll{padding-left:16px;padding-right:16px}
@@ -1010,21 +1061,33 @@ dt{color:var(--muted)} dd{margin:0;font-family:var(--mono);font-variant-numeric:
       <h1>Capacidade de Hospedagem · <span id="titulo">__MUNNOME__</span></h1>
       <button class="ghost toggle" id="tog" aria-expanded="true">Painel</button>
     </div>
-    <div class="base">BDGD __BASE__</div>
-    <form class="search" id="f">
-      <input id="q" type="search" placeholder="Endereço, coordenada, trafo ou alimentador" autocomplete="off">
-      <button type="submit">Buscar</button>
-    </form>
-    <p class="hint">Ou clique no mapa para ver os transformadores mais próximos do ponto.</p>
+    <div class="base">Dados da BDGD de __BASE__</div>
     <div class="row" id="munRow" style="display:none">
       <label for="mun">Município</label>
       <select id="mun"></select>
     </div>
-    <details id="ftr" class="menu" open>
-    <summary>Filtros de transformadores <span class="base" id="ftrN"></span></summary>
+    <nav class="tabs" role="tablist" aria-label="Seções">
+      <button type="button" role="tab" id="tabC" data-tab="C" aria-selected="true" aria-controls="abaC">Consultar</button>
+      <button type="button" role="tab" id="tabP" data-tab="P" aria-selected="false" aria-controls="abaP" hidden>Prospectar</button>
+      <button type="button" role="tab" id="tabS" data-tab="S" aria-selected="false" aria-controls="abaS">Sobre os dados</button>
+    </nav>
+  </header>
+  <section class="aba" id="abaC" role="tabpanel" aria-labelledby="tabC">
+    <form class="consulta" id="f">
+      <p class="pergunta">Onde você quer ligar GD?</p>
+      <label class="campo" for="q">Endereço, coordenada, trafo ou alimentador
+        <input id="q" type="search" placeholder="Ex.: Rua do Acampamento, 100" autocomplete="off"></label>
+      <div class="linha">
+        <label class="campo" for="pot">Potência pretendida (kW)
+          <input id="pot" type="number" min="0" step="0.1" placeholder="kW"></label>
+        <button type="submit">Consultar</button>
+      </div>
+      <p class="hint">Ou clique no mapa no local da instalação.</p>
+      <label class="chk" id="filtraRow" hidden><input type="checkbox" id="filtra" checked> Mostrar no mapa só os trafos que comportam essa potência</label>
+    </form>
+    <details id="ftr" class="menu">
+    <summary>Filtros avançados <span class="base" id="ftrN"></span></summary>
     <div class="row">
-      <label for="pot">GD pretendida</label>
-      <input id="pot" type="number" min="0" step="0.1" placeholder="kW">
       <label for="alim">Alimentador</label>
       <select id="alim"><option value="">Todos</option></select>
     </div>
@@ -1037,10 +1100,12 @@ dt{color:var(--muted)} dd{margin:0;font-family:var(--mono);font-variant-numeric:
     </div>
     <label class="chk"><input type="checkbox" id="uc1"> Só trafos com 1 unidade consumidora</label>
     <label class="chk"><input type="checkbox" id="alimOk"> Só trafos cujo alimentador comporta a GD pretendida</label>
-    <label class="chk" id="filtraRow" hidden><input type="checkbox" id="filtra" checked> Mostrar só os trafos que comportam a GD pretendida</label>
     </details>
-    <details id="prosp" class="menu" hidden>
-      <summary>Prospecção de empresas</summary>
+    <div class="scroll" id="info"></div>
+  </section>
+  <section class="aba" id="abaP" role="tabpanel" aria-labelledby="tabP" hidden>
+    <div id="prosp" class="painel">
+      <p class="pergunta">Empresas com perfil para GD</p>
       <label class="chk"><input type="checkbox" id="empOn"> Mostrar empresas no mapa</label>
       <label class="chk"><input type="checkbox" id="empHideTr"> Esconder os trafos do mapa</label>
       <div class="row"><label for="empAtv">Atividade</label><select id="empAtv"><option value="">Todas</option></select></div>
@@ -1049,9 +1114,25 @@ dt{color:var(--muted)} dd{margin:0;font-family:var(--mono);font-variant-numeric:
       <div class="row"><label for="empGd">GD</label><select id="empGd"><option value="0">Sem GD</option><option value="1">Sem GD ou talvez</option><option value="">Todas</option></select>
         <label for="empRede">Rede comporta</label><select id="empRede"><option value="">Qualquer</option><option value="3">Sim</option><option value="2">Sim ou parcial</option></select></div>
       <button type="button" class="ghost" id="empCsv">Baixar lista (CSV)</button>
-    </details>
-  </header>
-  <div class="scroll" id="info"></div>
+    </div>
+    <div class="scroll" id="infoEmp"></div>
+  </section>
+  <section class="aba" id="abaS" role="tabpanel" aria-labelledby="tabS" hidden>
+    <div class="scroll sobre">
+      <p class="pergunta">De onde vêm os números</p>
+      <dl><dt>Rede e cargas</dt><dd>BDGD da RGE (ANEEL), data-base __BASE__</dd>
+      <dt>GD já ligada</dt><dd>Base de GD da ANEEL</dd></dl>
+      <h2>Capacidade do trafo</h2>
+      <p>Menor valor entre a carga mínima de dia (o consumo dos vizinhos ao meio-dia, × fator de segurança) e a potência do trafo, descontada a GD que já existe. Acima da carga mínima, a energia volta para a rede (inversão de fluxo).</p>
+      <h2>Capacidade do alimentador</h2>
+      <p>Menor valor entre a carga mínima de dia do alimentador e a capacidade do cabo de saída, descontada a GD em BT e MT. O carregamento do alimentador é a demanda de pico ÷ capacidade do cabo de saída; valores muito acima de 100% indicam dado atípico na BDGD.</p>
+      <h2>Prospecção</h2>
+      <p>Pg = consumo médio de 12 meses ÷ (16% × 24 × 30) × fator da classe, arredondado para cima (REN 1.000, art. 73-A, II; Manual de Inversão de Fluxo, item 8.12). Vale para microgeração até 75 kW. Na abordagem comercial, respeite a LGPD e o cadastro “Não Perturbe”.</p>
+      <h2>Limitações</h2>
+      <p>Não considera proteção nem manobras da rede. Consumo de quem já tem GD é o líquido medido. É uma triagem: quem decide a conexão é a distribuidora.</p>
+      <p><a href="https://github.com/tfmachado19/capacidade-hospedagem/issues" target="_blank" rel="noopener">Relatar erro nos dados ou pedir melhoria</a></p>
+    </div>
+  </section>
 </aside>
 <div id="map"></div>
 <script>
@@ -1081,11 +1162,49 @@ function classe(t,pot){
 }
 const ROT={ok:"capacidade ≥ 30 kW",mid:"10 a 30 kW",low:"até 10 kW",none:"sem capacidade",nd:"sem dado de carga"};
 const ROTP={ok:"comporta a GD pretendida",low:"capacidade insuficiente",none:"sem capacidade",nd:"sem dado de carga"};
+// Cada classe tem também uma forma (círculo, losango, triângulo, quadrado), para quem não distingue as cores
+const FORMA={ok:"c",mid:"d",low:"t",none:"q",nd:"c"};
+function icone(k,s=14){
+  const f=FORMA[k],sh=f==="q"?`<rect x="2" y="2" width="12" height="12" rx="2"/>`:f==="t"?`<path d="M8 1.5L15 14.5H1z"/>`:
+    f==="d"?`<path d="M8 .8L15.2 8 8 15.2.8 8z"/>`:`<circle cx="8" cy="8" r="6.5"/>`;
+  return `<svg class="ico" width="${s}" height="${s}" viewBox="0 0 16 16" aria-hidden="true" style="fill:${COR[k]};stroke:rgba(0,0,0,.35);stroke-width:1">${sh}</svg>`;
+}
+L.Canvas.include({_updateForma(l){
+  if(!this._drawing||l._empty())return;
+  const p=l._point,c=this._ctx,r=Math.max(Math.round(l._radius),1),f=l.options.forma;
+  c.beginPath();
+  if(f==="q")c.rect(p.x-r*.85,p.y-r*.85,r*1.7,r*1.7);
+  else if(f==="t"){c.moveTo(p.x,p.y-r);c.lineTo(p.x+r,p.y+r*.8);c.lineTo(p.x-r,p.y+r*.8);c.closePath()}
+  else{c.moveTo(p.x,p.y-r);c.lineTo(p.x+r,p.y);c.lineTo(p.x,p.y+r);c.lineTo(p.x-r,p.y);c.closePath()}
+  this._fillStroke(c,l);
+}});
+const Forma=L.CircleMarker.extend({_updatePath(){
+  if(this.options.forma!=="c"&&this._renderer._updateForma)this._renderer._updateForma(this);else this._renderer._updateCircle(this)}});
 
-const map=L.map("map",{preferCanvas:true,zoomControl:true});
+const map=L.map("map",{preferCanvas:true,zoomControl:false});
 const osm=L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",{maxZoom:20,maxNativeZoom:19,attribution:"© OpenStreetMap · BDGD/ANEEL"});
 const sat=L.tileLayer("https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",{maxZoom:20,maxNativeZoom:19,attribution:"Imagens © Esri · BDGD/ANEEL"});
 osm.addTo(map);const camadas=L.control.layers({"Mapa":osm,"Satélite":sat},null,{position:"topright"}).addTo(map);
+L.control.zoom({position:"topright"}).addTo(map);
+// Sobre o mapa: data dos dados (sempre visível), legenda e dica de primeiro acesso
+function caixa(pos,cls,html){const c=L.control({position:pos});
+  c.onAdd=()=>{const d=L.DomUtil.create("div",cls);d.innerHTML=html;L.DomEvent.disableClickPropagation(d);L.DomEvent.disableScrollPropagation(d);return d};
+  return c.addTo(map)}
+caixa("topleft","mapbox",`<b>Dados de ${esc(META.base)}</b> · estimativa para triagem`);
+const legCtl=caixa("bottomleft","mapbox legenda","");
+const DICAS=["Digite o endereço (ou clique no mapa) e a potência que quer ligar. O painel diz se cabe.",
+  "Clique num trafo para abrir a ficha, com a capacidade e os botões para compartilhar e baixar em PDF.",
+  "Na aba Prospectar estão as empresas com perfil para GD. Em Sobre os dados, como os números são calculados."];
+let dicaN=0;try{if(localStorage.getItem("dicaVista"))dicaN=-1}catch(e){}
+const dicaCtl=dicaN<0?null:caixa("topleft","dica","");
+function mostrarDica(){
+  if(!dicaCtl)return;const d=dicaCtl.getContainer();
+  if(dicaN<0||dicaN>=DICAS.length){dicaCtl.remove();try{localStorage.setItem("dicaVista","1")}catch(e){}return}
+  d.innerHTML=`<span class="base">Primeiro acesso · ${dicaN+1} de ${DICAS.length}</span><span>${DICAS[dicaN]}</span>
+  <div class="acoes"><button type="button" class="ghost" data-d="-1">Pular</button><button type="button" data-d="${dicaN+1}">${dicaN<DICAS.length-1?"Próximo":"Entendi"}</button></div>`;
+  d.querySelectorAll("button").forEach(b=>b.onclick=()=>{dicaN=+b.dataset.d;mostrarDica()});
+}
+mostrarDica();
 // ---- Satélite Google (Map Tiles API oficial). A chave fica em dados/config.json:
 // {"googleMapsKey": "..."} — chave restrita ao domínio do site e à Map Tiles API.
 let gTiles=null,gKey="",gSessao="";
@@ -1172,7 +1291,7 @@ async function mostrarAlim(x){
   render();
 }
 function selEmp(x){
-  empSel=x;redeMt.clearLayers();rede.clearLayers();ponto=null;if(pino){map.removeLayer(pino);pino=null}
+  empSel=x;fichaFechada=true;aba("P");redeMt.clearLayers();rede.clearLayers();ponto=null;if(pino){map.removeLayer(pino);pino=null}
   if(x[11]){sel=null;desenhar();render();mostrarAlim(x)}
   else{
     const t=D.find(t=>t.id===x[13]);sel=t||null;desenhar();render();
@@ -1199,7 +1318,7 @@ async function mostrarRede(t){
   }
   render();
 }
-const potEl=document.getElementById("pot"),alimEl=document.getElementById("alim"),info=document.getElementById("info");
+const potEl=document.getElementById("pot"),alimEl=document.getElementById("alim"),info=document.getElementById("info"),infoEmp=document.getElementById("infoEmp");
 // faixas de potência (kVA) presentes no município; mantém a escolha se o valor existir
 function preencherKva(){
   const vs=[...new Set(D.map(t=>t.kva).filter(v=>v!=null))].sort((a,b)=>a-b);
@@ -1224,19 +1343,19 @@ function desenhar(){
   if(!sel)rede.clearLayers();
   if(!empSel)redeMt.clearLayers();
   capa.clearLayers();marcas.clear();const pot=+potEl.value||0;
-  visiveis().forEach(t=>{
+  const v=visiveis();if(sel&&!v.includes(sel))v.push(sel);
+  v.forEach(t=>{
     const k=classe(t,pot),c=hex(k);
-    const m=L.circleMarker([t.lat,t.lon],{radius:t===sel?9:5,color:t===sel?cssVar("--ink"):c,weight:t===sel?3:1,fillColor:c,fillOpacity:.85});
+    const m=new Forma([t.lat,t.lon],{forma:FORMA[k],radius:t===sel?10:6,color:t===sel?cssVar("--ink"):c,weight:t===sel?3:1,fillColor:c,fillOpacity:.85});
     m.bindTooltip(()=>dicaTrafo(t),{direction:"top",offset:[0,-6]});
     m.on("click",e=>{L.DomEvent.stopPropagation(e);abrir(t)});capa.addLayer(m);marcas.set(t.id,m);
   });
 }
 function resumo(){
-  const v=base(),pot=+potEl.value||0;const n={ok:0,mid:0,low:0,none:0,nd:0};v.forEach(t=>n[classe(t,pot)]++);
+  const v=base(),pot=+potEl.value||0;
   const oc=filtrando()?v.length-visiveis().length:0;
   const ca=alimEl.value&&v.length?v[0].ca:null;
   const gd=v.reduce((s,t)=>s+t.gd,0),kva=v.reduce((s,t)=>s+(t.kva||0),0);
-  const r=pot>0?ROTP:ROT;
   return `<section><h2>${alimEl.value?"Alimentador "+esc(alimEl.value):(META.muns?esc(META.munNome.split(",")[0]):"Município")}</h2>
   <div class="stats"><div class="stat"><b>${v.length.toLocaleString("pt-BR")}</b><span>trafos</span></div>
   <div class="stat"><b>${fmt(gd/1000,2)}</b><span>MW de GD</span></div>
@@ -1245,53 +1364,137 @@ function resumo(){
   <dt>Carregamento de GD do alimentador</dt><dd>${fmt(v[0].cga)} %</dd><dt>Capacidade p/ nova GD no alimentador</dt><dd>${fmt(v[0].capa,0)} kW</dd></dl>`:""}
   ${uc1El.checked?`<p class="hint">Mostrando só trafos com 1 unidade consumidora.</p>`:""}
   ${document.getElementById("alimOk").checked?`<p class="hint">Mostrando só trafos cujo alimentador comporta ${(+potEl.value||0)>0?fmt(+potEl.value)+" kW":"nova GD"}.</p>`:""}
-  ${kvaMinEl.value||kvaMaxEl.value?`<p class="hint">Trafos de ${kvaMinEl.value?fmtK(+kvaMinEl.value):"qualquer"} a ${kvaMaxEl.value?fmtK(+kvaMaxEl.value):"qualquer"} kVA.</p>`:""}</section>
-  <section><h2>${pot>0?"Para "+fmt(pot)+" kW":"Capacidade disponível"}</h2><div class="legend">
-  ${Object.keys(r).map(k=>`<div><span class="dot" style="background:${COR[k]}"></span>${r[k]} <span class="base">(${n[k]})</span></div>`).join("")}</div>
+  ${kvaMinEl.value||kvaMaxEl.value?`<p class="hint">Trafos de ${kvaMinEl.value?fmtK(+kvaMinEl.value):"qualquer"} a ${kvaMaxEl.value?fmtK(+kvaMaxEl.value):"qualquer"} kVA.</p>`:""}
   ${oc?`<p class="hint">${oc.toLocaleString("pt-BR")} trafos com capacidade abaixo de ${fmt(pot)} kW estão ocultos no mapa.</p>`:""}</section>`;
 }
-function rodape(){return `<p class="note">Estimativa feita a partir da BDGD/ANEEL (data-base ${esc(META.base)}): carga das UCs pela energia mensal e curvas típicas, GD pela potência instalada cadastrada. Capacidade = menor valor entre a carga mínima diurna (×${META.fs}) e a potência do trafo, descontada a GD existente. Capacidade do alimentador p/ nova GD = menor valor entre a carga mínima diurna do alimentador e a capacidade do condutor de saída, descontada a GD em BT e MT. Serve para triagem; a viabilidade de conexão é definida pela distribuidora.</p>`}
+// legenda fixa no canto do mapa, com a contagem de trafos de cada classe
+function legenda(){
+  const v=base(),pot=+potEl.value||0,n={ok:0,mid:0,low:0,none:0,nd:0},r=pot>0?ROTP:ROT;v.forEach(t=>n[classe(t,pot)]++);
+  return `<b>${pot>0?"Para "+fmt(pot)+" kW":"Capacidade p/ nova GD"}</b>`+
+    Object.keys(r).map(k=>`<div>${icone(k)}${r[k]} <span class="base">(${n[k].toLocaleString("pt-BR")})</span></div>`).join("");
+}
+// resposta direta: a potência pretendida cabe no trafo mais próximo do ponto?
+function maisProximo(lat,lon){let m=null;base().forEach(t=>{const d=dist(lat,lon,t.lat,t.lon);if(!m||d<m.d)m={t,d}});return m}
+const fmtD=d=>d<1000?Math.round(d)+" m":fmt(d/1000,2)+" km";
+function veredito(){
+  const p=maisProximo(ponto[0],ponto[1]);if(!p)return "";
+  const t=p.t,pot=+potEl.value||0,dd=`<div class="duo"><div class="stat"><b>${fmt(t.cap)} kW</b><span>trafo comporta</span></div>
+    <div class="stat"><b>${fmt(t.capa,0)} kW</b><span>alimentador comporta</span></div></div>`;
+  if(!(pot>0))return `<section>${dd}<p class="hint">Informe a potência pretendida para saber se cabe no trafo ${esc(t.id)} (a ${fmtD(p.d)}).</p></section>`;
+  const k=classe(t,pot),aOk=t.capa==null?null:t.capa>=pot;let c,ic,tit,txt;
+  if(k==="nd"){c="nd";tit="Sem dado de carga";txt=`O trafo mais próximo (${esc(t.id)}, a ${fmtD(p.d)}) não tem dado de carga na BDGD.`}
+  else if(k==="ok"&&aOk!==false){c="ok";tit="Provavelmente cabe";txt=`${fmt(pot)} kW no trafo <b>${esc(t.id)}</b>, a ${fmtD(p.d)} do ponto.`}
+  else if(k==="ok"){c="mid";tit="Cabe no trafo, alimentador no limite";txt=`O trafo ${esc(t.id)} comporta, mas o alimentador ${esc(t.alim||"")} comporta só ${fmt(t.capa,0)} kW de nova GD.`}
+  else{c=k;tit="Não cabe no trafo mais próximo";txt=`O trafo ${esc(t.id)} (a ${fmtD(p.d)}) comporta ${fmt(t.cap)} kW. Veja abaixo os trafos vizinhos.`}
+  return `<section aria-live="polite"><div class="ver" style="--c:${COR[c]}">${icone(c==="mid"?"mid":k,34)}<div><strong>${tit}</strong><span>${txt}</span></div></div>${dd}</section>`;
+}
+function rodape(){return `<p class="note">Estimativa para triagem a partir de dados públicos da ANEEL (BDGD de ${esc(META.base)}). Não substitui a análise da distribuidora. Veja como é calculado na aba “Sobre os dados”.</p>`}
+const LIM={"inversão de fluxo":"Limitada pela carga mínima de dia (risco de inversão de fluxo)","potência do trafo":"Limitada pela potência do trafo","sem dado":"Sem dado de carga na BDGD"};
+let detAberto=false;
 function ficha(t){
   const pot=+potEl.value||0,k=classe(t,pot),r=pot>0?ROTP:ROT;
-  return `<div class="card"><div class="top"><span class="id">${esc(t.id)}</span><span class="pill" style="background:${COR[k]}">${r[k]}</span></div>
-  <div><div class="base">Capacidade disponível estimada</div><div class="big">${fmt(t.cap)} <small>kW</small></div><div class="base">limitada por: ${esc(t.lim)}</div></div>
-  <dl><dt>Alimentador</dt><dd>${esc(t.alim||"–")}</dd><dt>Subestação</dt><dd>${esc(t.sub||"–")}</dd>
-  <dt>Potência do trafo</dt><dd>${fmt(t.kva,1)} kVA</dd><dt>GD instalada</dt><dd>${fmt(t.gd,2)} kW</dd>
+  return `<div class="card"><div class="top"><span class="id">Trafo ${esc(t.id)}</span><span class="pill" style="background:${COR[k]}">${icone(k,12)}${r[k]}</span></div>
+  <div><div class="base">Capacidade estimada para nova GD</div><div class="big">${fmt(t.cap)} <small>kW</small></div><div class="base">${esc(LIM[t.lim]||t.lim)}</div></div>
+  <dl><dt>Potência do trafo</dt><dd>${fmt(t.kva,1)} kVA</dd><dt>GD já ligada</dt><dd>${fmt(t.gd,1)} kW</dd>
+  <dt>Alimentador ${esc(t.alim||"–")}</dt><dd>${fmt(t.capa,0)} kW livres</dd></dl>
+  <details class="mais"${detAberto?" open":""}><summary>Mais detalhes</summary>
+  <dl><dt>Subestação</dt><dd>${esc(t.sub||"–")}</dd>
   <dt>Unidades geradoras</dt><dd>${t.ugs}</dd><dt>Unidades consumidoras</dt><dd>${t.ucs}</dd>
   <dt>Carga mín. diurna</dt><dd>${fmt(t.cmin,2)} kW</dd><dt>Demanda de pico</dt><dd>${fmt(t.pico,2)} kW</dd>
   <dt>Carregamento do trafo</dt><dd>${fmt(t.car)} %</dd><dt>GD / trafo</dt><dd>${fmt(t.kva?t.gd/t.kva*100:null)} %</dd>
-</dl>
-  <div class="base">Alimentador ${esc(t.alim||"–")}</div>
-  <dl><dt>Carregamento do alimentador</dt><dd>${fmt(t.ca)} %</dd><dt>GD no alimentador</dt><dd>${fmt(t.gda,0)} kW</dd>
-  <dt>Carregamento de GD do alimentador</dt><dd>${fmt(t.cga)} %</dd><dt>Capacidade p/ nova GD no alimentador</dt><dd>${fmt(t.capa,0)} kW</dd></dl>
+  <dt>Carregamento do alimentador</dt><dd>${fmt(t.ca)} %</dd><dt>GD no alimentador</dt><dd>${fmt(t.gda,0)} kW</dd>
+  <dt>Carregamento de GD do alimentador</dt><dd>${fmt(t.cga)} %</dd></dl></details>
   ${t.bt&&!t.bt.km&&!t.bt.np?`<div class="base">Sem rede BT nem GD cadastradas para este trafo na BDGD.</div>`:t.bt?`<div class="base">Rede BT no mapa: ${fmt(t.bt.km,2)} km · ${t.bt.np} poste${t.bt.np===1?"":"s"} com GD (${fmt(t.bt.kw)} kW) <span class="dot" style="display:inline-block;vertical-align:middle;background:#ffcc00"></span></div>`:(META.muns?`<div class="base">Carregando rede BT…</div>`:"")}
+  <div class="acoes"><button type="button" data-acao="link">Compartilhar link</button><button type="button" class="ghost" data-acao="pdf">Baixar PDF</button></div>
   <div class="links"><a href="https://www.google.com/maps?q=${t.lat},${t.lon}" target="_blank" rel="noopener">Abrir no Google Maps</a>
   <a class="gsat" href="${gSat(t.lat,t.lon)}" target="_blank" rel="noopener">Satélite no Google</a>
   <span class="base">${t.lat.toFixed(6)}, ${t.lon.toFixed(6)}</span></div></div>`;
 }
+// link direto para o trafo (#município/trafo/kW) e relatório para imprimir ou salvar em PDF
+function linkTrafo(t){const pot=+potEl.value||0;
+  return location.origin+location.pathname+"#"+[META.mun||"",t.id,pot>0?pot:""].filter((x,i)=>i<2||x!=="").map(x=>encodeURIComponent(x)).join("/")}
+async function compartilhar(t,b){
+  const u=linkTrafo(t);
+  try{if(navigator.share&&!desk.matches){await navigator.share({title:"Trafo "+t.id,url:u});return}
+    await navigator.clipboard.writeText(u);b.textContent="Link copiado!"}
+  catch(e){if(e&&e.name==="AbortError")return;
+    const a=document.createElement("textarea");a.value=u;document.body.append(a);a.select();
+    try{document.execCommand("copy");b.textContent="Link copiado!"}catch(e2){b.textContent="Não consegui copiar"}a.remove()}
+  setTimeout(()=>{b.textContent="Compartilhar link"},2500);
+}
+function relatorio(t){
+  const pot=+potEl.value||0,k=classe(t,pot),r=pot>0?ROTP:ROT,lin=(a,b)=>`<tr><th>${a}</th><td>${b}</td></tr>`;
+  const w=window.open("","_blank");if(!w)return;
+  w.document.write(`<!doctype html><html lang="pt-br"><head><meta charset="utf-8"><title>Trafo ${esc(t.id)} – capacidade de hospedagem</title>
+  <style>body{font:14px/1.5 Arial,sans-serif;color:#15211d;margin:32px;max-width:720px}h1{font-size:22px;margin:0 0 4px}
+  .s{color:#5d6b66;font-size:12px}table{border-collapse:collapse;width:100%;margin:16px 0}th,td{border-bottom:1px solid #d9e0dd;padding:6px 4px;text-align:left}
+  th{font-weight:normal;color:#5d6b66;width:55%}.big{font-size:28px;font-weight:bold}@media print{button{display:none}}</style></head><body>
+  <h1>Capacidade de hospedagem de GD · Trafo ${esc(t.id)}</h1>
+  <div class="s">${esc(META.munNome||"")} · dados da BDGD de ${esc(META.base)} · emitido em ${new Date().toLocaleDateString("pt-BR")}</div>
+  <p>Capacidade estimada para nova GD: <span class="big">${fmt(t.cap)} kW</span><br>${esc(LIM[t.lim]||t.lim)}${pot>0?`<br>Para ${fmt(pot)} kW: <b>${esc(r[k])}</b>`:""}</p>
+  <table>${lin("Potência do trafo",fmt(t.kva,1)+" kVA")+lin("GD já ligada",fmt(t.gd,1)+" kW")+lin("Unidades consumidoras · geradoras",t.ucs+" · "+t.ugs)+
+    lin("Carga mínima diurna",fmt(t.cmin,2)+" kW")+lin("Demanda de pico",fmt(t.pico,2)+" kW")+lin("Carregamento do trafo",fmt(t.car)+" %")+
+    lin("Alimentador · subestação",esc(t.alim||"–")+" · "+esc(t.sub||"–"))+lin("Capacidade p/ nova GD no alimentador",fmt(t.capa,0)+" kW")+
+    lin("Carregamento do alimentador",fmt(t.ca)+" %")+lin("GD no alimentador",fmt(t.gda,0)+" kW")+lin("Coordenadas",t.lat.toFixed(6)+", "+t.lon.toFixed(6))}</table>
+  <p class="s">Estimativa para triagem a partir de dados públicos da ANEEL (BDGD e base de GD). Não considera proteção nem manobras e não substitui a análise de inversão de fluxo da distribuidora.</p>
+  <p class="s">Consulta on-line: ${esc(linkTrafo(t))}</p><button onclick="print()">Imprimir / salvar PDF</button></body></html>`);
+  w.document.close();w.focus();setTimeout(()=>{try{w.print()}catch(e){}},300);
+}
+// ficha flutuando sobre o mapa, ao lado do trafo (no celular ela fica na gaveta)
+const desk=matchMedia("(min-width:761px)");
+let fichaPop=null,fichaEl=null,fichaFechada=false,fechandoProg=false;
+function atualizarFicha(){
+  const aberta=fichaPop&&map.hasLayer(fichaPop);
+  if(!desk.matches||!sel||fichaFechada){if(aberta){fechandoProg=true;map.closePopup(fichaPop);fechandoProg=false}return}
+  if(!fichaPop){
+    fichaEl=document.createElement("div");fichaEl.addEventListener("click",clique);
+    fichaEl.addEventListener("toggle",e=>{if(e.target.matches("details.mais")){detAberto=e.target.open;fichaPop.update()}},true);
+    fichaPop=L.popup({className:"fichaPop",maxWidth:340,minWidth:300,closeOnClick:false,autoPanPaddingTopLeft:[20,70],autoPanPaddingBottomRight:[20,20]});
+    fichaPop.on("remove",()=>{if(!fechandoProg)fichaFechada=true});
+  }
+  // só redesenha (e reposiciona o mapa) quando o conteúdo ou o trafo mudou
+  const h=ficha(sel),ll=L.latLng(sel.lat,sel.lon);
+  if(!aberta){fichaEl.innerHTML=fichaUlt=h;fichaPop.setLatLng(ll).setContent(fichaEl).openOn(map)}
+  else if(h!==fichaUlt||!fichaPop.getLatLng().equals(ll)){fichaEl.innerHTML=fichaUlt=h;fichaPop.setLatLng(ll);fichaPop.update()}
+}
+let fichaUlt="";
+desk.addEventListener?.("change",()=>render());
 function dist(a,b,c,d){const R=6371e3,r=Math.PI/180,x=(d-b)*r*Math.cos((a+c)/2*r),y=(c-a)*r;return Math.sqrt(x*x+y*y)}
 function proximos(lat,lon,n=6){return visiveis().map(t=>({t,d:dist(lat,lon,t.lat,t.lon)})).sort((a,b)=>a.d-b.d).slice(0,n)}
 function listaProx(lat,lon){
   const pot=+potEl.value||0;
-  return `<section><h2>Trafos mais próximos do ponto</h2><div class="near">${proximos(lat,lon).map(({t,d})=>
-   `<button data-id="${esc(t.id)}"><span class="dot" style="background:${COR[classe(t,pot)]}"></span><span><b class="id">${esc(t.id)}</b><br><span class="d">${fmt(t.kva,1)} kVA · GD ${fmt(t.gd,1)} kW</span></span><span><b>${fmt(t.cap)}</b> <span class="d">kW</span><br><span class="d">${d<1000?Math.round(d)+" m":fmt(d/1000,2)+" km"}</span></span></button>`).join("")}</div>
+  return `<section><h2>${pot>0?"Outras opções perto":"Trafos mais próximos do ponto"}</h2><div class="near">${proximos(lat,lon,7).filter(({t})=>t!==sel).slice(0,6).map(({t,d})=>
+   `<button data-id="${esc(t.id)}">${icone(classe(t,pot),16)}<span><b class="id">${esc(t.id)}</b><br><span class="d">${fmt(t.kva,1)} kVA · GD ${fmt(t.gd,1)} kW</span></span><span><b>${fmt(t.cap)}</b> <span class="d">kW</span><br><span class="d">${fmtD(d)}</span></span></button>`).join("")}</div>
    <p class="hint">${filtrando()?"Só trafos que comportam "+fmt(+potEl.value)+" kW. ":""}Distância em linha reta. A conexão segue a rede de BT do trafo que atende o local.</p></section>`;
 }
 let ponto=null,msg="";
 function render(){
   let h="";if(msg)h+=`<p class="msg">${esc(msg)}</p>`;
-  if(empSel)h+=fichaEmp(empSel);
-  if(sel)h+=`<section><h2>Transformador</h2>${ficha(sel)}</section>`;
+  if(ponto)h+=veredito();
+  if(sel&&!desk.matches)h+=`<section><h2>Transformador</h2>${ficha(sel)}</section>`;
   if(ponto)h+=listaProx(ponto[0],ponto[1]);
-  h+=resumoEmp()+resumo()+rodape();info.innerHTML=h;
-  info.querySelectorAll("button[data-tr]").forEach(b=>b.onclick=()=>{const t=D.find(x=>x.id===b.dataset.tr);if(t){empSel=null;abrir(t)}});
-  info.querySelectorAll(".near button").forEach(b=>b.onclick=()=>abrir(D.find(t=>t.id===b.dataset.id)));
+  // legenda: no canto do mapa (computador) ou dentro da gaveta (celular, onde o mapa é pequeno)
+  const leg=legenda();legCtl.getContainer().innerHTML=leg;
+  h+=resumo()+`<section class="legenda soCel">${leg}</section>`+rodape();info.innerHTML=h;
+  infoEmp.innerHTML=(empSel?fichaEmp(empSel):"")+resumoEmp();
+  atualizarFicha();
 }
-function abrir(t,voar=true){sel=t;msg="";empSel=null;desenhar();render();mostrarRede(t);if(voar)map.setView([t.lat,t.lon],Math.max(map.getZoom(),17));topoPainel();abrirPainel()}
+// cliques nos botões do painel e da ficha: trafo da lista, "ver trafo", compartilhar, PDF
+function clique(e){
+  const b=e.target.closest("button[data-id],button[data-tr],button[data-acao]");if(!b)return;
+  if(b.dataset.acao){if(sel)b.dataset.acao==="pdf"?relatorio(sel):compartilhar(sel,b);return}
+  const t=D.find(x=>x.id===(b.dataset.id||b.dataset.tr));if(t){empSel=null;abrir(t)}
+}
+info.addEventListener("click",clique);infoEmp.addEventListener("click",clique);
+function abrir(t,voar=true){
+  sel=t;msg="";empSel=null;fichaFechada=false;if(!desk.matches)aba("C");
+  try{history.replaceState(null,"","#"+[META.mun||"",t.id].map(encodeURIComponent).join("/"))}catch(e){}
+  if(voar)map.setView([t.lat,t.lon],Math.max(map.getZoom(),17),{animate:false});desenhar();render();mostrarRede(t);topoPainel();abrirPainel()}
 function marcarPonto(lat,lon,rotulo){
-  ponto=[lat,lon];empSel=null;if(pino)map.removeLayer(pino);
+  ponto=[lat,lon];empSel=null;fichaFechada=false;aba("C");if(pino)map.removeLayer(pino);
   pino=L.marker([lat,lon]).addTo(map).bindTooltip(rotulo||"Ponto consultado");
-  const p=proximos(lat,lon,1)[0];sel=p?p.t:null;msg="";desenhar();render();mostrarRede(sel);map.setView([lat,lon],18);abrirPainel();
+  // o trafo do ponto é o mais próximo, mesmo que não comporte a potência (a resposta diz se cabe)
+  const p=maisProximo(lat,lon);sel=p?p.t:null;msg="";map.setView([lat,lon],18,{animate:false});desenhar();render();mostrarRede(sel);abrirPainel();topoPainel();
 }
 map.on("click",e=>pontoGlobal(e.latlng.lat,e.latlng.lng));
 // Área inteira: troca de município sob demanda (dados/<código>.json)
@@ -1356,7 +1559,12 @@ function dicaEmp(x){
   Consumo médio 12 meses: <b>${fmt(x[2],0)} kWh</b><br>Pg sem análise de inversão: <b>${fmt(x[17],0)} kW</b><br>
   GD: ${GDR[x[6]]} · Rede comporta: ${RED[x[7]]}`;
 }
-function topoPainel(){info.scrollTop=0;side.scrollTop=0}
+// computador: painel no topo; celular: rola a gaveta até a resposta/ficha da aba aberta
+function topoPainel(){
+  if(desk.matches){side.scrollTop=0;return}
+  const a=document.querySelector(".aba:not([hidden]) .scroll");if(!a)return;
+  side.scrollTop+=a.getBoundingClientRect().top-side.getBoundingClientRect().top-8;
+}
 function resumoEmp(){
   if(!META.muns||!$("empOn").checked)return "";
   const kwp=empVis.reduce((s,x)=>s+x[3],0),kwh=empVis.reduce((s,x)=>s+x[2],0);
@@ -1413,13 +1621,13 @@ document.getElementById("f").addEventListener("submit",async e=>{
 const uc1El=document.getElementById("uc1"),filtraEl=document.getElementById("filtra"),filtraRow=document.getElementById("filtraRow");
 // resumo dos filtros ativos no título do menu (útil com o menu recolhido)
 function resumoFiltros(){
-  const f=[],pot=+potEl.value||0;
-  if(pot>0)f.push(`GD ${fmt(pot)} kW`);if(alimEl.value)f.push(alimEl.value);
+  const f=[];
+  if(alimEl.value)f.push(alimEl.value);
   if(kvaMinEl.value||kvaMaxEl.value)f.push(`${kvaMinEl.value?fmtK(+kvaMinEl.value):"…"}–${kvaMaxEl.value?fmtK(+kvaMaxEl.value):"…"} kVA`);
   if(uc1El.checked)f.push("1 UC");if(document.getElementById("alimOk").checked)f.push("alim. comporta");
   document.getElementById("ftrN").textContent=f.length?"· "+f.join(" · "):"";
 }
-function aoMudarPot(){resumoFiltros();filtraRow.hidden=!((+potEl.value||0)>0);if(ponto){const p=proximos(ponto[0],ponto[1],1)[0];if(sel&&!visiveis().includes(sel))sel=p?p.t:null}desenhar();render()}
+function aoMudarPot(){resumoFiltros();filtraRow.hidden=!((+potEl.value||0)>0);if(sel&&!base().includes(sel)){const p=ponto&&maisProximo(ponto[0],ponto[1]);sel=p?p.t:null}desenhar();render()}
 potEl.addEventListener("input",aoMudarPot);uc1El.addEventListener("change",aoMudarPot);
 kvaMinEl.addEventListener("change",aoMudarPot);kvaMaxEl.addEventListener("change",aoMudarPot);
 document.getElementById("alimOk").addEventListener("change",aoMudarPot);filtraEl.addEventListener("change",aoMudarPot);
@@ -1429,9 +1637,20 @@ tog.onclick=()=>{side.classList.toggle("min");tog.setAttribute("aria-expanded",!
 function abrirPainel(){if(side.classList.contains("min")){side.classList.remove("min");setTimeout(()=>map.invalidateSize(),50)}}
 function ajustar(){const v=visiveis();if(v.length)map.fitBounds(v.map(t=>[t.lat,t.lon]),{padding:[20,20]})}
 matchMedia("(prefers-color-scheme:dark)").addEventListener?.("change",()=>desenhar());
+// abas do painel
+let empMexeu=false;
+function aba(k){
+  ["C","P","S"].forEach(x=>{$("aba"+x).hidden=x!==k;$("tab"+x).setAttribute("aria-selected",x===k)});
+  // na primeira vez que abre Prospectar, já liga as empresas no mapa
+  if(k==="P"&&!empMexeu&&!$("empOn").checked&&META.muns){empMexeu=true;$("empOn").checked=true;desenharEmp()}
+}
+document.querySelectorAll(".tabs button").forEach(b=>b.onclick=()=>aba(b.dataset.tab));
 const munEl=document.getElementById("mun");
+// link direto: #<município>/<trafo>/<kW>
+const [hMun,hTr,hKw]=location.hash.slice(1).split("/").map(s=>{try{return decodeURIComponent(s)}catch(e){return s}});
+if(hKw&&+hKw>0){potEl.value=+hKw;filtraRow.hidden=false}
 if(META.muns){
-  $("prosp").hidden=false;
+  $("tabP").hidden=false;$("empOn").addEventListener("change",()=>{empMexeu=true});
   ["empOn","empAtv","empTen","empGd","empRede"].forEach(i=>$(i).addEventListener("change",()=>{empSel=null;desenharEmp()}));
   $("empKwh").addEventListener("input",()=>{empSel=null;desenharEmp()});
   $("empHideTr").addEventListener("change",()=>{if($("empHideTr").checked)map.removeLayer(capa);else capa.addTo(map)});
@@ -1440,8 +1659,8 @@ if(META.muns){
   META.muns.forEach(m=>{const o=document.createElement("option");o.value=m.c;o.textContent=m.n;munEl.append(o)});
   munEl.addEventListener("change",()=>carregarMun(munEl.value));
   const b=META.bboxAll;map.fitBounds([[b[0],b[1]],[b[2],b[3]]]);
-  const h=location.hash.slice(1);carregarMun(META.muns.some(m=>m.c===h)?h:META.default);
-}else{desenhar();render();ajustar()}
+  carregarMun(META.muns.some(m=>m.c===hMun)?hMun:META.default).then(()=>{const t=hTr&&D.find(x=>String(x.id)===hTr);if(t)abrir(t)});
+}else{desenhar();render();ajustar();const t=hTr&&D.find(x=>String(x.id)===hTr);if(t)abrir(t)}
 </script>
 </body>
 </html>
