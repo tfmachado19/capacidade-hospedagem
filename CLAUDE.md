@@ -15,6 +15,9 @@ nem sempre programadores: explique resultados em linguagem simples.
 - `dados/bt/<alimentador>.json` — rede BT de cada trafo e postes com GD (ao abrir um trafo).
 - `dados/mt/<alimentador>.json` — traçado da rede MT de cada alimentador (ao clicar numa empresa de MT).
 - `dados/emp/<código IBGE>.json` — empresas da prospecção (ao ligar a camada de prospecção).
+- `dados/edif/14/<x>/<y>.json` — contornos de prédios (aba Medir), gerados por `scripts/edificios.py`
+  a partir do Overture Maps (s3://overturemaps-us-west-2/release/<versão>/theme=buildings/,
+  leitura anônima com pyarrow; DuckDB não baixa extensões no ambiente de nuvem).
 - `scripts/trafos_bdgd.py` — lê a BDGD e gera planilha de trafos + `index.html` + `dados/`.
 - `scripts/prospeccao.py` — gera a planilha de prospecção e `dados/emp/`.
 

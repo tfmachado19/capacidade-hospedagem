@@ -119,3 +119,15 @@ traceja a ligação até a empresa. Numa empresa de MT, desenha o alimentador in
 (traçado da camada SSDMT, simplificado, em `dados/mt/<alimentador>.json`).
 
 Não envie as planilhas de prospecção ao repositório.
+
+## Medir telhado (aba "Medir")
+
+Toque num telhado: o site acha o contorno do prédio e mostra área (vista de cima e com a
+inclinação escolhida), perímetro, lados, medidas do retângulo envolvente, quantos módulos
+cabem, kWp e geração estimada; o botão "Consultar a rede" leva essa potência para a aba
+Consultar. Sem contorno, desenhe os cantos à mão (dá para arrastar os cantos).
+
+Contornos: Overture Maps (OpenStreetMap + Google Open Buildings + Microsoft), licença ODbL,
+em `dados/edif/14/<x>/<y>.json` (quadrados de ~2,4 km), só perto de trafos da RGE.
+Para atualizar: baixe o tema `buildings` do Overture para a região (parquet com colunas
+`geometry`, `bbox`, `fonte`) e rode `py scripts/edificios.py edificios.parquet --site .`.

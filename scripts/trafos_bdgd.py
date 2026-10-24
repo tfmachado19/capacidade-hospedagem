@@ -960,6 +960,13 @@ aside::-webkit-scrollbar{width:10px}aside::-webkit-scrollbar-thumb{background:va
 .leaflet-tooltip{font:13px/1.4 var(--body)}
 .selo{background:var(--panel);color:var(--ink);border:1px solid var(--line);border-radius:6px;padding:4px 8px;font-size:12px;box-shadow:0 1px 4px rgba(0,0,0,.2);max-width:70vw}
 .selo .velha{color:var(--low);font-weight:600}
+/* aba Medir */
+#medUso,#medW{width:76px;font-family:var(--mono)}#medC,#medL{width:76px;font-family:var(--mono)}
+.acoes button[aria-pressed="false"]{background:var(--chip);color:var(--ink)}
+.lado{background:rgba(20,20,20,.75)!important;color:#fff!important;border:0!important;box-shadow:none!important;font:600 11px var(--mono)!important;padding:1px 4px!important}
+.lado::before{display:none}
+.vert{background:#fff;border:2px solid #f2b400;border-radius:50%;box-shadow:0 0 0 1px rgba(0,0,0,.5)}
+.medGrande{font:600 30px var(--mono);font-variant-numeric:tabular-nums}.medGrande small{font-size:15px;color:var(--muted)}
 .glogo img{display:block;height:18px;filter:drop-shadow(0 0 1px rgba(0,0,0,.6))}
 .links a.gsat{display:inline-block;background:var(--accent);color:var(--accent-ink);padding:4px 10px;border-radius:6px;text-decoration:none;font-weight:600}
 .stats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
@@ -1069,6 +1076,7 @@ details.mais[open] summary{margin-bottom:6px}
     <nav class="tabs" role="tablist" aria-label="Seções">
       <button type="button" role="tab" id="tabC" data-tab="C" aria-selected="true" aria-controls="abaC">Consultar</button>
       <button type="button" role="tab" id="tabP" data-tab="P" aria-selected="false" aria-controls="abaP" hidden>Prospectar</button>
+      <button type="button" role="tab" id="tabM" data-tab="M" aria-selected="false" aria-controls="abaM">Medir</button>
       <button type="button" role="tab" id="tabS" data-tab="S" aria-selected="false" aria-controls="abaS">Sobre os dados</button>
     </nav>
   </header>
@@ -1117,6 +1125,30 @@ details.mais[open] summary{margin-bottom:6px}
     </div>
     <div class="scroll" id="infoEmp"></div>
   </section>
+  <section class="aba" id="abaM" role="tabpanel" aria-labelledby="tabM" hidden>
+    <div class="painel">
+      <p class="pergunta">Medir telhado</p>
+      <p class="hint" id="medDica">Toque num telhado no mapa: o contorno aparece sozinho. Se não aparecer, ou para medir só uma parte, use "Desenhar contorno".</p>
+      <div class="acoes">
+        <button type="button" id="medToque" aria-pressed="true">Tocar no telhado</button>
+        <button type="button" class="ghost" id="medDesenho" aria-pressed="false">Desenhar contorno</button>
+        <button type="button" class="ghost" id="medLimpa">Limpar</button>
+      </div>
+      <div class="row"><label for="medInc">Inclinação</label>
+        <select id="medInc">
+          <option value="0">0° · laje ou plano</option>
+          <option value="6">6° · fibrocimento / metálica (10%)</option>
+          <option value="17" selected>17° · telha cerâmica (30%)</option>
+          <option value="22">22° · telha cerâmica (40%)</option>
+          <option value="27">27° · telhado íngreme (50%)</option>
+        </select></div>
+      <div class="row"><label for="medUso">Aproveitamento</label><input id="medUso" type="number" min="10" max="100" step="5" value="60"><span class="base">% da área</span></div>
+      <div class="row"><label for="medW">Módulo</label><input id="medW" type="number" min="100" max="900" step="5" value="585"><span class="base">W</span>
+        <input id="medC" type="number" min="0.5" max="3" step="0.01" value="2.28" aria-label="comprimento do módulo (m)"><span class="base">×</span>
+        <input id="medL" type="number" min="0.5" max="2" step="0.01" value="1.13" aria-label="largura do módulo (m)"><span class="base">m</span></div>
+    </div>
+    <div class="scroll" id="infoMed"></div>
+  </section>
   <section class="aba" id="abaS" role="tabpanel" aria-labelledby="tabS" hidden>
     <div class="scroll sobre">
       <p class="pergunta">De onde vêm os números</p>
@@ -1128,6 +1160,8 @@ details.mais[open] summary{margin-bottom:6px}
       <p>Menor valor entre a carga mínima de dia do alimentador e a capacidade do cabo de saída, descontada a GD em BT e MT. O carregamento do alimentador é a demanda de pico ÷ capacidade do cabo de saída; valores muito acima de 100% indicam dado atípico na BDGD.</p>
       <h2>Prospecção</h2>
       <p>Pg = consumo médio de 12 meses ÷ (16% × 24 × 30) × fator da classe, arredondado para cima (REN 1.000, art. 73-A, II; Manual de Inversão de Fluxo, item 8.12). Vale para microgeração até 75 kW. Na abordagem comercial, respeite a LGPD e o cadastro “Não Perturbe”.</p>
+      <h2>Medição de telhados</h2>
+      <p>Contornos dos prédios do Overture Maps, que junta OpenStreetMap (desenhado por voluntários), Google Open Buildings e Microsoft (detectados por inteligência artificial em imagens de satélite). A área é a projeção vista de cima; a inclinação escolhida converte para a área real do telhado. O contorno pode estar deslocado ou desatualizado em relação à imagem: confira e, se preciso, arraste os cantos ou desenhe à mão. Licença ODbL: © OpenStreetMap contributors, Overture Maps Foundation.</p>
       <h2>Limitações</h2>
       <p>Não considera proteção nem manobras da rede. Consumo de quem já tem GD é o líquido medido. É uma triagem: quem decide a conexão é a distribuidora.</p>
       <p><a href="https://github.com/tfmachado19/capacidade-hospedagem/issues" target="_blank" rel="noopener">Relatar erro nos dados ou pedir melhoria</a></p>
@@ -1496,7 +1530,8 @@ function marcarPonto(lat,lon,rotulo){
   // o trafo do ponto é o mais próximo, mesmo que não comporte a potência (a resposta diz se cabe)
   const p=maisProximo(lat,lon);sel=p?p.t:null;msg="";map.setView([lat,lon],18,{animate:false});desenhar();render();mostrarRede(sel);abrirPainel();topoPainel();
 }
-map.on("click",e=>pontoGlobal(e.latlng.lat,e.latlng.lng));
+map.on("click",e=>{if(abaAtual==="M")medClique(e.latlng);else pontoGlobal(e.latlng.lat,e.latlng.lng)});
+let abaAtual="C";
 // Área inteira: troca de município sob demanda (dados/<código>.json)
 function dentro(b,lat,lon){return b&&lat>=b[0]&&lat<=b[2]&&lon>=b[1]&&lon<=b[3]}
 function distC(b,lat,lon){return (lat-(b[0]+b[2])/2)**2+(lon-(b[1]+b[3])/2)**2}
@@ -1637,10 +1672,128 @@ tog.onclick=()=>{side.classList.toggle("min");tog.setAttribute("aria-expanded",!
 function abrirPainel(){if(side.classList.contains("min")){side.classList.remove("min");setTimeout(()=>map.invalidateSize(),50)}}
 function ajustar(){const v=visiveis();if(v.length)map.fitBounds(v.map(t=>[t.lat,t.lon]),{padding:[20,20]})}
 matchMedia("(prefers-color-scheme:dark)").addEventListener?.("change",()=>desenhar());
+// ---- Medir telhado: contornos de prédios (dados/edif/14/<x>/<y>.json) ou desenho à mão
+const med={cache:{},pts:[],fonte:"",modo:"toque",editando:false,camada:L.layerGroup().addTo(map),
+  marcadores:[],estavaSat:false,trafosOcultos:false,empOcultas:false};
+const FONTES=["OpenStreetMap","Google Open Buildings (detectado por IA)","Microsoft (detectado por IA)"];
+const medAtrib="Prédios © OpenStreetMap contributors, Overture Maps";
+function medEntrar(){
+  med.estavaSat=map.hasLayer(sat)||(gTiles&&map.hasLayer(gTiles));
+  if(!med.estavaSat){map.removeLayer(osm);(gTiles||sat).addTo(map);map.fire("baselayerchange")}
+  if(map.hasLayer(capa)){map.removeLayer(capa);med.trafosOcultos=true}
+  if(map.hasLayer(empLayer)){map.removeLayer(empLayer);med.empOcultas=true}
+  map.attributionControl.addAttribution(medAtrib);
+  if(map.getZoom()<18&&map.getZoom()>=14)map.setZoom(18);
+  medRender();
+}
+function medSair(){
+  if(med.trafosOcultos&&!$("empHideTr").checked)capa.addTo(map);
+  if(med.empOcultas)empLayer.addTo(map);
+  med.trafosOcultos=med.empOcultas=false;
+  map.attributionControl.removeAttribution(medAtrib);
+}
+function tileZ14(lat,lon){const n=16384,la=lat*Math.PI/180;
+  return [Math.floor((lon+180)/360*n),Math.floor((1-Math.log(Math.tan(la)+1/Math.cos(la))/Math.PI)/2*n)]}
+async function edificios(lat,lon){
+  const [x,y]=tileZ14(lat,lon),k=x+"/"+y;
+  if(!(k in med.cache)){try{const r=await fetch(`dados/edif/14/${k}.json`);
+      if(!r.ok)throw 0;const d=await r.json();
+      med.cache[k]=d.b.map(a=>{let px=a[1]+d.o[0],py=a[2]+d.o[1];const p=[[py/1e6,px/1e6]];
+        for(let i=3;i<a.length;i+=2){px+=a[i];py+=a[i+1];p.push([py/1e6,px/1e6])}return {f:a[0],p}})}
+    catch(e){med.cache[k]=[]}}
+  return med.cache[k];
+}
+// geometria em metros (projeção local)
+function proj(pts){const la0=pts[0][0],lo0=pts[0][1],kx=111320*Math.cos(la0*Math.PI/180),ky=110540;
+  return pts.map(([la,lo])=>[(lo-lo0)*kx,(la-la0)*ky])}
+function dentro(pt,poly){let c=false;for(let i=0,j=poly.length-1;i<poly.length;j=i++){const [yi,xi]=poly[i],[yj,xj]=poly[j];
+  if(((yi>pt[0])!==(yj>pt[0]))&&(pt[1]<(xj-xi)*(pt[0]-yi)/(yj-yi)+xi))c=!c}return c}
+function distPoly(pt,poly){const q=proj([pt,...poly]),[px,py]=q[0];let d=1e9;
+  for(let i=1;i<q.length;i++){const [ax,ay]=q[i],[bx,by]=q[i%(q.length-1)+1],dx=bx-ax,dy=by-ay,l=dx*dx+dy*dy;
+    const t=l?Math.max(0,Math.min(1,((px-ax)*dx+(py-ay)*dy)/l)):0;d=Math.min(d,Math.hypot(px-ax-t*dx,py-ay-t*dy))}return d}
+function medidas(pts){
+  const q=proj(pts),n=q.length;let a=0,per=0;const lados=[];
+  for(let i=0;i<n;i++){const [x1,y1]=q[i],[x2,y2]=q[(i+1)%n];a+=x1*y2-x2*y1;const l=Math.hypot(x2-x1,y2-y1);per+=l;lados.push(l)}
+  // menor retângulo que envolve o contorno (testa a direção de cada lado)
+  let best=null;for(let i=0;i<n;i++){const [x1,y1]=q[i],[x2,y2]=q[(i+1)%n],L=Math.hypot(x2-x1,y2-y1);if(L<.01)continue;
+    const ux=(x2-x1)/L,uy=(y2-y1)/L;let a0=1e9,a1=-1e9,b0=1e9,b1=-1e9;
+    q.forEach(([x,y])=>{const s=x*ux+y*uy,t=-x*uy+y*ux;a0=Math.min(a0,s);a1=Math.max(a1,s);b0=Math.min(b0,t);b1=Math.max(b1,t)});
+    const A=(a1-a0)*(b1-b0);if(!best||A<best.A)best={A,c:Math.max(a1-a0,b1-b0),l:Math.min(a1-a0,b1-b0)}}
+  return {area:Math.abs(a)/2,per,lados,ret:best}
+}
+async function medClique(ll){
+  if(med.modo==="desenho"){med.pts.push([ll.lat,ll.lng]);med.fonte="desenho";medDesenhar();medRender();return}
+  if(map.getZoom()<16){medMsg("Aproxime mais o mapa (zoom de rua) e toque no telhado.");return}
+  medMsg("Procurando o contorno do telhado…");
+  const lista=await edificios(ll.lat,ll.lng),pt=[ll.lat,ll.lng];
+  let e=lista.find(b=>dentro(pt,b.p));
+  if(!e){let dm=8;lista.forEach(b=>{const d=distPoly(pt,b.p);if(d<dm){dm=d;e=b}})}
+  if(!e){med.pts=[];medDesenhar();medMsg("Não achei contorno de prédio neste ponto. Use \"Desenhar contorno\" e marque os cantos do telhado na imagem.");return}
+  med.pts=e.p.map(p=>[...p]);med.fonte=FONTES[e.f]||"";med.editando=false;medDesenhar();medRender();
+}
+function medMsg(t){$("infoMed").innerHTML=`<p class="msg">${esc(t)}</p>`}
+function medDesenhar(){
+  med.camada.clearLayers();med.marcadores=[];
+  if(!med.pts.length)return;
+  const fechado=med.pts.length>=3;
+  med.forma=(fechado?L.polygon(med.pts,{color:"#f2b400",weight:3,fillColor:"#f2b400",fillOpacity:.25,interactive:false,renderer:rTopo})
+          :L.polyline(med.pts,{color:"#f2b400",weight:3,dashArray:"6 4",interactive:false,renderer:rTopo})).addTo(med.camada);
+  if(fechado){const m=medidas(med.pts);const n=med.pts.length;
+    if(n<=40)med.pts.forEach((p,i)=>{const q=med.pts[(i+1)%n];if(m.lados[i]<1)return;
+      L.tooltip({permanent:true,direction:"center",className:"lado"}).setLatLng([(p[0]+q[0])/2,(p[1]+q[1])/2])
+        .setContent(fmt(m.lados[i],1)+" m").addTo(med.camada)})}
+  if(med.modo==="desenho"||med.editando)med.pts.forEach((p,i)=>{
+    const mk=L.marker(p,{draggable:true,icon:L.divIcon({className:"vert",iconSize:[14,14]})}).addTo(med.camada);
+    mk.on("drag",ev=>{const g=ev.target.getLatLng();med.pts[i]=[g.lat,g.lng];
+      if(med.forma)med.forma.setLatLngs(med.pts)});
+    mk.on("dragend",()=>{medDesenhar();medRender()});
+    mk.on("click",ev=>{L.DomEvent.stopPropagation(ev);if(med.modo==="desenho"&&i===0&&med.pts.length>=3)medModo("toque",true)});
+    med.marcadores.push(mk)});
+}
+function medModo(m,manter){
+  med.modo=m;$("medToque").setAttribute("aria-pressed",m==="toque");$("medDesenho").setAttribute("aria-pressed",m==="desenho");
+  $("medDica").textContent=m==="desenho"?"Toque nos cantos do telhado, em sequência. Para terminar, toque no primeiro canto ou em \"Tocar no telhado\". Arraste um canto para ajustar."
+    :"Toque num telhado no mapa: o contorno aparece sozinho. Se não aparecer, ou para medir só uma parte, use \"Desenhar contorno\".";
+  if(m==="desenho"&&!manter){med.pts=[];med.fonte="desenho";med.editando=false}
+  medDesenhar();medRender();
+}
+function medRender(){
+  const el=$("infoMed");
+  if(med.pts.length<3){if(med.modo==="desenho")el.innerHTML=`<p class="hint">${med.pts.length} de pelo menos 3 cantos marcados.</p>`;
+    else if(!med.pts.length)el.innerHTML="";return}
+  const m=medidas(med.pts),inc=+$("medInc").value||0,uso=(+$("medUso").value||0)/100,
+    real=m.area/Math.cos(inc*Math.PI/180),aMod=(+$("medC").value||0)*(+$("medL").value||0),w=+$("medW").value||0,
+    nMod=aMod>0?Math.floor(real*uso/aMod):0,kwp=nMod*w/1000;
+  el.innerHTML=`<section><h2>Telhado</h2><div class="card">
+   <div><div class="base">Área do telhado (com inclinação de ${inc}°)</div><div class="medGrande">${fmt(real,1)} <small>m²</small></div></div>
+   <dl><dt>Área vista de cima</dt><dd>${fmt(m.area,1)} m²</dd><dt>Perímetro</dt><dd>${fmt(m.per,1)} m</dd>
+   <dt>Medidas (retângulo envolvente)</dt><dd>${fmt(m.ret.c,1)} × ${fmt(m.ret.l,1)} m</dd>
+   <dt>Lados</dt><dd>${m.lados.length<=12?m.lados.map(l=>fmt(l,1)).join(" · ")+" m":m.lados.length+" lados"}</dd>
+   <dt>Contorno</dt><dd>${esc(med.fonte==="desenho"?"desenhado por você":med.fonte)}</dd></dl></div></section>
+   <section><h2>Sistema que cabe</h2><div class="card">
+   <div class="medGrande">${fmt(kwp,2)} <small>kWp</small></div>
+   <dl><dt>Módulos de ${fmt(w,0)} W</dt><dd>${nMod}</dd><dt>Área usada (${fmt(uso*100,0)}%)</dt><dd>${fmt(real*uso,1)} m²</dd>
+   <dt>Geração estimada</dt><dd>~${fmt(kwp*1150/12,0)} kWh/mês</dd></dl>
+   ${kwp>75?`<p class="hint">Acima de 75 kW é minigeração: a conexão exige estudo da distribuidora e a potência fica limitada pela demanda contratada.</p>`:""}
+   <div class="acoes"><button type="button" id="medConsulta"${kwp>0?"":" disabled"}>Consultar a rede com ${fmt(kwp,2)} kW</button>
+   <button type="button" class="ghost" id="medEdita">${med.editando||med.modo==="desenho"?"Parar de editar":"Ajustar cantos"}</button>
+   <button type="button" class="ghost" id="medCopia">Copiar medidas</button></div>
+   <p class="hint">O aproveitamento desconta afastamentos, sombras e águas viradas para o sul. Geração pela média do RS (~1.150 kWh/kWp por ano); a orientação real do telhado muda esse valor.</p></div></section>`;
+  $("medEdita").onclick=()=>{if(med.modo==="desenho")medModo("toque",true);else{med.editando=!med.editando;medDesenhar();medRender()}};
+  $("medCopia").onclick=()=>{const t=`Telhado: ${fmt(real,1)} m² (inclinação ${inc}°), vista de cima ${fmt(m.area,1)} m², perímetro ${fmt(m.per,1)} m, ${fmt(m.ret.c,1)} × ${fmt(m.ret.l,1)} m. Cabem ${nMod} módulos de ${w} W = ${fmt(kwp,2)} kWp (~${fmt(kwp*1150/12,0)} kWh/mês).`;
+    navigator.clipboard?.writeText(t).then(()=>{$("medCopia").textContent="Copiado!"},()=>{})};
+  $("medConsulta").onclick=()=>{const c=med.pts.reduce((s,p)=>[s[0]+p[0]/med.pts.length,s[1]+p[1]/med.pts.length],[0,0]);
+    potEl.value=Math.round(kwp*100)/100;aba("C");filtraRow.hidden=false;pontoGlobal(c[0],c[1],"Telhado medido")};
+}
+["medInc","medUso","medW","medC","medL"].forEach(i=>$(i).addEventListener("input",medRender));
+$("medToque").onclick=()=>medModo("toque",true);$("medDesenho").onclick=()=>medModo("desenho");
+$("medLimpa").onclick=()=>{med.pts=[];med.editando=false;medDesenhar();medRender();medModo(med.modo,true)};
 // abas do painel
 let empMexeu=false;
 function aba(k){
-  ["C","P","S"].forEach(x=>{$("aba"+x).hidden=x!==k;$("tab"+x).setAttribute("aria-selected",x===k)});
+  const antes=abaAtual;abaAtual=k;
+  ["C","P","M","S"].forEach(x=>{$("aba"+x).hidden=x!==k;$("tab"+x).setAttribute("aria-selected",x===k)});
+  if(k==="M"&&antes!=="M")medEntrar();else if(antes==="M"&&k!=="M")medSair();
   // na primeira vez que abre Prospectar, já liga as empresas no mapa
   if(k==="P"&&!empMexeu&&!$("empOn").checked&&META.muns){empMexeu=true;$("empOn").checked=true;desenharEmp()}
 }
