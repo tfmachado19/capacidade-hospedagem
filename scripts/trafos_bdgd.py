@@ -1170,6 +1170,10 @@ details.mais[open] summary{margin-bottom:6px}
 </aside>
 <div id="map"></div>
 <script>
+// Mesmo arquivo serve o site oficial (raiz) e o beta (/beta/): os dados ficam sempre na raiz.
+const BETA=/\/beta\/?$/.test(location.pathname.replace(/index\.html$/,"")),BASE=BETA?"../":"";
+if(BETA){document.title="[BETA] "+document.title;const h=document.querySelector("h1");
+  if(h)h.insertAdjacentHTML("afterbegin",'<span style="background:#c62828;color:#fff;border-radius:4px;padding:1px 6px;margin-right:6px;font-size:13px;vertical-align:middle">BETA</span>');}
 let D=__DATA__||[];
 const META=__META__;
 const COR={ok:"var(--ok)",mid:"var(--mid)",low:"var(--low)",none:"var(--none)",nd:"var(--nodata)"};
@@ -1246,7 +1250,7 @@ const gLogo=L.control({position:"bottomright"});
 gLogo.onAdd=()=>{const d=L.DomUtil.create("div","glogo");
   d.innerHTML='<img alt="Google" src="https://maps.gstatic.com/mapfiles/api-3/images/google_white5.png">';return d};
 async function iniciarGoogle(){
-  try{const c=await (await fetch("dados/config.json",{cache:"no-store"})).json();gKey=(c.googleMapsKey||"").trim()}catch(e){return}
+  try{const c=await (await fetch(BASE+"dados/config.json",{cache:"no-store"})).json();gKey=(c.googleMapsKey||"").trim()}catch(e){return}
   if(!gKey)return;
   try{
     const ant=JSON.parse(localStorage.getItem("gSessao")||"null");
@@ -1318,7 +1322,7 @@ function linhas(d,estilo,grupo){const ls=[];d.l.forEach(a=>{let x=a[0],y=a[1];co
 async function mostrarAlim(x){
   const al=x[14];if(!al)return;
   const f=String(al).replace(/[^\w.-]/g,"_");
-  try{if(!(f in mtCache)){const r=await fetch(`dados/mt/${f}.json`);mtCache[f]=r.ok?await r.json():null}}catch(e){mtCache[f]=null}
+  try{if(!(f in mtCache)){const r=await fetch(`${BASE}dados/mt/${f}.json`);mtCache[f]=r.ok?await r.json():null}}catch(e){mtCache[f]=null}
   if(empSel!==x)return;
   const d=mtCache[f];x._km=d?d.km:0;
   if(d)linhas(d,{color:"#1f5fbf",weight:4,opacity:.9,interactive:false,renderer:rTopo},redeMt);
@@ -1340,7 +1344,7 @@ async function mostrarRede(t){
   rede.clearLayers();
   if(!t||!META.muns||!t.alim)return;
   const f=String(t.alim).replace(/[^\w.-]/g,"_");
-  try{if(!(f in btCache)){const r=await fetch(`dados/bt/${f}.json`);btCache[f]=r.ok?await r.json():{}}}catch(e){return}
+  try{if(!(f in btCache)){const r=await fetch(`${BASE}dados/bt/${f}.json`);btCache[f]=r.ok?await r.json():{}}}catch(e){return}
   const d=btCache[f][t.id];if(sel!==t)return;
   t.bt=d?{km:d.km,np:d.g.length,kw:d.g.reduce((s,p)=>s+p[2],0)}:{km:0,np:0,kw:0};
   if(d){
@@ -1545,10 +1549,10 @@ async function pontoGlobal(lat,lon,rot){
 async function carregarMun(c,aj=true){
   const m=META.muns.find(x=>x.c===c)||META.muns[0];
   msg="Carregando "+m.n+"…";render();
-  try{const r=await fetch(`dados/${m.c}.json`);if(!r.ok)throw 0;D=await r.json()}
+  try{const r=await fetch(`${BASE}dados/${m.c}.json`);if(!r.ok)throw 0;D=await r.json()}
   catch(e){msg="Não consegui carregar os dados de "+m.n+".";render();return}
   META.mun=m.c;META.bbox=m.b;META.munNome=m.n+", RS";munEl.value=m.c;
-  document.getElementById("titulo").textContent=m.n;document.title="Capacidade de Hospedagem "+m.n;
+  document.getElementById("titulo").textContent=m.n;document.title=(BETA?"[BETA] ":"")+"Capacidade de Hospedagem "+m.n;
   sel=null;ponto=null;msg="";if(pino){map.removeLayer(pino);pino=null}
   empSel=null;preparar();preencherAlim();desenhar();render();if(aj)ajustar();desenharEmp();
   try{history.replaceState(null,"","#"+m.c)}catch(e){}
@@ -1560,7 +1564,7 @@ const GDR=["sem GD","talvez (GD no mesmo ponto de conexão)","provável","sim"],
 const $=id=>document.getElementById(id);
 async function dadosEmp(){
   const c=META.mun;if(!c)return null;
-  if(!(c in empCache)){try{const r=await fetch(`dados/emp/${c}.json`);empCache[c]=r.ok?await r.json():{a:{},e:[]}}catch(e){empCache[c]={a:{},e:[]}}}
+  if(!(c in empCache)){try{const r=await fetch(`${BASE}dados/emp/${c}.json`);empCache[c]=r.ok?await r.json():{a:{},e:[]}}catch(e){empCache[c]={a:{},e:[]}}}
   return empCache[c];
 }
 function empFiltro(d){
@@ -1696,7 +1700,7 @@ function tileZ14(lat,lon){const n=16384,la=lat*Math.PI/180;
   return [Math.floor((lon+180)/360*n),Math.floor((1-Math.log(Math.tan(la)+1/Math.cos(la))/Math.PI)/2*n)]}
 async function edificios(lat,lon){
   const [x,y]=tileZ14(lat,lon),k=x+"/"+y;
-  if(!(k in med.cache)){try{const r=await fetch(`dados/edif/14/${k}.json`);
+  if(!(k in med.cache)){try{const r=await fetch(`${BASE}dados/edif/14/${k}.json`);
       if(!r.ok)throw 0;const d=await r.json();
       med.cache[k]=d.b.map(a=>{let px=a[1]+d.o[0],py=a[2]+d.o[1];const p=[[py/1e6,px/1e6]];
         for(let i=3;i<a.length;i+=2){px+=a[i];py+=a[i+1];p.push([py/1e6,px/1e6])}return {f:a[0],p}})}

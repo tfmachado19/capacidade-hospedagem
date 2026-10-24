@@ -11,6 +11,8 @@ nem sempre programadores: explique resultados em linguagem simples.
 
 - `index.html` — o site inteiro (HTML + CSS + JS, Leaflet). **É gerado** a partir da string
   `TEMPLATE` em `scripts/trafos_bdgd.py`.
+- `beta/index.html` — versão beta do site (https://tfmachado19.github.io/capacidade-hospedagem/beta/),
+  onde as mudanças são testadas antes de irem para o oficial. `scripts/promover_beta.py` copia para a raiz.
 - `dados/<código IBGE>.json` — trafos de cada município (carregados ao escolher o município).
 - `dados/bt/<alimentador>.json` — rede BT de cada trafo e postes com GD (ao abrir um trafo).
 - `dados/mt/<alimentador>.json` — traçado da rede MT de cada alimentador (ao clicar numa empresa de MT).
@@ -24,12 +26,20 @@ nem sempre programadores: explique resultados em linguagem simples.
 ## Regras de trabalho
 
 - Tudo que entra na `main` é publicado automaticamente pelo GitHub Pages.
+- **Beta antes do oficial (obrigatório):** toda mudança no visual/JS vai primeiro para
+  `beta/index.html` (e para o `TEMPLATE` em `scripts/trafos_bdgd.py`) — **não** mexa no
+  `index.html` da raiz. Teste, publique na `main` e passe ao usuário o link do beta:
+  https://tfmachado19.github.io/capacidade-hospedagem/beta/ . Só depois que o usuário aprovar
+  ("pode publicar no oficial"), rode `python3 scripts/promover_beta.py` (copia o beta para a
+  raiz), teste a raiz e publique. O mesmo arquivo funciona nos dois endereços (variável `BETA`
+  no JS: etiqueta "BETA" e dados lidos de `../dados/`).
+- **Dados (`dados/`) são compartilhados** entre beta e oficial: mudança de dados aparece nos
+  dois. Mantenha o formato compatível com o código do oficial ou avise o usuário antes.
+- Ao regenerar o site com `trafos_bdgd.py`, copie o `index.html` gerado para `beta/index.html`
+  (não para a raiz) e siga o fluxo do beta.
 - **Publicação:** depois de testar, envie direto para a `main`. Se o GitHub recusar o push
   (a `main` tem regra exigindo Pull Request para quem não é administrador), envie para uma
   branch e abra um Pull Request para a `main`, explicando a mudança em português simples.
-- **Mudança no visual/JS do site:** altere o `TEMPLATE` em `scripts/trafos_bdgd.py` **e** o
-  `index.html` da mesma forma (ou regenere o site). Se mudar só um, a próxima atualização de
-  dados desfaz a mudança.
 - **Nunca envie ao repositório:** o zip da BDGD, as bases PJ da ANEEL, planilhas `.xlsx`
   (de trafos ou de prospecção), `__pycache__`. O `.gitignore` já cobre `.zip`, `.xlsx` e cache.
 - Antes de publicar mudança no site, teste num navegador headless (Playwright/Chromium já vêm

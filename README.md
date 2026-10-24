@@ -29,6 +29,8 @@ potência somada por poste. A posição é a do poste, não a da unidade. Esses 
 `dados/bt/<alimentador>.json` e são baixados só quando um trafo é aberto.
 
 Site: https://tfmachado19.github.io/capacidade-hospedagem
+Beta (mudanças em teste antes de irem para o oficial): https://tfmachado19.github.io/capacidade-hospedagem/beta/
+Para passar o beta para o oficial: `python3 scripts/promover_beta.py`, depois commit e push.
 
 ## Trabalho em equipe com Claude Code
 
