@@ -1250,7 +1250,7 @@ const gLogo=L.control({position:"bottomright"});
 gLogo.onAdd=()=>{const d=L.DomUtil.create("div","glogo");
   d.innerHTML='<img alt="Google" src="https://maps.gstatic.com/mapfiles/api-3/images/google_white5.png">';return d};
 async function iniciarGoogle(){
-  try{const c=await (await fetch(BASE+"dados/config.json",{cache:"no-store"})).json();gKey=(c.googleMapsKey||"").trim()}catch(e){return}
+  try{const c=await (await fetch(BETA?"config.json":"dados/config.json",{cache:"no-store"})).json();gKey=(c.googleMapsKey||"").trim()}catch(e){return}
   if(!gKey)return;
   try{
     const ant=JSON.parse(localStorage.getItem("gSessao")||"null");
