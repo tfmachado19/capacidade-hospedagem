@@ -441,7 +441,7 @@ def _registros(pts):
 def _html(dados_js, meta, titulo):
     return (TEMPLATE.replace("__DATA__", dados_js).replace("__META__", _js(meta))
             .replace("__MUNNOME__", titulo).replace("__BASE__", meta["base"])
-            .replace("__DIST__", meta.get("titulo") or "distribuidora"))
+            .replace("__DIST__", meta.get("distTexto") or meta.get("titulo") or "distribuidora"))
 
 
 def salvar_plataforma(df, arq, meta):
@@ -557,6 +557,8 @@ def salvar_site(df, pasta, meta, padrao="4316907"):
     muns.sort(key=chave)
     meta.update(muns=muns, bboxAll=_bbox(pts), bbox=None, mun=None,
                 default=padrao if any(m["c"] == padrao for m in muns) else muns[0]["c"])
+    # lista de municípios desta distribuidora, usada pelo scripts/unificar.py (página com várias)
+    (pasta / "dados" / "meta.json").write_text(_js(meta), encoding="utf-8")
     (pasta / "index.html").write_text(_html("null", meta, meta.get("titulo", "Área de concessão")),
                                       encoding="utf-8")
     return len(muns)
@@ -1087,6 +1089,10 @@ details.mais[open] summary{margin-bottom:6px}
       <button class="ghost toggle" id="tog" aria-expanded="true">Painel</button>
     </div>
     <div class="base">Dados da BDGD de __BASE__</div>
+    <div class="row" id="distRow" style="display:none">
+      <label for="dist">Distribuidora</label>
+      <select id="dist"></select>
+    </div>
     <div class="row" id="munRow" style="display:none">
       <label for="mun">Município</label>
       <select id="mun"></select>
@@ -1355,7 +1361,7 @@ function linhas(d,estilo,grupo){const ls=[];d.l.forEach(a=>{let x=a[0],y=a[1];co
 async function mostrarAlim(x){
   const al=x[14];if(!al)return;
   const f=String(al).replace(/[^\w.-]/g,"_");
-  try{if(!(f in mtCache)){const r=await fetch(`${BASE}dados/mt/${f}.json`);mtCache[f]=r.ok?await r.json():null}}catch(e){mtCache[f]=null}
+  try{if(!(f in mtCache)){const r=await fetch(`${DB}dados/mt/${f}.json`);mtCache[f]=r.ok?await r.json():null}}catch(e){mtCache[f]=null}
   if(empSel!==x)return;
   const d=mtCache[f];x._km=d?d.km:0;
   if(d)linhas(d,{color:"#1f5fbf",weight:4,opacity:.9,interactive:false,renderer:rTopo},redeMt);
@@ -1377,7 +1383,7 @@ async function mostrarRede(t){
   rede.clearLayers();
   if(!t||!META.muns||!t.alim)return;
   const f=String(t.alim).replace(/[^\w.-]/g,"_");
-  try{if(!(f in btCache)){const r=await fetch(`${BASE}dados/bt/${f}.json`);btCache[f]=r.ok?await r.json():{}}}catch(e){return}
+  try{if(!(f in btCache)){const r=await fetch(`${DB}dados/bt/${f}.json`);btCache[f]=r.ok?await r.json():{}}}catch(e){return}
   const d=btCache[f][t.id];if(sel!==t)return;
   t.bt=d?{km:d.km,np:d.g.length,kw:d.g.reduce((s,p)=>s+p[2],0)}:{km:0,np:0,kw:0};
   if(d){
@@ -1576,25 +1582,36 @@ function marcarPonto(lat,lon,rotulo){
 map.on("click",e=>{if(abaAtual==="M")medClique(e.latlng);else pontoGlobal(e.latlng.lat,e.latlng.lng)});
 let abaAtual="C";
 // Área inteira: troca de município sob demanda (dados/<código>.json)
+// Várias distribuidoras (META.dists): cada município tem d (distribuidora) e k (chave única "d:código");
+// os dados de cada distribuidora ficam em <p>dados/ (ex.: RGE em dados/, CEEE em ceee/dados/)
+let DB=BASE;
+const munK=m=>m.k||m.c,distDe=m=>(META.dists||[]).find(d=>d.k===m.d);
 function dentro(b,lat,lon){return b&&lat>=b[0]&&lat<=b[2]&&lon>=b[1]&&lon<=b[3]}
 function distC(b,lat,lon){return (lat-(b[0]+b[2])/2)**2+(lon-(b[1]+b[3])/2)**2}
 async function pontoGlobal(lat,lon,rot){
   if(META.muns&&!dentro(META.bbox,lat,lon)){
-    const m=META.muns.filter(x=>dentro(x.b,lat,lon)).sort((x,y)=>distC(x.b,lat,lon)-distC(y.b,lat,lon))[0];
-    if(m&&m.c!==META.mun)await carregarMun(m.c,false);
+    const m=META.muns.filter(x=>dentro(x.b,lat,lon)).sort((x,y)=>(x.d!==META.dist)-(y.d!==META.dist)||distC(x.b,lat,lon)-distC(y.b,lat,lon))[0];
+    if(m&&munK(m)!==META.munK)await carregarMun(munK(m),false);
   }
   marcarPonto(lat,lon,rot);
 }
 async function carregarMun(c,aj=true){
-  const m=META.muns.find(x=>x.c===c)||META.muns[0];
+  const m=META.muns.find(x=>munK(x)===c)||META.muns.find(x=>x.c===c)||META.muns[0];
+  const dd=distDe(m),db=BASE+(dd?dd.p:"");
   msg="Carregando "+m.n+"…";render();
-  try{const r=await fetch(`${BASE}dados/${m.c}.json`);if(!r.ok)throw 0;D=await r.json()}
+  try{const r=await fetch(`${db}dados/${m.c}.json`);if(!r.ok)throw 0;D=await r.json()}
   catch(e){msg="Não consegui carregar os dados de "+m.n+".";render();return}
-  META.mun=m.c;META.bbox=m.b;META.munNome=m.n+", RS";munEl.value=m.c;
+  if(dd&&dd.k!==META.dist){   // trocou de distribuidora: limpa o que é dela
+    INV=null;invErro=false;invVis=[];for(const o of [btCache,mtCache,empCache])for(const k in o)delete o[k];$("empAtv").dataset.mun="";
+    const op=$("invOnde").querySelector('option[value="t"]');if(op)op.textContent="Toda a área da "+dd.n}
+  DB=db;META.dist=dd?dd.k:null;META.munK=munK(m);if(dd)META.titulo=dd.n;
+  if(distEl.value&&dd&&distEl.value!==dd.k){distEl.value=dd.k;listarMuns()}
+  META.mun=m.c;META.bbox=m.b;META.munNome=m.n+", RS";munEl.value=munK(m);
   document.getElementById("titulo").textContent=m.n;document.title=(BETA?"[BETA] ":"")+"Capacidade de Hospedagem "+m.n;
   sel=null;ponto=null;msg="";if(pino){map.removeLayer(pino);pino=null}
   empSel=null;preparar();preencherAlim();desenhar();render();if(aj)ajustar();desenharEmp();
-  try{history.replaceState(null,"","#"+m.c)}catch(e){}
+  if(typeof abaAtual!=="undefined"&&abaAtual==="I"&&!INV)ligarInv();
+  try{history.replaceState(null,"","#"+munK(m))}catch(e){}
 }
 // ---- Prospecção de empresas (dados/emp/<município>.json, sob demanda)
 // linha: [lat,lon,kWh/mês,kWp,divisão,classe,gd,rede,endereço,bairro,grupo,mt,DIC,trafo,alimentador,demanda,CNAE]
@@ -1603,7 +1620,7 @@ const GDR=["sem GD","talvez (GD no mesmo ponto de conexão)","provável","sim"],
 const $=id=>document.getElementById(id);
 async function dadosEmp(){
   const c=META.mun;if(!c)return null;
-  if(!(c in empCache)){try{const r=await fetch(`${BASE}dados/emp/${c}.json`);empCache[c]=r.ok?await r.json():{a:{},e:[]}}catch(e){empCache[c]={a:{},e:[]}}}
+  if(!(c in empCache)){try{const r=await fetch(`${DB}dados/emp/${c}.json`);empCache[c]=r.ok?await r.json():{a:{},e:[]}}catch(e){empCache[c]={a:{},e:[]}}}
   return empCache[c];
 }
 function empFiltro(d){
@@ -1630,7 +1647,7 @@ let INV=null,invVis=[],invN=30,invErro=false;
 const nomeMun=c=>((META.muns||[]).find(m=>m.c===c)||{n:c}).n;
 async function ligarInv(){
   if(!INV&&!invErro){infoInv.innerHTML=`<p class="hint">Carregando os locais…</p>`;
-    try{const r=await fetch(`${BASE}dados/invest.json`);if(!r.ok)throw 0;INV=await r.json();
+    try{const r=await fetch(`${DB}dados/invest.json`);if(!r.ok)throw 0;INV=await r.json();
       INV.forEach(t=>{const inv=t.cmin==null?null:t.cmin*META.fs-t.gd,lim=t.kva==null?null:t.kva-t.gd;
         t.cap=(inv==null&&lim==null)?null:Math.max(0,Math.min(inv??Infinity,lim??Infinity))})}
     catch(e){invErro=true}}
@@ -1642,7 +1659,7 @@ function invFiltro(){
   return INV.filter(t=>(todo||t.m===META.mun)&&ok(t.capa)&&(!tr||ok(t.cap))).sort((a,b)=>b.capa-a.capa||(b.cap??-1)-(a.cap??-1));
 }
 async function abrirInv(t){
-  if(t.m!==META.mun)await carregarMun(t.m,false);
+  if(t.m!==META.mun)await carregarMun((META.dist?META.dist+":":"")+t.m,false);
   const x=D.find(x=>x.id===t.id);if(x)abrir(x);
 }
 function dicaInv(t){
@@ -1793,17 +1810,18 @@ function tileZ14(lat,lon){const n=16384,la=lat*Math.PI/180;
   return [Math.floor((lon+180)/360*n),Math.floor((1-Math.log(Math.tan(la)+1/Math.cos(la))/Math.PI)/2*n)]}
 async function edificios(lat,lon){
   const [x,y]=tileZ14(lat,lon),k=x+"/"+y;
-  if(!(k in med.cache)){try{const r=await fetch(`${BASE}dados/edif/14/${k}.json`);
-      if(!r.ok)throw 0;const d=await r.json();
-      med.cache[k]=d.b.map(a=>{let px=a[1]+d.o[0],py=a[2]+d.o[1];const p=[[py/1e6,px/1e6]];
-        for(let i=3;i<a.length;i+=2){px+=a[i];py+=a[i+1];p.push([py/1e6,px/1e6])}return {f:a[0],p}})}
-    catch(e){med.cache[k]=[]}}
+  if(!(k in med.cache)){   // contornos de todas as distribuidoras (a medição não depende do município)
+    const lst=await Promise.all((META.dists||[{p:""}]).map(async ds=>{try{const r=await fetch(`${BASE}${ds.p}dados/edif/14/${k}.json`);
+      if(!r.ok)return [];const d=await r.json();
+      return d.b.map(a=>{let px=a[1]+d.o[0],py=a[2]+d.o[1];const p=[[py/1e6,px/1e6]];
+        for(let i=3;i<a.length;i+=2){px+=a[i];py+=a[i+1];p.push([py/1e6,px/1e6])}return {f:a[0],p}})}catch(e){return []}}));
+    med.cache[k]=lst.flat()}
   return med.cache[k];
 }
 // geometria em metros (projeção local)
 function proj(pts){const la0=pts[0][0],lo0=pts[0][1],kx=111320*Math.cos(la0*Math.PI/180),ky=110540;
   return pts.map(([la,lo])=>[(lo-lo0)*kx,(la-la0)*ky])}
-function dentro(pt,poly){let c=false;for(let i=0,j=poly.length-1;i<poly.length;j=i++){const [yi,xi]=poly[i],[yj,xj]=poly[j];
+function dentroPoly(pt,poly){let c=false;for(let i=0,j=poly.length-1;i<poly.length;j=i++){const [yi,xi]=poly[i],[yj,xj]=poly[j];
   if(((yi>pt[0])!==(yj>pt[0]))&&(pt[1]<(xj-xi)*(pt[0]-yi)/(yj-yi)+xi))c=!c}return c}
 function distPoly(pt,poly){const q=proj([pt,...poly]),[px,py]=q[0];let d=1e9;
   for(let i=1;i<q.length;i++){const [ax,ay]=q[i],[bx,by]=q[i%(q.length-1)+1],dx=bx-ax,dy=by-ay,l=dx*dx+dy*dy;
@@ -1823,7 +1841,7 @@ async function medClique(ll){
   if(map.getZoom()<16){medMsg("Aproxime mais o mapa (zoom de rua) e toque no telhado.");return}
   medMsg("Procurando o contorno do telhado…");
   const lista=await edificios(ll.lat,ll.lng),pt=[ll.lat,ll.lng];
-  let e=lista.find(b=>dentro(pt,b.p));
+  let e=lista.find(b=>dentroPoly(pt,b.p));
   if(!e){let dm=8;lista.forEach(b=>{const d=distPoly(pt,b.p);if(d<dm){dm=d;e=b}})}
   if(!e){med.pts=[];medDesenhar();medMsg("Não achei contorno de prédio neste ponto. Use \"Desenhar contorno\" e marque os cantos do telhado na imagem.");return}
   med.pts=e.p.map(p=>[...p]);med.fonte=FONTES[e.f]||"";med.editando=false;medDesenhar();medRender();
@@ -1896,7 +1914,15 @@ function aba(k){
   if(k==="I"&&!INV&&!invErro&&META.muns)ligarInv();
 }
 document.querySelectorAll(".tabs button").forEach(b=>b.onclick=()=>aba(b.dataset.tab));
-const munEl=document.getElementById("mun");
+const munEl=document.getElementById("mun"),distEl=document.getElementById("dist");
+// lista de municípios conforme o filtro de distribuidora ("" = todas); nomes repetidos levam a distribuidora
+function listarMuns(){
+  const f=distEl.value,ant=munEl.value,lista=META.muns.filter(m=>!f||m.d===f),vis=new Set(),dup=new Set();
+  lista.forEach(m=>{if(vis.has(m.c))dup.add(m.c);vis.add(m.c)});
+  munEl.innerHTML="";lista.forEach(m=>{const o=document.createElement("option");o.value=munK(m);
+    o.textContent=m.n+(dup.has(m.c)?` (${(distDe(m)||{}).n||m.d})`:"");munEl.append(o)});
+  if([...munEl.options].some(o=>o.value===ant))munEl.value=ant;
+}
 // link direto: #<município>/<trafo>/<kW>
 const [hMun,hTr,hKw]=location.hash.slice(1).split("/").map(s=>{try{return decodeURIComponent(s)}catch(e){return s}});
 if(hKw&&+hKw>0){potEl.value=+hKw;filtraRow.hidden=false}
@@ -1911,10 +1937,16 @@ if(META.muns){
   $("empHideTr").addEventListener("change",()=>{if($("empHideTr").checked)map.removeLayer(capa);else capa.addTo(map)});
   $("empCsv").addEventListener("click",()=>{if(!$("empOn").checked){$("empOn").checked=true;desenharEmp().then(baixarCsv)}else baixarCsv()});
   document.getElementById("munRow").style.display="";
-  META.muns.forEach(m=>{const o=document.createElement("option");o.value=m.c;o.textContent=m.n;munEl.append(o)});
+  if(META.dists){$("distRow").style.display="";
+    distEl.innerHTML='<option value="">Todas</option>'+META.dists.map(d=>`<option value="${d.k}">${esc(d.n)}</option>`).join("");
+    distEl.addEventListener("change",()=>{listarMuns();const m=META.muns.find(x=>munK(x)===META.munK);
+      if(distEl.value&&(!m||m.d!==distEl.value)){const dd=META.dists.find(d=>d.k===distEl.value);
+        const alvo=(dd&&dd.padrao)||(munEl.options[0]&&munEl.options[0].value);if(alvo)carregarMun(alvo)}})}
+  listarMuns();
   munEl.addEventListener("change",()=>carregarMun(munEl.value));
   const b=META.bboxAll;map.fitBounds([[b[0],b[1]],[b[2],b[3]]]);
-  carregarMun(META.muns.some(m=>m.c===hMun)?hMun:META.default).then(()=>{const t=hTr&&D.find(x=>String(x.id)===hTr);if(t)abrir(t)});
+  carregarMun((h=>h?munK(h):META.default)(META.muns.find(m=>munK(m)===hMun)||
+    META.muns.find(m=>m.c===hMun&&(!META.dists||m.d===META.dists[0].k))||META.muns.find(m=>m.c===hMun))).then(()=>{const t=hTr&&D.find(x=>String(x.id)===hTr);if(t)abrir(t)});
 }else{desenhar();render();ajustar();const t=hTr&&D.find(x=>String(x.id)===hTr);if(t)abrir(t)}
 </script>
 </body>

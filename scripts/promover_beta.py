@@ -16,3 +16,11 @@ if cb.exists():
         d["googleMapsKey"] = kb
         co.write_text(json.dumps(d) + "\n", encoding="utf-8")
         print(f"chave do Google: {cb} → {co}")
+# página única com várias distribuidoras: o endereço antigo /ceee/ passa a abrir a página única na CEEE
+if '"dists":' in o.read_text(encoding="utf-8"):
+    (raiz / "ceee" / "index.html").write_text(
+        '<!doctype html><meta charset="utf-8"><title>CEEE Equatorial</title>'
+        '<meta http-equiv="refresh" content="0; url=../#CEEE:4314902">'
+        '<script>location.replace("../"+(location.hash||"#CEEE:4314902").replace(/^#(\\d)/,"#CEEE:$1"))</script>'
+        '<a href="../#CEEE:4314902">Abrir o mapa da CEEE Equatorial</a>\n', encoding="utf-8")
+    print("ceee/index.html → redireciona para a página única")

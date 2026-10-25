@@ -22,10 +22,13 @@ nem sempre programadores: explique resultados em linguagem simples.
 - `dados/edif/14/<x>/<y>.json` — contornos de prédios (aba Medir), gerados por `scripts/edificios.py`
   a partir do Overture Maps (s3://overturemaps-us-west-2/release/<versão>/theme=buildings/,
   leitura anônima com pyarrow; DuckDB não baixa extensões no ambiente de nuvem).
-- `ceee/` — site da **CEEE Equatorial** (código da distribuidora 5707): `ceee/index.html` + `ceee/dados/`
-  (mesma estrutura de `dados/`). https://tfmachado19.github.io/capacidade-hospedagem/ceee/
-- `scripts/atualizar_codigo.py` — reaplica o `TEMPLATE` numa página mantendo os dados dela
-  (ex.: `ceee/index.html`).
+- **Duas distribuidoras na mesma página** (filtro "Distribuidora" + lista de municípios):
+  RGE (dados em `dados/`) e **CEEE Equatorial** (código 5707, dados em `ceee/dados/`).
+  `dados/meta.json` e `ceee/dados/meta.json` têm a lista de municípios de cada uma (gravados pelo
+  `trafos_bdgd.py`). `scripts/unificar.py` junta tudo e gera `beta/index.html` com o `TEMPLATE`.
+  No JS: `META.dists`, município com `d` (distribuidora) e `k` (chave "RGE:4316907"); `DB` é a
+  pasta de dados da distribuidora do município aberto.
+- `scripts/atualizar_codigo.py` — reaplica o `TEMPLATE` numa página de uma distribuidora só.
 - `scripts/trafos_bdgd.py` — lê a BDGD e gera planilha de trafos + `index.html` + `dados/`.
 - `scripts/prospeccao.py` — gera a planilha de prospecção e `dados/emp/`.
 
@@ -41,10 +44,12 @@ nem sempre programadores: explique resultados em linguagem simples.
   no JS: etiqueta "BETA" e dados lidos de `../dados/`).
 - **Dados (`dados/`) são compartilhados** entre beta e oficial: mudança de dados aparece nos
   dois. Mantenha o formato compatível com o código do oficial ou avise o usuário antes.
-- **Duas distribuidoras:** RGE (raiz, `beta/`) e CEEE Equatorial (`ceee/`). Ao promover o beta
-  para o oficial, rode também `python3 scripts/atualizar_codigo.py ceee/index.html`, para a CEEE
-  receber as mesmas melhorias. Textos do site não podem citar "RGE" fixo: use `META.titulo`
-  no JS ou `__DIST__` no HTML do `TEMPLATE`.
+- **Gerar o beta:** depois de mudar o `TEMPLATE`, rode `python3 scripts/unificar.py` (gera
+  `beta/index.html` com as duas distribuidoras). Não edite `beta/index.html` à mão.
+  Textos do site não podem citar "RGE" fixo: use `META.titulo` (distribuidora do município aberto)
+  no JS ou `__DIST__` no HTML do `TEMPLATE`. Teste sempre um município de cada distribuidora.
+- Ao promover uma página unificada, `promover_beta.py` transforma `ceee/index.html` em
+  redirecionamento para a página única (os dados continuam em `ceee/dados/`).
 - Ao regenerar o site com `trafos_bdgd.py`, copie o `index.html` gerado para `beta/index.html`
   (não para a raiz) e siga o fluxo do beta.
 - **Publicação:** depois de testar, envie direto para a `main`. Se o GitHub recusar o push

@@ -32,10 +32,11 @@ Site: https://tfmachado19.github.io/capacidade-hospedagem
 Beta (mudanças em teste antes de irem para o oficial): https://tfmachado19.github.io/capacidade-hospedagem/beta/
 Para passar o beta para o oficial: `python3 scripts/promover_beta.py`, depois commit e push.
 
-**CEEE Equatorial** (75 municípios, abre em Porto Alegre): https://tfmachado19.github.io/capacidade-hospedagem/ceee/
-Mesmo código e mesmas funções do site da RGE, com os dados da BDGD da CEEE Equatorial
-(`CEEE_Equatorial_5707_2025-12-31`) em `ceee/dados/`. Para levar ao site da CEEE uma melhoria já
-aprovada no da RGE: `python3 scripts/atualizar_codigo.py ceee/index.html`.
+**RGE e CEEE Equatorial na mesma página:** o filtro "Distribuidora" (Todas / RGE / CEEE
+Equatorial) muda a lista de municípios (376 da RGE + 75 da CEEE; Cachoeira do Sul, Rolante e
+Santana da Boa Vista aparecem nas duas, com o nome da distribuidora). Dados da CEEE
+(`CEEE_Equatorial_5707_2025-12-31`) em `ceee/dados/`. A página é montada por
+`python3 scripts/unificar.py` (gera o beta).
 
 ## Trabalho em equipe com Claude Code
 
