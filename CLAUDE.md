@@ -22,6 +22,10 @@ nem sempre programadores: explique resultados em linguagem simples.
 - `dados/edif/14/<x>/<y>.json` — contornos de prédios (aba Medir), gerados por `scripts/edificios.py`
   a partir do Overture Maps (s3://overturemaps-us-west-2/release/<versão>/theme=buildings/,
   leitura anônima com pyarrow; DuckDB não baixa extensões no ambiente de nuvem).
+- `ceee/` — site da **CEEE Equatorial** (código da distribuidora 5707): `ceee/index.html` + `ceee/dados/`
+  (mesma estrutura de `dados/`). https://tfmachado19.github.io/capacidade-hospedagem/ceee/
+- `scripts/atualizar_codigo.py` — reaplica o `TEMPLATE` numa página mantendo os dados dela
+  (ex.: `ceee/index.html`).
 - `scripts/trafos_bdgd.py` — lê a BDGD e gera planilha de trafos + `index.html` + `dados/`.
 - `scripts/prospeccao.py` — gera a planilha de prospecção e `dados/emp/`.
 
@@ -37,6 +41,10 @@ nem sempre programadores: explique resultados em linguagem simples.
   no JS: etiqueta "BETA" e dados lidos de `../dados/`).
 - **Dados (`dados/`) são compartilhados** entre beta e oficial: mudança de dados aparece nos
   dois. Mantenha o formato compatível com o código do oficial ou avise o usuário antes.
+- **Duas distribuidoras:** RGE (raiz, `beta/`) e CEEE Equatorial (`ceee/`). Ao promover o beta
+  para o oficial, rode também `python3 scripts/atualizar_codigo.py ceee/index.html`, para a CEEE
+  receber as mesmas melhorias. Textos do site não podem citar "RGE" fixo: use `META.titulo`
+  no JS ou `__DIST__` no HTML do `TEMPLATE`.
 - Ao regenerar o site com `trafos_bdgd.py`, copie o `index.html` gerado para `beta/index.html`
   (não para a raiz) e siga o fluxo do beta.
 - **Publicação:** depois de testar, envie direto para a `main`. Se o GitHub recusar o push
@@ -70,12 +78,24 @@ python3 -I scripts/prospeccao.py --bdgd RGE.zip --ucbt-pj ucbt_pj.zip --ucmt-pj 
 ```
 A área inteira leva ~8 min (trafos) + ~5 min (prospecção) e usa ~5 GB de RAM.
 
+CEEE Equatorial (BDGD `CEEE_Equatorial_5707_<data-base>`; nas bases PJ, `DIST = 5707`):
+```bash
+python3 -I scripts/trafos_bdgd.py CEEE.zip --mun todos --mun-nome "CEEE Equatorial" --padrao 4314902 --gd-aneel gd.parquet --saida /tmp/ceee
+python3 -I scripts/edificios.py edificios_rge.parquet edificios_sul.parquet --site /tmp/ceee/site_todos
+python3 -I scripts/prospeccao.py --bdgd CEEE.zip --ucbt-pj ucbt_pj.zip --ucmt-pj ucmt_pj.csv --dist 5707 \
+    --trafos /tmp/ceee/BDGD_trafos_todos.xlsx --nomes gd.parquet --saida /tmp/prosp_ceee --site /tmp/ceee/site_todos
+# copie /tmp/ceee/site_todos/* para ceee/ (mantendo ceee/dados/config.json)
+```
+O Overture precisa cobrir também o sul do estado (até lat −33,9: Pelotas, Rio Grande, Chuí).
+
 ## Premissas e armadilhas conhecidas (não "corrigir" sem discutir)
 
 - **POT_INST da BDGD da RGE não é potência instalada**: é energia do melhor mês ÷ 720 h. A
   potência da GD vem da base da ANEEL pelo `CEG_GD` (`--gd-aneel`). Sem casamento: BT usa
   POT_INST, MT usa DEM_CONT (usinas PCH/UHE/UTE).
-- **Tensão (TTEN):** código 49 = 13,8 kV, 63 = 23 kV. Outros códigos ficam sem carregamento.
+- **Tensão (TTEN):** código 49 = 13,8 kV, 62 = 22 kV (CEEE), 63 = 23 kV (RGE). Outros códigos ficam
+  sem carregamento. Cabo de saída com corrente nominal < 50 A é tratado como erro de cadastro (sem dado).
+- BT da CEEE é 220/127 V (TTEN 10 e 6); da RGE, 380/220 V (15 e 10).
 - **Capacidade do trafo** = menor entre (carga mínima diurna × fator de segurança − GD) e (kVA − GD).
 - **Alimentador:** capacidade = √3 × kV × corrente nominal (SEGCON.CNOM) do trecho de saída;
   carga mínima = energia medida na saída (CTMT, já líquida da GD) + geração estimada da GD

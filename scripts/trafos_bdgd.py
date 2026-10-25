@@ -69,7 +69,7 @@ CAND = {
     "ponnot": ["PONNOT"],
 }
 # Tabela TTEN da ANEEL (só as tensões de MT usadas nos alimentadores)
-TTEN_KV = {"49": 13.8, "63": 23.0}
+TTEN_KV = {"49": 13.8, "62": 22.0, "63": 23.0}
 ENE = [f"ENE_{i:02d}" for i in range(1, 13)]
 POT = [f"POT_{i:02d}" for i in range(1, 97)]
 DIAS_MES = np.array([31, 28.25, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31])
@@ -375,6 +375,7 @@ def calc_alimentadores(gdb, L, curvas, janela, fp, ctmts=None, gd_kw=None):
                 sc, left_on="TIP_CND", right_on="COD_ID", how="left")
             corr = pd.to_numeric(sd["CNOM"], errors="coerce")
             ct["I"] = ct["COD_ID"].map(corr.groupby(sd["CTMT"]).min())
+            ct.loc[ct["I"] < 50, "I"] = np.nan     # cabo de saída < 50 A: erro de cadastro, fica sem dado
         except Exception as e:
             log(f"  (capacidade dos alimentadores indisponível: {e})")
     ct["KV"] = txt(ct["TEN_NOM"]).map(TTEN_KV)
@@ -439,7 +440,8 @@ def _registros(pts):
 
 def _html(dados_js, meta, titulo):
     return (TEMPLATE.replace("__DATA__", dados_js).replace("__META__", _js(meta))
-            .replace("__MUNNOME__", titulo).replace("__BASE__", meta["base"]))
+            .replace("__MUNNOME__", titulo).replace("__BASE__", meta["base"])
+            .replace("__DIST__", meta.get("titulo") or "distribuidora"))
 
 
 def salvar_plataforma(df, arq, meta):
@@ -572,6 +574,7 @@ def main():
     ap.add_argument("--saida", default=None, help="pasta de saída")
     ap.add_argument("--gd-aneel", default=None,
                     help="base de GD da ANEEL (.parquet/.csv) p/ potência instalada via CEG_GD")
+    ap.add_argument("--padrao", default="4316907", help="com --mun todos: município que o site abre (código IBGE)")
     ap.add_argument("--mun-nome", default=None, help="nome do município p/ busca de endereço (ex.: \"Itaara, RS\"); "
                     "com --mun todos, título do site (ex.: \"RGE\")")
     a = ap.parse_args()
@@ -893,7 +896,7 @@ def main():
     if todos:
         site = saida / "site_todos"
         meta.update(munNome="Rio Grande do Sul", titulo=a.mun_nome or "Área de concessão")
-        n_mun = salvar_site(df, site, meta)
+        n_mun = salvar_site(df, site, meta, padrao=a.padrao)
         log("Gerando rede BT e postes com GD por trafo ...")
         log(f"  rede BT de {salvar_redes_bt(gdb, L, site, df, ug):,} trafos em {site / 'dados' / 'bt'}")
         log(f"  traçado de {salvar_redes_mt(gdb, L, site):,} alimentadores em {site / 'dados' / 'mt'}")
@@ -1170,7 +1173,7 @@ details.mais[open] summary{margin-bottom:6px}
     <div class="painel">
       <p class="pergunta">Usinas de investimento</p>
       <p class="hint">Trafos com um único consumidor, ligados a alimentador com folga para nova GD, do maior para o menor.</p>
-      <div class="row"><label for="invOnde">Onde</label><select id="invOnde"><option value="m">Município selecionado</option><option value="t">Toda a área da RGE</option></select></div>
+      <div class="row"><label for="invOnde">Onde</label><select id="invOnde"><option value="m">Município selecionado</option><option value="t">Toda a área da __DIST__</option></select></div>
       <label class="chk"><input type="checkbox" id="invTr"> Exigir folga também no trafo</label>
       <label class="chk"><input type="checkbox" id="invMapa" checked> Mostrar os locais no mapa</label>
       <button type="button" class="ghost" id="invCsv">Baixar lista (CSV)</button>
@@ -1180,7 +1183,7 @@ details.mais[open] summary{margin-bottom:6px}
   <section class="aba" id="abaS" role="tabpanel" aria-labelledby="tabS" hidden>
     <div class="scroll sobre">
       <p class="pergunta">De onde vêm os números</p>
-      <dl><dt>Rede e cargas</dt><dd>BDGD da RGE (ANEEL), data-base __BASE__</dd>
+      <dl><dt>Rede e cargas</dt><dd>BDGD da __DIST__ (ANEEL), data-base __BASE__</dd>
       <dt>GD já ligada</dt><dd>Base de GD da ANEEL</dd></dl>
       <h2>Capacidade do trafo</h2>
       <p>Menor valor entre a carga mínima de dia (o consumo dos vizinhos ao meio-dia, × fator de segurança) e a potência do trafo, descontada a GD que já existe. Acima da carga mínima, a energia volta para a rede (inversão de fluxo).</p>
@@ -1652,13 +1655,13 @@ function listaInv(){
   if(!INV)return "";
   if($("invOnde").value!=="t"&&!META.mun)return `<p class="hint">Carregando o município…</p>`;
   const pot=+potEl.value||0,tr=$("invTr").checked,todo=$("invOnde").value==="t",na=new Set(invVis.map(t=>t.alim)).size;
-  return `<section><h2>${todo?"Toda a área da RGE":esc(META.munNome.split(",")[0])}</h2>
+  return `<section><h2>${todo?"Toda a área da "+esc(META.titulo):esc(META.munNome.split(",")[0])}</h2>
   <div class="stats"><div class="stat"><b>${invVis.length.toLocaleString("pt-BR")}</b><span>locais</span></div>
   <div class="stat"><b>${na.toLocaleString("pt-BR")}</b><span>alimentadores</span></div>
   <div class="stat"><b>${invVis.length?fmt(invVis[0].capa/1000,2):"–"}</b><span>MW maior folga</span></div></div>
   <p class="hint">${pot>0?`Alimentador com folga ≥ ${fmt(pot)} kW`:"Qualquer folga no alimentador"}${tr?" e no trafo":""}. Locais do mesmo alimentador disputam a mesma folga.
   ${tr?"":"O trafo de um só consumidor costuma ser pequeno: a usina em geral exige trocar ou ampliar o trafo. "}${$("invMapa").checked?"Círculos azuis no mapa.":""}</p>
-  ${invVis.length?"":`<p class="hint">Nenhum local ${todo?"na área":"neste município"} com esses critérios.${todo?"":" Escolha “Toda a área da RGE”."}</p>`}
+  ${invVis.length?"":`<p class="hint">Nenhum local ${todo?"na área":"neste município"} com esses critérios.${todo?"":" Escolha “Toda a área da "+esc(META.titulo)+"”."}</p>`}
   <div class="near">${invVis.slice(0,invN).map(t=>`<button data-inv="${esc(t.id)}" data-m="${esc(t.m)}"><span class="dot inv"></span><span><b class="id">${esc(t.id)}</b><br><span class="d">${todo?esc(nomeMun(t.m))+" · ":""}${esc(t.alim||"–")} · ${fmtK(t.kva)} kVA</span></span><span><b>${fmt(t.capa,0)}</b> <span class="d">kW alim.</span><br><span class="d">trafo ${fmt(t.cap,0)} kW</span></span></button>`).join("")}</div>
   ${invVis.length>invN?`<button type="button" class="ghost" data-mais="1">Mostrar mais (${(invVis.length-invN).toLocaleString("pt-BR")} restantes)</button>`:""}</section>`;
 }
@@ -1672,7 +1675,7 @@ function baixarInv(){
   const cab=["Trafo","Município","Alimentador","Subestação","Potência do trafo (kVA)","GD já ligada (kW)","Folga do alimentador p/ nova GD (kW)","Trafo comporta (kW)","Latitude","Longitude","Google Maps"];
   const lin=invVis.map(t=>[t.id,nomeMun(t.m),t.alim,t.sub,n(t.kva),n(t.gd),n(t.capa),n(t.cap),t.lat,t.lon,`https://www.google.com/maps?q=${t.lat},${t.lon}`].map(q).join(";"));
   const blob=new Blob(["\ufeff"+[cab.map(q).join(";"),...lin].join("\r\n")],{type:"text/csv;charset=utf-8"});
-  const onde=$("invOnde").value==="t"?"RGE":META.munNome.split(",")[0].replace(/\W+/g,"_");
+  const onde=$("invOnde").value==="t"?META.titulo.replace(/\W+/g,"_"):META.munNome.split(",")[0].replace(/\W+/g,"_");
   const l=document.createElement("a");l.href=URL.createObjectURL(blob);l.download=`usinas_investimento_${onde}.csv`;l.click();setTimeout(()=>URL.revokeObjectURL(l.href),2000);
 }
 // Informações ao passar o mouse (ou tocar) no mapa

@@ -32,6 +32,11 @@ Site: https://tfmachado19.github.io/capacidade-hospedagem
 Beta (mudanças em teste antes de irem para o oficial): https://tfmachado19.github.io/capacidade-hospedagem/beta/
 Para passar o beta para o oficial: `python3 scripts/promover_beta.py`, depois commit e push.
 
+**CEEE Equatorial** (75 municípios, abre em Porto Alegre): https://tfmachado19.github.io/capacidade-hospedagem/ceee/
+Mesmo código e mesmas funções do site da RGE, com os dados da BDGD da CEEE Equatorial
+(`CEEE_Equatorial_5707_2025-12-31`) em `ceee/dados/`. Para levar ao site da CEEE uma melhoria já
+aprovada no da RGE: `python3 scripts/atualizar_codigo.py ceee/index.html`.
+
 ## Trabalho em equipe com Claude Code
 
 1. Peça ao dono do repositório para te convidar como colaborador (GitHub → Settings →

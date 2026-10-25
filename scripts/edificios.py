@@ -39,7 +39,7 @@ def tile(lon, lat, z=Z):
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("parquet")
+    ap.add_argument("parquet", nargs="+", help="um ou mais parquets do Overture (ex.: norte e sul do estado)")
     ap.add_argument("--site", default=".")
     ap.add_argument("--min-m2", type=float, default=12, help="ignora construções menores (m²)")
     a = ap.parse_args()
@@ -56,7 +56,8 @@ def main():
                     cel.add((cx + dx, cy + dy))
     print(f"[{time.time()-t0:5.0f}s] {len(cel):,} células perto de trafos", flush=True)
 
-    T = pq.read_table(a.parquet, columns=["geometry", "bbox", "fonte"])
+    import pyarrow as pa
+    T = pa.concat_tables([pq.read_table(f, columns=["geometry", "bbox", "fonte"]) for f in a.parquet])
     bx = T.column("bbox").combine_chunks()
     lon = (pc.struct_field(bx, "xmin").to_numpy() + pc.struct_field(bx, "xmax").to_numpy()) / 2
     lat = (pc.struct_field(bx, "ymin").to_numpy() + pc.struct_field(bx, "ymax").to_numpy()) / 2
