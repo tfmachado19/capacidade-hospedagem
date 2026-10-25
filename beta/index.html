@@ -154,6 +154,7 @@ details.mais[open] summary{margin-bottom:6px}
 .aba>.btInv{margin:10px 18px 0;min-height:44px;font-size:15px;display:flex;gap:8px;align-items:center;justify-content:center;border:1px solid var(--accent);color:var(--accent)}
 .btInv[hidden]{display:none}
 #invOnde{flex:1 1 0;width:0;min-width:110px}
+#invKvaMin,#invKvaMax{flex:1 1 0;width:0;min-width:90px;font-family:var(--mono)}
 .dot.inv{background:#1d4ed8;border:2px solid #fff;box-shadow:0 0 0 1px rgba(0,0,0,.35)}
 @media (max-width:760px){
   body{grid-template-columns:1fr;grid-template-rows:1fr auto}
@@ -279,6 +280,8 @@ details.mais[open] summary{margin-bottom:6px}
       <p class="pergunta">Usinas de investimento</p>
       <p class="hint">Trafos com um único consumidor, ligados a alimentador com folga para nova GD, do maior para o menor.</p>
       <div class="row"><label for="invOnde">Onde</label><select id="invOnde"><option value="m">Município selecionado</option><option value="t">Toda a área da RGE e da CEEE Equatorial</option></select></div>
+      <div class="row"><label for="invKvaMin">Trafo de</label><select id="invKvaMin"><option value="">mín.</option></select>
+        <label for="invKvaMax">até</label><select id="invKvaMax"><option value="">máx.</option></select><span class="base">kVA</span></div>
       <label class="chk"><input type="checkbox" id="invTr"> Exigir folga também no trafo</label>
       <label class="chk"><input type="checkbox" id="invMapa" checked> Mostrar os locais no mapa</label>
       <button type="button" class="ghost" id="invCsv">Baixar lista (CSV)</button>
@@ -755,6 +758,9 @@ async function ligarInv(){
       const partes=await Promise.all(fontes.map(async ds=>{const r=await fetch(`${BASE}${ds.p}dados/invest.json`);if(!r.ok)throw 0;
         const l=await r.json();l.forEach(t=>{t.d=ds.k});return l}));
       INV=partes.flat();
+      // faixas de potência (kVA) presentes nos locais, para o filtro "Trafo de … até …"
+      const vs=[...new Set(INV.map(t=>t.kva).filter(v=>v!=null))].sort((a,b)=>a-b);
+      for(const el of [$("invKvaMin"),$("invKvaMax")])vs.forEach(v=>{const o=document.createElement("option");o.value=v;o.textContent=fmtK(v);el.append(o)});
       INV.forEach(t=>{const inv=t.cmin==null?null:t.cmin*META.fs-t.gd,lim=t.kva==null?null:t.kva-t.gd;
         t.cap=(inv==null&&lim==null)?null:Math.max(0,Math.min(inv??Infinity,lim??Infinity))})}
     catch(e){invErro=true}}
@@ -764,7 +770,9 @@ async function ligarInv(){
 function invFiltro(){
   const pot=+potEl.value||0,tr=$("invTr").checked,o=invOnde(),ok=v=>v!=null&&(pot>0?v>=pot:v>0);
   const onde=t=>o.todo?(!o.dist||t.d===o.dist):(t.m===META.mun&&(!META.dist||t.d===META.dist));
-  return INV.filter(t=>onde(t)&&ok(t.capa)&&(!tr||ok(t.cap))).sort((a,b)=>b.capa-a.capa||(b.cap??-1)-(a.cap??-1));
+  const k0=$("invKvaMin").value===""?null:+$("invKvaMin").value,k1=$("invKvaMax").value===""?null:+$("invKvaMax").value;
+  const faixa=t=>(k0==null||(t.kva!=null&&t.kva>=k0))&&(k1==null||(t.kva!=null&&t.kva<=k1));
+  return INV.filter(t=>onde(t)&&faixa(t)&&ok(t.capa)&&(!tr||ok(t.cap))).sort((a,b)=>b.capa-a.capa||(b.cap??-1)-(a.cap??-1));
 }
 async function abrirInv(t){
   if(t.m!==META.mun||(t.d&&t.d!==META.dist))await carregarMun((t.d?t.d+":":"")+t.m,false);
@@ -785,7 +793,7 @@ function listaInv(){
   <div class="stats"><div class="stat"><b>${invVis.length.toLocaleString("pt-BR")}</b><span>locais</span></div>
   <div class="stat"><b>${na.toLocaleString("pt-BR")}</b><span>alimentadores</span></div>
   <div class="stat"><b>${invVis.length?fmt(invVis[0].capa/1000,2):"–"}</b><span>MW maior folga</span></div></div>
-  <p class="hint">${pot>0?`Alimentador com folga ≥ ${fmt(pot)} kW`:"Qualquer folga no alimentador"}${tr?" e no trafo":""}. Locais do mesmo alimentador disputam a mesma folga.
+  <p class="hint">${pot>0?`Alimentador com folga ≥ ${fmt(pot)} kW`:"Qualquer folga no alimentador"}${tr?" e no trafo":""}${($("invKvaMin").value||$("invKvaMax").value)?`; trafo de ${$("invKvaMin").value?fmtK(+$("invKvaMin").value):"qualquer"} a ${$("invKvaMax").value?fmtK(+$("invKvaMax").value):"qualquer"} kVA`:""}. Locais do mesmo alimentador disputam a mesma folga.
   ${tr?"":"O trafo de um só consumidor costuma ser pequeno: a usina em geral exige trocar ou ampliar o trafo. "}${$("invMapa").checked?"Círculos azuis no mapa.":""}</p>
   ${invVis.length?"":`<p class="hint">Nenhum local ${todo?"na área":"neste município"} com esses critérios.${todo?"":" Escolha uma opção de área inteira em “Onde”."}</p>`}
   <div class="near">${invVis.slice(0,invN).map(t=>`<button data-inv="${esc(t.id)}" data-m="${esc(t.m)}" data-d="${esc(t.d||"")}"><span class="dot inv"></span><span><b class="id">${esc(t.id)}</b><br><span class="d">${todo?esc(nomeMun(t))+(META.dists&&!o.dist?" ("+esc(t.d)+")":"")+" · ":""}${esc(t.alim||"–")} · ${fmtK(t.kva)} kVA</span></span><span><b>${fmt(t.capa,0)}</b> <span class="d">kW alim.</span><br><span class="d">trafo ${fmt(t.cap,0)} kW</span></span></button>`).join("")}</div>
@@ -1064,7 +1072,7 @@ if(hKw&&+hKw>0){potEl.value=+hKw;filtraRow.hidden=false}
 if(META.muns){
   $("tabP").hidden=false;$("tabI").hidden=false;$("btInv").hidden=false;
   $("btInv").onclick=()=>{aba("I");abrirPainel();topoPainel()};
-  ["invTr","invMapa"].forEach(i=>$(i).addEventListener("change",()=>{invN=30;desenhar();render()}));
+  ["invTr","invMapa","invKvaMin","invKvaMax"].forEach(i=>$(i).addEventListener("change",()=>{invN=30;desenhar();render()}));
   $("invOnde").addEventListener("change",()=>{invN=30;desenhar();render();if(invVis.length)map.fitBounds(invVis.map(t=>[t.lat,t.lon]),{padding:[20,20],maxZoom:15})});
   $("invCsv").addEventListener("click",()=>{if(INV)baixarInv();else ligarInv().then(()=>{if(INV)baixarInv()})});$("empOn").addEventListener("change",()=>{empMexeu=true});
   ["empOn","empAtv","empTen","empGd","empRede"].forEach(i=>$(i).addEventListener("change",()=>{empSel=null;desenharEmp()}));
