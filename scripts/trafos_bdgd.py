@@ -1617,8 +1617,8 @@ async function carregarMun(c,aj=true){
   try{const r=await fetch(`${db}dados/${m.c}.json`);if(!r.ok)throw 0;D=await r.json()}
   catch(e){msg="Não consegui carregar os dados de "+m.n+".";render();return}
   if(dd&&dd.k!==META.dist){   // trocou de distribuidora: limpa o que é dela
-    INV=null;invErro=false;invVis=[];for(const o of [btCache,mtCache,empCache])for(const k in o)delete o[k];$("empAtv").dataset.mun="";
-    const op=$("invOnde").querySelector('option[value="t"]');if(op)op.textContent="Toda a área da "+dd.n}
+    if(!META.dists){INV=null;invErro=false;invVis=[]}for(const o of [btCache,mtCache,empCache])for(const k in o)delete o[k];$("empAtv").dataset.mun="";
+    const op=!META.dists&&$("invOnde").querySelector('option[value="t"]');if(op)op.textContent="Toda a área da "+dd.n}
   DB=db;META.dist=dd?dd.k:null;META.munK=munK(m);if(dd)META.titulo=dd.n;
   if(distEl.value&&dd&&distEl.value!==dd.k){distEl.value=dd.k;listarMuns()}
   META.mun=m.c;META.bbox=m.b;META.munNome=m.n+", RS";munEl.value=munK(m);
@@ -1660,10 +1660,17 @@ async function desenharEmp(){
 // ---- Usinas de investimento (dados/invest.json, toda a área): trafos com 1 UC cujo alimentador tem folga p/ nova GD
 // linha: {id,lat,lon,kva,gd,cmin,capa,alim,sub,m (código IBGE)}
 let INV=null,invVis=[],invN=30,invErro=false;
-const nomeMun=c=>((META.muns||[]).find(m=>m.c===c)||{n:c}).n;
+// t.d = distribuidora do local (página com várias distribuidoras carrega os locais de todas)
+const nomeMun=t=>((META.muns||[]).find(m=>m.c===t.m&&(!t.d||m.d===t.d))||{n:t.m}).n;
+const nomeDist=k=>((META.dists||[]).find(d=>d.k===k)||{n:k||""}).n;
+// "m" = município aberto; "t" = toda a área; "t:RGE" = toda a área de uma distribuidora
+function invOnde(){const v=$("invOnde").value;return {todo:v[0]==="t",dist:v.slice(2),rotulo:$("invOnde").selectedOptions[0].textContent}}
 async function ligarInv(){
   if(!INV&&!invErro){infoInv.innerHTML=`<p class="hint">Carregando os locais…</p>`;
-    try{const r=await fetch(`${DB}dados/invest.json`);if(!r.ok)throw 0;INV=await r.json();
+    try{const fontes=META.dists||[{k:"",p:""}];
+      const partes=await Promise.all(fontes.map(async ds=>{const r=await fetch(`${BASE}${ds.p}dados/invest.json`);if(!r.ok)throw 0;
+        const l=await r.json();l.forEach(t=>{t.d=ds.k});return l}));
+      INV=partes.flat();
       INV.forEach(t=>{const inv=t.cmin==null?null:t.cmin*META.fs-t.gd,lim=t.kva==null?null:t.kva-t.gd;
         t.cap=(inv==null&&lim==null)?null:Math.max(0,Math.min(inv??Infinity,lim??Infinity))})}
     catch(e){invErro=true}}
@@ -1671,44 +1678,46 @@ async function ligarInv(){
 }
 // sem potência pretendida: qualquer folga (> 0); com potência: folga ≥ potência. Ordem: maior folga do alimentador
 function invFiltro(){
-  const pot=+potEl.value||0,tr=$("invTr").checked,todo=$("invOnde").value==="t",ok=v=>v!=null&&(pot>0?v>=pot:v>0);
-  return INV.filter(t=>(todo||t.m===META.mun)&&ok(t.capa)&&(!tr||ok(t.cap))).sort((a,b)=>b.capa-a.capa||(b.cap??-1)-(a.cap??-1));
+  const pot=+potEl.value||0,tr=$("invTr").checked,o=invOnde(),ok=v=>v!=null&&(pot>0?v>=pot:v>0);
+  const onde=t=>o.todo?(!o.dist||t.d===o.dist):(t.m===META.mun&&(!META.dist||t.d===META.dist));
+  return INV.filter(t=>onde(t)&&ok(t.capa)&&(!tr||ok(t.cap))).sort((a,b)=>b.capa-a.capa||(b.cap??-1)-(a.cap??-1));
 }
 async function abrirInv(t){
-  if(t.m!==META.mun)await carregarMun((META.dist?META.dist+":":"")+t.m,false);
+  if(t.m!==META.mun||(t.d&&t.d!==META.dist))await carregarMun((t.d?t.d+":":"")+t.m,false);
   const x=D.find(x=>x.id===t.id);if(x)abrir(x);
 }
 function dicaInv(t){
-  return `<b>Usina de investimento · trafo ${esc(t.id)}</b><br>${esc(nomeMun(t.m))} · ${fmt(t.kva,1)} kVA · 1 UC<br>
+  return `<b>Usina de investimento · trafo ${esc(t.id)}</b><br>${esc(nomeMun(t))}${t.d&&META.dists?" ("+esc(nomeDist(t.d))+")":""} · ${fmt(t.kva,1)} kVA · 1 UC<br>
   Alimentador ${esc(t.alim||"–")}: folga <b>${fmt(t.capa,0)} kW</b><br>Trafo comporta: ${fmt(t.cap)} kW`;
 }
 function listaInv(){
   if(!META.muns)return "";
   if(invErro)return `<p class="msg">Não consegui carregar a lista de locais. Tente recarregar a página.</p>`;
   if(!INV)return "";
-  if($("invOnde").value!=="t"&&!META.mun)return `<p class="hint">Carregando o município…</p>`;
-  const pot=+potEl.value||0,tr=$("invTr").checked,todo=$("invOnde").value==="t",na=new Set(invVis.map(t=>t.alim)).size;
-  return `<section><h2>${todo?"Toda a área da "+esc(META.titulo):esc(META.munNome.split(",")[0])}</h2>
+  const o=invOnde(),todo=o.todo;
+  if(!todo&&!META.mun)return `<p class="hint">Carregando o município…</p>`;
+  const pot=+potEl.value||0,tr=$("invTr").checked,na=new Set(invVis.map(t=>t.d+"|"+t.alim)).size;
+  return `<section><h2>${todo?esc(o.rotulo):esc(META.munNome.split(",")[0])}</h2>
   <div class="stats"><div class="stat"><b>${invVis.length.toLocaleString("pt-BR")}</b><span>locais</span></div>
   <div class="stat"><b>${na.toLocaleString("pt-BR")}</b><span>alimentadores</span></div>
   <div class="stat"><b>${invVis.length?fmt(invVis[0].capa/1000,2):"–"}</b><span>MW maior folga</span></div></div>
   <p class="hint">${pot>0?`Alimentador com folga ≥ ${fmt(pot)} kW`:"Qualquer folga no alimentador"}${tr?" e no trafo":""}. Locais do mesmo alimentador disputam a mesma folga.
   ${tr?"":"O trafo de um só consumidor costuma ser pequeno: a usina em geral exige trocar ou ampliar o trafo. "}${$("invMapa").checked?"Círculos azuis no mapa.":""}</p>
-  ${invVis.length?"":`<p class="hint">Nenhum local ${todo?"na área":"neste município"} com esses critérios.${todo?"":" Escolha “Toda a área da "+esc(META.titulo)+"”."}</p>`}
-  <div class="near">${invVis.slice(0,invN).map(t=>`<button data-inv="${esc(t.id)}" data-m="${esc(t.m)}"><span class="dot inv"></span><span><b class="id">${esc(t.id)}</b><br><span class="d">${todo?esc(nomeMun(t.m))+" · ":""}${esc(t.alim||"–")} · ${fmtK(t.kva)} kVA</span></span><span><b>${fmt(t.capa,0)}</b> <span class="d">kW alim.</span><br><span class="d">trafo ${fmt(t.cap,0)} kW</span></span></button>`).join("")}</div>
+  ${invVis.length?"":`<p class="hint">Nenhum local ${todo?"na área":"neste município"} com esses critérios.${todo?"":" Escolha uma opção de área inteira em “Onde”."}</p>`}
+  <div class="near">${invVis.slice(0,invN).map(t=>`<button data-inv="${esc(t.id)}" data-m="${esc(t.m)}" data-d="${esc(t.d||"")}"><span class="dot inv"></span><span><b class="id">${esc(t.id)}</b><br><span class="d">${todo?esc(nomeMun(t))+(META.dists&&!o.dist?" ("+esc(t.d)+")":"")+" · ":""}${esc(t.alim||"–")} · ${fmtK(t.kva)} kVA</span></span><span><b>${fmt(t.capa,0)}</b> <span class="d">kW alim.</span><br><span class="d">trafo ${fmt(t.cap,0)} kW</span></span></button>`).join("")}</div>
   ${invVis.length>invN?`<button type="button" class="ghost" data-mais="1">Mostrar mais (${(invVis.length-invN).toLocaleString("pt-BR")} restantes)</button>`:""}</section>`;
 }
 infoInv.addEventListener("click",e=>{
   const b=e.target.closest("button[data-inv],button[data-mais]");if(!b)return;
   if(b.dataset.mais){invN+=30;render();return}
-  const t=INV.find(t=>t.id===b.dataset.inv&&t.m===b.dataset.m);if(t)abrirInv(t);
+  const t=INV.find(t=>t.id===b.dataset.inv&&t.m===b.dataset.m&&(t.d||"")===b.dataset.d);if(t)abrirInv(t);
 });
 function baixarInv(){
   const q=v=>`"${String(v??"").replace(/"/g,'""')}"`,n=v=>v==null?"":String(Math.round(v*10)/10).replace(".",",");
-  const cab=["Trafo","Município","Alimentador","Subestação","Potência do trafo (kVA)","GD já ligada (kW)","Folga do alimentador p/ nova GD (kW)","Trafo comporta (kW)","Latitude","Longitude","Google Maps"];
-  const lin=invVis.map(t=>[t.id,nomeMun(t.m),t.alim,t.sub,n(t.kva),n(t.gd),n(t.capa),n(t.cap),t.lat,t.lon,`https://www.google.com/maps?q=${t.lat},${t.lon}`].map(q).join(";"));
+  const cab=["Trafo","Município","Distribuidora","Alimentador","Subestação","Potência do trafo (kVA)","GD já ligada (kW)","Folga do alimentador p/ nova GD (kW)","Trafo comporta (kW)","Latitude","Longitude","Google Maps"];
+  const lin=invVis.map(t=>[t.id,nomeMun(t),nomeDist(t.d)||META.titulo,t.alim,t.sub,n(t.kva),n(t.gd),n(t.capa),n(t.cap),t.lat,t.lon,`https://www.google.com/maps?q=${t.lat},${t.lon}`].map(q).join(";"));
   const blob=new Blob(["\ufeff"+[cab.map(q).join(";"),...lin].join("\r\n")],{type:"text/csv;charset=utf-8"});
-  const onde=$("invOnde").value==="t"?META.titulo.replace(/\W+/g,"_"):META.munNome.split(",")[0].replace(/\W+/g,"_");
+  const o=invOnde(),onde=(o.todo?(o.dist?nomeDist(o.dist):"RS"):META.munNome.split(",")[0]).replace(/\W+/g,"_");
   const l=document.createElement("a");l.href=URL.createObjectURL(blob);l.download=`usinas_investimento_${onde}.csv`;l.click();setTimeout(()=>URL.revokeObjectURL(l.href),2000);
 }
 // Informações ao passar o mouse (ou tocar) no mapa
@@ -1980,6 +1989,8 @@ if(META.muns){
   $("empCsv").addEventListener("click",()=>{if(!$("empOn").checked){$("empOn").checked=true;desenharEmp().then(baixarCsv)}else baixarCsv()});
   document.getElementById("munRow").style.display="";
   if(META.dists){$("distRow").style.display="";
+    $("invOnde").innerHTML='<option value="m">Município selecionado</option><option value="t">Todo o Rio Grande do Sul ('+
+      META.dists.map(d=>esc(d.n)).join(" e ")+')</option>'+META.dists.map(d=>`<option value="t:${d.k}">Toda a ${esc(d.n)}</option>`).join("");
     distEl.innerHTML='<option value="">Todas</option>'+META.dists.map(d=>`<option value="${d.k}">${esc(d.n)}</option>`).join("");
     distEl.addEventListener("change",()=>{listarMuns();const m=META.muns.find(x=>munK(x)===META.munK);
       if(distEl.value&&(!m||m.d!==distEl.value)){const dd=META.dists.find(d=>d.k===distEl.value);
