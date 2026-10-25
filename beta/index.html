@@ -58,6 +58,16 @@ aside::-webkit-scrollbar{width:10px}aside::-webkit-scrollbar-thumb{background:va
 .leaflet-tooltip{font:13px/1.4 var(--body)}
 .selo{background:var(--panel);color:var(--ink);border:1px solid var(--line);border-radius:6px;padding:4px 8px;font-size:12px;box-shadow:0 1px 4px rgba(0,0,0,.2);max-width:70vw}
 .selo .velha{color:var(--low);font-weight:600}
+/* busca de cidade: digita e escolhe na lista filtrada */
+.busca-mun{position:relative;flex:1;min-width:0}
+#munBusca{width:100%;padding:9px 11px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--ink);font:inherit;min-height:40px}
+#munLista{position:absolute;z-index:1000;left:0;right:0;top:calc(100% + 2px);margin:0;padding:4px 0;list-style:none;background:var(--panel);
+  border:1px solid var(--line);border-radius:8px;box-shadow:0 6px 18px rgba(0,0,0,.18);max-height:264px;overflow-y:auto}
+#munLista[hidden]{display:none}
+#munLista li{padding:9px 12px;cursor:pointer;font-size:14px;min-height:40px;box-sizing:border-box}
+#munLista li[aria-selected="true"],#munLista li[data-k]:hover{background:var(--chip)}
+#munLista li.vazio{color:var(--muted);cursor:default}
+#munLista mark{background:none;color:var(--accent);font-weight:700}
 /* aba Medir */
 #medUso,#medW{width:76px;font-family:var(--mono)}#medC,#medL{width:76px;font-family:var(--mono)}
 .acoes button[aria-pressed="false"]{background:var(--chip);color:var(--ink)}
@@ -178,8 +188,13 @@ details.mais[open] summary{margin-bottom:6px}
       <select id="dist"></select>
     </div>
     <div class="row" id="munRow" style="display:none">
-      <label for="mun">Município</label>
-      <select id="mun"></select>
+      <label for="munBusca">Município</label>
+      <div class="busca-mun">
+        <input id="munBusca" type="search" autocomplete="off" spellcheck="false" placeholder="Digite o nome da cidade"
+          role="combobox" aria-expanded="false" aria-controls="munLista" aria-autocomplete="list">
+        <ul id="munLista" role="listbox" aria-label="Cidades" hidden></ul>
+      </div>
+      <select id="mun" hidden aria-hidden="true" tabindex="-1"></select>
     </div>
     <nav class="tabs" role="tablist" aria-label="Seções">
       <button type="button" role="tab" id="tabC" data-tab="C" aria-selected="true" aria-controls="abaC">Consultar</button>
@@ -691,6 +706,7 @@ async function carregarMun(c,aj=true){
   DB=db;META.dist=dd?dd.k:null;META.munK=munK(m);if(dd)META.titulo=dd.n;
   if(distEl.value&&dd&&distEl.value!==dd.k){distEl.value=dd.k;listarMuns()}
   META.mun=m.c;META.bbox=m.b;META.munNome=m.n+", RS";munEl.value=munK(m);
+  const mb=document.getElementById("munBusca");if(mb&&document.activeElement!==mb)mb.value=(munEl.selectedOptions[0]||{}).textContent||m.n;
   document.getElementById("titulo").textContent=m.n;document.title=(BETA?"[BETA] ":"")+"Capacidade de Hospedagem "+m.n;
   sel=null;ponto=null;msg="";if(pino){map.removeLayer(pino);pino=null}
   empSel=null;preparar();preencherAlim();desenhar();render();if(aj)ajustar();desenharEmp();
@@ -1007,6 +1023,32 @@ function listarMuns(){
     o.textContent=m.n+(dup.has(m.c)?` (${(distDe(m)||{}).n||m.d})`:"");munEl.append(o)});
   if([...munEl.options].some(o=>o.value===ant))munEl.value=ant;
 }
+// busca de cidade: ao digitar, mostra embaixo só as parecidas (sem acento; as que começam com o texto primeiro)
+const munBusca=$("munBusca"),munLista=$("munLista");
+const semAc=t=>t.normalize("NFD").replace(/[\u0300-\u036f]/g,"").toLowerCase();
+let munIdx=-1;
+const nomeAtual=()=>(munEl.selectedOptions[0]||{}).textContent||"";
+function mostrarMuns(){
+  const q=semAc(munBusca.value.trim());
+  let ops=[...munEl.options].map(o=>({k:o.value,t:o.textContent,s:semAc(o.textContent)}));
+  if(q)ops=ops.filter(o=>o.s.includes(q)).sort((a,b)=>(b.s.startsWith(q)-a.s.startsWith(q))||a.s.localeCompare(b.s));
+  const tot=ops.length;ops=ops.slice(0,60);munIdx=ops.length?0:-1;
+  const marca=o=>{if(!q)return esc(o.t);const i=o.s.indexOf(q);return esc(o.t.slice(0,i))+"<mark>"+esc(o.t.slice(i,i+q.length))+"</mark>"+esc(o.t.slice(i+q.length))};
+  munLista.innerHTML=ops.length?ops.map((o,i)=>`<li role="option" id="munOp${i}" data-k="${esc(o.k)}" aria-selected="${i===0}">${marca(o)}</li>`).join("")
+    +(tot>ops.length?`<li class="vazio">… e mais ${tot-ops.length}. Continue digitando.</li>`:""):`<li class="vazio">Nenhuma cidade encontrada</li>`;
+  munLista.hidden=false;munBusca.setAttribute("aria-expanded","true");
+}
+function fecharMuns(){munLista.hidden=true;munBusca.setAttribute("aria-expanded","false")}
+function escolherMun(k){fecharMuns();if(!k)return;munEl.value=k;munBusca.value=nomeAtual();munBusca.blur();carregarMun(k)}
+munBusca.addEventListener("focus",()=>{munBusca.value="";mostrarMuns()});
+munBusca.addEventListener("input",mostrarMuns);
+munBusca.addEventListener("keydown",e=>{const li=[...munLista.querySelectorAll("li[data-k]")];
+  if(e.key==="ArrowDown"||e.key==="ArrowUp"){e.preventDefault();if(munLista.hidden)mostrarMuns();if(!li.length)return;
+    munIdx=(munIdx+(e.key==="ArrowDown"?1:-1)+li.length)%li.length;li.forEach((x,i)=>x.setAttribute("aria-selected",i===munIdx));li[munIdx].scrollIntoView({block:"nearest"})}
+  else if(e.key==="Enter"){e.preventDefault();if(li[munIdx])escolherMun(li[munIdx].dataset.k)}
+  else if(e.key==="Escape"){fecharMuns();munBusca.value=nomeAtual();munBusca.blur()}});
+munLista.addEventListener("mousedown",e=>{e.preventDefault();const li=e.target.closest("li[data-k]");if(li)escolherMun(li.dataset.k)});
+munBusca.addEventListener("blur",()=>setTimeout(()=>{fecharMuns();munBusca.value=nomeAtual()},150));
 // link direto: #<município>/<trafo>/<kW>
 const [hMun,hTr,hKw]=location.hash.slice(1).split("/").map(s=>{try{return decodeURIComponent(s)}catch(e){return s}});
 if(hKw&&+hKw>0){potEl.value=+hKw;filtraRow.hidden=false}
