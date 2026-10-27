@@ -42,6 +42,11 @@ nem sempre programadores: explique resultados em linguagem simples.
   `trafos_bdgd.py`). `scripts/unificar.py` junta tudo e gera `beta/index.html` com o `TEMPLATE`.
   No JS: `META.dists`, município com `d` (distribuidora) e `k` (chave "RGE:4316907"); `DB` é a
   pasta de dados da distribuidora do município aberto.
+- **Busca única no alto do mapa** (controle Leaflet com `#f`, `#q`, `#pot`): sugere cidades (uma linha
+  por cidade, com as distribuidoras que atendem), trafos e alimentadores do município aberto e a busca
+  de endereço (Nominatim). Num ponto coberto por várias distribuidoras, `munDoPonto()` escolhe a do
+  trafo mais próximo. Os campos `#dist` e `#mun` continuam no HTML, escondidos (o código usa); o resumo
+  do município mostra "Também atende aqui" para trocar de distribuidora.
 - `scripts/atualizar_codigo.py` — reaplica o `TEMPLATE` numa página de uma distribuidora só.
 - `scripts/trafos_bdgd.py` — lê a BDGD e gera planilha de trafos + `index.html` + `dados/`.
 - `scripts/prospeccao.py` — gera a planilha de prospecção e `dados/emp/`.
