@@ -28,7 +28,7 @@ nem sempre programadores: explique resultados em linguagem simples.
 - **Cooperativas e permissionárias do RS** (18: Celetro, Cerfox, Ceriluz, Cermissões, Certaja, Certel,
   Certhil, Cooperluz, Coopernorte, Coopersul, Coprel, Creluz, Creral, Demei, Eletrocar, Hidropan, Mux
   Energia, Nova Palma): dados em `rs/<chave>/dados/`, mesma estrutura. Lista em `DISTS` do
-  `scripts/unificar.py`. Ainda sem camada de prospecção de empresas nem prédios (aba Medir).
+  `scripts/unificar.py`. Têm camada de prospecção de empresas (`dados/emp/`); ainda sem prédios (aba Medir).
 - `scripts/curvas_padrao.json` — curvas típicas por classe (RE, CO, IN, RU, PP, SP, IP) tiradas da BDGD
   da RGE por `scripts/curvas_padrao.py`. Usadas quando a BDGD não tem curvas (CRVCRG vazia, caso da
   maioria das cooperativas) e no lugar de curvas descartadas (pico > 8× a média, `PICO_MAX_CURVA`).
@@ -135,8 +135,12 @@ O Overture precisa cobrir também o sul do estado (até lat −33,9: Pelotas, Ri
   Pg = consumo médio 12 meses ÷ (0,16 × 24 × 30) × FA, arredondado para cima. FA: residencial
   46%, industrial 69%, comercial/serviços 63%, rural 53%, serviço/poder público 57%. Vale para
   microgeração (até 75 kW).
-- **GD por UC:** o `PAC` é compartilhado por várias UCs; por isso a GD da empresa é "sim /
-  provável / talvez / não".
+- **GD da empresa (prospecção) só é "tem GD" quando é certo** (pedido do usuário): GD cadastrada na
+  própria UC (`CEG_GD`) ou no ponto de conexão (`PAC`) que só atende aquela unidade (contando UCs de BT e
+  MT). GD no mesmo PAC com outras unidades, no mesmo poste (`PN_CON`) ou em MT a até `RAIO_MT` (150 m)
+  fica "não confirmada" (código 1) e vai em `x[18]` = `[[lat, lon, kW, mt, relação, distância m, nº]]`;
+  ao abrir a empresa o site desenha essas GDs no mapa ligadas a ela. Local da GD = `PN_CON` → PONNOT;
+  potência = base da ANEEL pelo `CEG_GD`. O código 2 ("provável") não é mais usado.
 - **pandas novo:** `astype(str)` mantém nulos como nulos. Use a função `txt()` dos scripts,
   que trata isso.
 - Consumo de quem já tem GD é o líquido medido (subestima a carga).

@@ -134,14 +134,137 @@ def ler_pj(caminho, dist, mun):
     return d.reset_index(drop=True)
 
 
+def ler_camada(gdb, camada, cols, filtro=None):
+    """Lê só as colunas que existem na camada (BDGDs de distribuidoras diferentes variam)."""
+    try:
+        info = pyogrio.read_info(gdb, layer=camada)
+    except Exception:
+        return pd.DataFrame(columns=cols)
+    tem = {c.upper(): c for c in info["fields"]}
+    usar = [tem[c] for c in cols if c in tem]
+    d = pyogrio.read_dataframe(gdb, layer=camada, read_geometry=False, columns=usar, where=filtro)
+    d = d.rename(columns={tem[c]: c for c in cols if c in tem})
+    for c in cols:
+        if c not in d.columns:
+            d[c] = None
+    return d
+
+
+def gd_com_local(gdb, ug, ugmt, base_gd):
+    """GDs de BT e MT com potência (base da ANEEL pelo CEG_GD; sem casamento: POT_INST em BT, DEM_CONT em MT)
+    e o local do ponto de conexão (PN_CON → PONNOT: poste ou estrutura)."""
+    kwmap = None
+    if base_gd:
+        g = pd.read_parquet(base_gd, columns=["CodEmpreendimento", "MdaPotenciaInstaladaKW"])
+        g["CodEmpreendimento"] = txt(g["CodEmpreendimento"])
+        g["kw"] = pd.to_numeric(g["MdaPotenciaInstaladaKW"].astype(str).str.replace(",", "."), errors="coerce")
+        kwmap = g.dropna().drop_duplicates("CodEmpreendimento").set_index("CodEmpreendimento")["kw"]
+    partes = []
+    for d, mt, alt in ((ug, 0, "POT_INST"), (ugmt, 1, "DEM_CONT")):
+        ceg = txt(d["CEG_GD"])
+        kw = ceg.map(kwmap) / ceg.map(ceg.value_counts()) if kwmap is not None else pd.Series(np.nan, index=d.index)
+        kw = kw.fillna(pd.to_numeric(d[alt], errors="coerce"))
+        partes.append(pd.DataFrame({"PAC": txt(d["PAC"]), "PN": txt(d["PN_CON"]), "CEG": ceg,
+                                    "kw": kw.fillna(0).to_numpy(), "mt": mt}))
+    gds = pd.concat(partes, ignore_index=True)
+    pn = pyogrio.read_dataframe(gdb, layer="PONNOT", columns=["COD_ID"])
+    if pn.crs is not None and pn.crs.to_epsg() != 4326:
+        pn = pn.to_crs(4326)
+    pn = pd.DataFrame({"PN": txt(pn["COD_ID"]), "lat": pn.geometry.y.to_numpy(), "lon": pn.geometry.x.to_numpy()})
+    pn = pn[pn["PN"].isin(set(gds["PN"]))].drop_duplicates("PN")
+    return gds.merge(pn, on="PN", how="left")
+
+
+from openpyxl.cell.cell import ILLEGAL_CHARACTERS_RE as ILEGAL  # noqa: E402
+
+RAIO_MT = 150   # metros: GD em MT perto da empresa
+
+
+def gd_da_empresa(d, gds, uc_pac):
+    """(texto, código, lista) por empresa. Código: 3 = tem GD (certo), 1 = há GD por perto não confirmada,
+    0 = sem GD. Lista: [[lat, lon, kW, mt, relação, distância m, nº de GDs]], relação 0 = da empresa,
+    1 = mesmo ponto de conexão com outras unidades, 2 = mesmo poste, 3 = em MT perto."""
+    pac, pn = txt(d["PAC"]).to_numpy(), txt(d["PN_CON"]).to_numpy() if "PN_CON" in d.columns else np.full(len(d), "")
+    ceg = txt(d["CEG_GD"]).to_numpy() if "CEG_GD" in d.columns else np.full(len(d), "")
+    lat = pd.to_numeric(d["POINT_Y"], errors="coerce").to_numpy()
+    lon = pd.to_numeric(d["POINT_X"], errors="coerce").to_numpy()
+    ok = gds.dropna(subset=["lat", "lon"])
+    agrega = lambda g: [round(float(g["lat"].iat[0]), 6), round(float(g["lon"].iat[0]), 6),
+                        round(float(g["kw"].sum()), 1), int(g["mt"].iat[0]), int(len(g))]
+    por_pac = {k: g for k, g in ok.groupby("PAC") if k}
+    por_pn = {k: g for k, g in ok.groupby("PN") if k}
+    por_ceg = {k: g for k, g in ok.groupby("CEG") if k}
+    mt = ok[ok["mt"] == 1]
+    grade = {}
+    for i, (la, lo) in enumerate(zip(mt["lat"].to_numpy(), mt["lon"].to_numpy())):
+        grade.setdefault((int(la // 0.005), int(lo // 0.005)), []).append(i)
+    mla, mlo = mt["lat"].to_numpy(), mt["lon"].to_numpy()
+
+    def dist(la1, lo1, la2, lo2):
+        return float(np.hypot((la2 - la1) * 110540, (lo2 - lo1) * 111320 * np.cos(np.radians(la1))))
+
+    textos, codigos, listas = [], [], []
+    for k in range(len(d)):
+        itens, vistos = [], set()
+
+        def junta(g, rel):
+            novos = g[~g.index.isin(vistos)]
+            if not len(novos):
+                return
+            vistos.update(novos.index)
+            for _, gg in novos.groupby("PN"):
+                la, lo, kw, m, n = agrega(gg)
+                itens.append([la, lo, kw, m, rel, round(dist(lat[k], lon[k], la, lo)) if np.isfinite(lat[k]) else None, n])
+
+        certo = False
+        if ceg[k] and ceg[k] in por_ceg:
+            junta(por_ceg[ceg[k]], 0)
+            certo = True
+        elif ceg[k]:
+            certo = True                          # CEG na UC, mas a GD não tem local na BDGD
+        if pac[k] in por_pac:
+            so_ela = uc_pac.get(pac[k], 1) <= 1
+            junta(por_pac[pac[k]], 0 if so_ela else 1)
+            certo = certo or so_ela
+        if pn[k] in por_pn:
+            junta(por_pn[pn[k]], 2)
+        if np.isfinite(lat[k]) and len(mt):
+            ci, cj = int(lat[k] // 0.005), int(lon[k] // 0.005)
+            perto = [i for a in (-1, 0, 1) for b in (-1, 0, 1) for i in grade.get((ci + a, cj + b), [])
+                     if dist(lat[k], lon[k], mla[i], mlo[i]) <= RAIO_MT]
+            if perto:
+                junta(mt.iloc[perto], 3)
+        itens.sort(key=lambda x: (x[4], x[5] if x[5] is not None else 0))
+        itens = itens[:8]
+        if certo:
+            kw = sum(x[2] for x in itens if x[4] == 0)
+            textos.append("sim (GD cadastrada na UC)" if ceg[k] else
+                          "sim (GD no ponto de conexão, que só atende esta unidade)")
+            codigos.append(3)
+            if kw:
+                textos[-1] += f" · {kw:,.1f} kW"
+        elif itens:
+            rel = {1: "no mesmo ponto de conexão, com outras unidades", 2: "no mesmo poste",
+                   3: f"em MT a até {RAIO_MT} m"}
+            textos.append("não confirmada: GD " + "; ".join(
+                f"{rel[x[4]]} ({x[2]:,.1f} kW{f', {x[5]} m' if x[4] == 3 and x[5] is not None else ''})" for x in itens[:3]))
+            codigos.append(1)
+        else:
+            textos.append("não")
+            codigos.append(0)
+        listas.append(itens)
+    return textos, codigos, listas
+
+
 def salvar_site_emp(emp, site):
     """dados/emp/<código IBGE>.json: {"a": {divisão: nome}, "e": [[lat, lon, kWh/mês, kWp, divisão, classe,
-    gd, rede, endereço, bairro, grupo, mt, DIC, trafo, alimentador, demanda contratada, CNAE, Pg], ...]}
-    gd: 0 sem GD, 1 talvez, 2 provável, 3 sim · rede: 0 sem dado, 1 não, 2 parcial, 3 sim"""
+    gd, rede, endereço, bairro, grupo, mt, DIC, trafo, alimentador, demanda contratada, CNAE, Pg, GDs], ...]}
+    gd: 0 sem GD, 1 GD por perto não confirmada, 3 tem GD (certo) · rede: 0 sem dado, 1 não, 2 parcial, 3 sim
+    GDs: [[lat, lon, kW, mt, relação, distância m, nº]] (ver gd_da_empresa); vazio quando não há"""
     pasta = Path(site) / "dados" / "emp"
     pasta.mkdir(parents=True, exist_ok=True)
     emp = emp.dropna(subset=["Latitude", "Longitude"])
-    gd = emp["GD"].str.split(" ").str[0].map({"não": 0, "talvez": 1, "provável": 2, "sim": 3}).fillna(0).astype(int)
+    gd = emp["_gd"].fillna(0).astype(int)
     rede = emp["Rede comporta o sistema?"].str.split(" ").str[0].map(
         {"sem": 0, "não": 1, "parcial": 2, "sim": 3}).fillna(0).astype(int)
     r1 = lambda v, d=1: None if pd.isna(v) else round(float(v), d)
@@ -152,12 +275,14 @@ def salvar_site_emp(emp, site):
         "brr": emp["Bairro"], "gru": emp["Grupo tarifário"], "mt": emp["_mt"],
         "dic": emp["Horas sem energia no ano (DIC)"].round(1),
         "tr": emp.get("Trafo", pd.Series("", index=emp.index)).fillna(""), "al": emp["Alimentador"].fillna(""),
-        "dem": emp.get("Demanda contratada (kW)", pd.Series(np.nan, index=emp.index)), "cnae": emp["CNAE"]})
+        "dem": emp.get("Demanda contratada (kW)", pd.Series(np.nan, index=emp.index)), "cnae": emp["CNAE"],
+        "gdl": emp["_gdl"]})
     n = 0
     for mun, g in linhas.groupby("mun"):
         divs = sorted(set(g["div"]) - {""})
         e = [[r.lat, r.lon, int(r.kwh), r.kwp, r.div, r.cls, int(r.gd), int(r.rede), r.end, r.brr, r.gru,
-              int(r.mt), r1(r.dic), r.tr, r.al, r1(r.dem, 0), r.cnae, int(r.pg)] for r in g.itertuples(index=False)]
+              int(r.mt), r1(r.dic), r.tr, r.al, r1(r.dem, 0), r.cnae, int(r.pg), r.gdl or []]
+             for r in g.itertuples(index=False)]
         d = {"a": {k: CNAE_DIV.get(k, k) for k in divs}, "e": e}
         (pasta / f"{mun}.json").write_text(json.dumps(d, ensure_ascii=False, separators=(",", ":")), encoding="utf-8")
         n += 1
@@ -201,26 +326,25 @@ def main():
 
     # GD por ponto de conexão (PAC) e UCs por PAC (BDGD)
     log("Lendo UCs e GDs da BDGD ...")
-    ug = pyogrio.read_dataframe(gdb, layer="UGBT_tab", read_geometry=False, where=filtro,
-                                columns=["PAC", "SIT_ATIV", "MUN", "UNI_TR_MT"])
+    ug = ler_camada(gdb, "UGBT_tab", ["PAC", "SIT_ATIV", "MUN", "UNI_TR_MT", "PN_CON", "CEG_GD", "POT_INST"], filtro)
     ug = ug[txt(ug["SIT_ATIV"]).str.upper().isin(["AT", ""])]
-    ugmt = pyogrio.read_dataframe(gdb, layer="UGMT_tab", read_geometry=False, where=filtro,
-                                  columns=["PAC", "SIT_ATIV", "MUN"])
+    ugmt = ler_camada(gdb, "UGMT_tab", ["PAC", "SIT_ATIV", "MUN", "PN_CON", "CEG_GD", "POT_INST", "DEM_CONT"], filtro)
     ugmt = ugmt[txt(ugmt["SIT_ATIV"]).str.upper().isin(["AT", ""])]
-    ug_pac = pd.concat([txt(ug["PAC"]), txt(ugmt["PAC"])]).value_counts()
     uc = pyogrio.read_dataframe(gdb, layer="UCBT_tab", read_geometry=False, where=filtro,
                                 columns=["PAC", "MUN", "BRR", "CLAS_SUB", "UNI_TR_MT", "SIT_ATIV"] + ENE)
     uc = uc[txt(uc["SIT_ATIV"]).str.upper().isin(["AT", ""])]
-    uc_pac = txt(uc["PAC"]).value_counts()
+    ucmt_pac = ler_camada(gdb, "UCMT_tab", ["PAC", "SIT_ATIV"], filtro)
+    ucmt_pac = ucmt_pac[txt(ucmt_pac["SIT_ATIV"]).str.upper().isin(["AT", ""])]
+    # nº de unidades consumidoras (BT + MT) em cada ponto de conexão
+    uc_pac = pd.concat([txt(uc["PAC"]), txt(ucmt_pac["PAC"])]).value_counts()
+    gds = gd_com_local(gdb, ug, ugmt, a.nomes)
+    log(f"  {len(gds):,} GDs com local ({int(gds['mt'].sum()):,} em MT)")
 
     def info_gd(d):
-        pac = txt(d["PAC"])
-        n_ug, n_uc = pac.map(ug_pac).fillna(0).astype(int), pac.map(uc_pac).fillna(1).astype(int).clip(lower=1)
-        ceg = txt(d["CEG_GD"]) if "CEG_GD" in d.columns else pd.Series("", index=d.index)
-        return np.select([ceg != "", n_ug >= n_uc, n_ug > 0],
-                         ["sim (GD cadastrada na UC)", "provável (GD em todas as UCs do ponto)",
-                          [f"talvez ({u} GD em {c} UCs do ponto)" for u, c in zip(n_ug, n_uc)]],
-                         "não")
+        """GD da empresa. Só é 'sim' com certeza: GD cadastrada na própria UC (CEG_GD) ou no ponto de
+        conexão que só tem esta unidade. GD no mesmo ponto com outras unidades, no mesmo poste ou em MT
+        a até 300 m fica como 'não confirmada' e vai na lista (desenhada no mapa ao abrir a empresa)."""
+        return gd_da_empresa(d, gds, uc_pac)
 
     def empresas(d, mt):
         E = num(d, ENE)
@@ -243,7 +367,7 @@ def main():
             "Pg sem análise de inversão (kW)": np.ceil(anual / 12 / (FC_SOLAR * 24 * 30) * fa - 1e-9).clip(lower=0),
             "Consumo anual (kWh)": anual,
             "Sistema FV sugerido (kWp)": (anual / KWH_KWP).clip(upper=3000 if mt else 75),
-            "GD": info_gd(d),
+            "GD": "",
             "Cliente desde": txt(d["DAT_CON"]),
             "Horas sem energia no ano (DIC)": num(d, DIC).sum(axis=1),
             "Interrupções no ano (FIC)": num(d, FIC).sum(axis=1),
@@ -269,6 +393,8 @@ def main():
             [lim.isna(), lim >= kwp, lim > 0], ["sem dado", "sim", "parcial"], "não (precisa de estudo)")
         out["Latitude"] = pd.to_numeric(d["POINT_Y"], errors="coerce")
         out["Longitude"] = pd.to_numeric(d["POINT_X"], errors="coerce")
+        texto, codigo, lista = info_gd(d)
+        out["GD"], out["_gd"], out["_gdl"] = texto, codigo, lista
         out["Google Maps"] = [f"https://www.google.com/maps?q={la:.6f},{lo:.6f}" if pd.notna(la) else ""
                               for la, lo in zip(out["Latitude"], out["Longitude"])]
         return out.sort_values("Consumo anual (kWh)", ascending=False)
@@ -313,7 +439,7 @@ def main():
 
     # Atividades
     emp = pd.concat([e_bt_todas.assign(Rede="BT"), e_mt.assign(Rede="MT")], ignore_index=True)
-    emp["sem_gd"] = emp["GD"] == "não"
+    emp["sem_gd"] = emp["_gd"] < 3          # GD só conta quando é certa
     atv = emp.groupby(emp["CNAE"].str[:2]).agg(**{
         "Empresas": ("Endereço", "size"), "Sem GD": ("sem_gd", "sum"),
         "Consumo anual total (MWh)": ("Consumo anual (kWh)", lambda s: s.sum() / 1000),
@@ -337,7 +463,7 @@ def main():
     leiame = pd.DataFrame({"Como ler": [
         "FONTE: BDGD da distribuidora e bases UCBT_PJ/UCMT_PJ da ANEEL (data-base 31/12/2025). O CNPJ vem criptografado pela ANEEL; não há nome nem CNPJ.",
         "EMPRESAS: unidades consumidoras de pessoa jurídica ativas, com endereço, CNAE, consumo e coordenada informados pela distribuidora. Em BT, só as com consumo médio ≥ " + f"{a.min_kwh:g} kWh/mês.",
-        "GD: 'sim' = GD cadastrada na própria UC (CEG_GD); 'provável' = todas as UCs do ponto de conexão têm GD; 'talvez' = há GD no mesmo ponto de conexão, que pode ser de um vizinho; 'não' = sem GD no ponto.",
+        f"GD: 'sim' só quando é certo — GD cadastrada na própria UC (CEG_GD) ou no ponto de conexão que só atende esta unidade. 'não confirmada' = há GD no mesmo ponto de conexão com outras unidades, no mesmo poste ou em MT a até {RAIO_MT} m (pode ser de um vizinho; no site, ao abrir a empresa, essas GDs aparecem no mapa). 'não' = nenhuma GD nesses lugares.",
         "CONSUMO MÉDIO 12 MESES: média de ENE_01..12 da BDGD (jan–dez/2025). Para quem já tem GD é o consumo líquido (o autoconsumo não aparece).",
         "Pg SEM ANÁLISE DE INVERSÃO (kW) = consumo médio 12 meses ÷ (16% × 24 h × 30 dias) × FA, arredondado para cima (Manual de Inversão de Fluxo, itens 8.12–8.15; REN 1.000 arts. 73-A, II e 655-B). FA do Anexo II: residencial 46%, industrial 69%, comercial/serviços 63%, rural 53%, serviço e poder público 57%. A hipótese de afastamento vale para microgeração (até 75 kW) dentro da potência disponibilizada; acima disso o Pg é só referência. Na fatura, o C é o consumo faturado dos 12 últimos ciclos, que pode diferir da BDGD.",
         f"SISTEMA FV SUGERIDO (kWp) = consumo anual ÷ {KWH_KWP} kWh/kWp (geração típica no RS), limitado a 75 kW na BT (microgeração) e 3.000 kW na MT (minigeração solar, Lei 14.300). Não considera custo de disponibilidade.",
@@ -359,6 +485,10 @@ def main():
     with pd.ExcelWriter(arq, engine="openpyxl") as w:
         for nome, tab in (("Empresas BT", e_bt), ("Empresas MT", e_mt), ("Bairros", bai),
                           ("Atividades", atv), ("Municípios", mun), ("Leia-me", leiame)):
+            tab = tab.drop(columns=[c for c in ("_gd", "_gdl") if c in tab.columns])
+            for c in tab.columns:          # caracteres de controle (cadastro com erro) que o Excel não aceita
+                if not pd.api.types.is_numeric_dtype(tab[c]):
+                    tab[c] = tab[c].map(lambda v: ILEGAL.sub("", v) if isinstance(v, str) else v)
             tab = tab.round({c: 1 for c in tab.columns if pd.api.types.is_float_dtype(tab[c])
                              and c not in ("Latitude", "Longitude")})
             tab.to_excel(w, sheet_name=nome, index=False)

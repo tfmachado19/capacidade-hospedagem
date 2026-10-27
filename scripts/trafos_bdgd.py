@@ -1088,6 +1088,10 @@ aside::-webkit-scrollbar{width:10px}aside::-webkit-scrollbar-thumb{background:va
 #sugLista li.vazio{color:var(--muted);cursor:default}
 .tambem{display:flex;gap:6px;flex-wrap:wrap;align-items:center;font-size:12px;color:var(--muted)}
 .tambem button{padding:4px 10px;font-size:12px}
+.gdTagW{background:none;border:0}
+.gdTag{position:absolute;transform:translate(-50%,-50%);white-space:nowrap;background:#facc15;color:#422006;border:2px solid #fff;
+  border-radius:12px;padding:1px 7px;font:700 12px var(--body);box-shadow:0 1px 5px rgba(0,0,0,.45)}
+.gdTag.mt{background:#fb923c;color:#431407}
 /* aba Medir */
 #medUso,#medW{width:76px;font-family:var(--mono)}#medC,#medL{width:76px;font-family:var(--mono)}
 .acoes button[aria-pressed="false"]{background:var(--chip);color:var(--ink)}
@@ -1260,7 +1264,7 @@ details.mais[open] summary{margin-bottom:6px}
       <div class="row"><label for="empAtv">Atividade</label><select id="empAtv"><option value="">Todas</option></select></div>
       <div class="row"><label for="empKwh">Consumo mín.</label><input id="empKwh" type="number" min="0" step="100" value="1000"><span class="base">kWh/mês</span>
         <label for="empTen">Rede</label><select id="empTen"><option value="">BT e MT</option><option value="0">BT</option><option value="1">MT</option></select></div>
-      <div class="row"><label for="empGd">GD</label><select id="empGd"><option value="0">Sem GD</option><option value="1">Sem GD ou talvez</option><option value="">Todas</option></select>
+      <div class="row"><label for="empGd">GD</label><select id="empGd"><option value="0">Sem GD (nem por perto)</option><option value="1">Sem GD confirmada</option><option value="c">Só com GD</option><option value="">Todas</option></select>
         <label for="empRede">Rede comporta</label><select id="empRede"><option value="">Qualquer</option><option value="3">Sim</option><option value="2">Sim ou parcial</option></select></div>
       <button type="button" class="ghost" id="empCsv">Baixar lista (CSV)</button>
     </div>
@@ -1494,6 +1498,7 @@ async function mostrarAlim(x){
 }
 function selEmp(x){
   empSel=x;fichaFechada=true;aba("P");redeMt.clearLayers();rede.clearLayers();ponto=null;if(pino){map.removeLayer(pino);pino=null}
+  desenharGdEmp(x);
   if(x[11]){sel=null;desenhar();render();mostrarAlim(x)}
   else{
     const t=D.find(t=>t.id===x[13]);sel=t||null;desenhar();render();
@@ -1759,7 +1764,9 @@ async function carregarMun(c,aj=true){
 // ---- Prospecção de empresas (dados/emp/<município>.json, sob demanda)
 // linha: [lat,lon,kWh/mês,kWp,divisão,classe,gd,rede,endereço,bairro,grupo,mt,DIC,trafo,alimentador,demanda,CNAE]
 const empLayer=L.layerGroup().addTo(map),empCache={};let empSel=null,empVis=[];
-const GDR=["sem GD","talvez (GD no mesmo ponto de conexão)","provável","sim"],RED=["sem dado","não (precisa de estudo)","parcial","sim"];
+// GD da empresa: 3 = tem (certo: cadastrada na UC ou no ponto de conexão só dela); 1 = há GD por perto, não
+// confirmada (mesmo ponto com outras unidades, mesmo poste ou MT a até 150 m); x[18] = essas GDs (desenhadas no mapa)
+const GDR=["sem GD","não confirmada (há GD por perto)","não confirmada (há GD por perto)","tem GD"],RED=["sem dado","não (precisa de estudo)","parcial","sim"];
 const $=id=>document.getElementById(id);
 async function dadosEmp(){
   const c=META.mun;if(!c)return null;
@@ -1768,7 +1775,7 @@ async function dadosEmp(){
 }
 function empFiltro(d){
   const atv=$("empAtv").value,kmin=+$("empKwh").value||0,ten=$("empTen").value,gd=$("empGd").value,rd=$("empRede").value;
-  return d.e.filter(x=>x[2]>=kmin&&(!atv||x[4]===atv)&&(ten===""||x[11]===+ten)&&(gd===""||x[6]<=+gd)&&(rd===""||x[7]>=+rd));
+  return d.e.filter(x=>x[2]>=kmin&&(!atv||x[4]===atv)&&(ten===""||x[11]===+ten)&&(gd===""||(gd==="c"?x[6]===3:x[6]<=+gd))&&(rd===""||x[7]>=+rd));
 }
 async function desenharEmp(){
   empLayer.clearLayers();empVis=[];
@@ -1779,7 +1786,7 @@ async function desenharEmp(){
     Object.entries(d.a).sort((x,y)=>x[1].localeCompare(y[1],"pt")).forEach(([k,v])=>{const o=document.createElement("option");o.value=k;o.textContent=v;sa.append(o)});
     sa.value=ant in d.a?ant:"";sa.dataset.mun=META.mun}
   empVis=empFiltro(d);
-  empVis.forEach(x=>{const m=L.circleMarker([x[0],x[1]],{radius:x[11]?8:6,color:"#3d1a78",weight:1.5,fillColor:x[6]>=2?"#b9a6d9":"#8e44ec",fillOpacity:.95});
+  empVis.forEach(x=>{const m=L.circleMarker([x[0],x[1]],{radius:x[11]?8:6,color:"#3d1a78",weight:1.5,fillColor:x[6]===3?"#b9a6d9":"#8e44ec",fillOpacity:.95});
     m.bindTooltip(()=>dicaEmp(x),{direction:"top",offset:[0,-6]});
     m.on("click",e=>{L.DomEvent.stopPropagation(e);selEmp(x)});empLayer.addLayer(m)});
   render();
@@ -1919,8 +1926,28 @@ function resumoEmp(){
   const kwp=empVis.reduce((s,x)=>s+x[3],0),kwh=empVis.reduce((s,x)=>s+x[2],0);
   return `<section><h2>Prospecção</h2><div class="stats"><div class="stat"><b>${empVis.length.toLocaleString("pt-BR")}</b><span>empresas</span></div>
   <div class="stat"><b>${fmt(kwh/1000,1)}</b><span>MWh/mês</span></div><div class="stat"><b>${fmt(kwp/1000,2)}</b><span>MWp sugerido</span></div></div>
-  <p class="hint">Círculos roxos = empresas (maiores = MT; claros = já têm GD provável). Toque numa empresa para ver os dados.
+  <p class="hint">Círculos roxos = empresas (maiores = MT; claros = já têm GD confirmada; ao abrir uma empresa, as GDs por perto aparecem no mapa). Toque numa empresa para ver os dados.
   Pg = consumo médio 12 meses ÷ (16% × 24 × 30) × FA da classe, arredondado para cima (REN 1.000, art. 73-A, II; Manual de Inversão de Fluxo, item 8.12). Vale para microgeração até 75 kW.</p></section>`;
+}
+const REL_GD=["da empresa","mesmo ponto de conexão (com outras unidades)","mesmo poste","em MT, perto"];
+const gdsDe=x=>Array.isArray(x[18])?x[18]:[];
+function listaGdEmp(x){
+  const l=gdsDe(x);if(!l.length)return "";
+  const nc=x[6]!==3;
+  return `<div class="base" style="margin-top:8px">${nc?"<b>Não dá para afirmar que a GD é desta empresa.</b> ":""}No mapa: etiquetas ☀ amarelas (GD em BT) e laranja (GD em MT), ligadas à empresa (anel roxo) por linha tracejada.</div>
+  <dl>${l.map(g=>`<dt>${esc(REL_GD[g[4]]||"")}</dt><dd>${fmt(g[2],1)} kW${g[6]>1?` (${g[6]} GDs)`:""}${g[3]?" · MT":" · BT"}${g[5]!=null?` · ${fmt(g[5],0)} m`:""}</dd>`).join("")}</dl>`;
+}
+function desenharGdEmp(x){
+  const l=gdsDe(x);
+  l.forEach(g=>{const mt=g[3]===1;
+    L.polyline([[x[0],x[1]],[g[0],g[1]]],{color:mt?"#c2410c":"#a16207",weight:3,dashArray:"6 6",interactive:false,renderer:rTopo}).addTo(redeMt);
+    L.marker([g[0],g[1]],{zIndexOffset:1000,keyboard:false,icon:L.divIcon({className:"gdTagW",iconSize:[0,0],
+      html:`<span class="gdTag${mt?" mt":""}">☀ ${fmt(g[2],1)} kW${mt?" MT":""}</span>`})})
+      .bindTooltip(`GD ${mt?"em MT":"em BT"} · ${fmt(g[2],1)} kW${g[6]>1?` (${g[6]} GDs)`:""}<br>${esc(REL_GD[g[4]]||"")}${g[5]!=null?` · ${fmt(g[5],0)} m da empresa`:""}`,{direction:"top",offset:[0,-12]}).addTo(redeMt)});
+  // anel roxo na empresa (a origem das linhas tracejadas)
+  L.circleMarker([x[0],x[1]],{radius:13,color:"#8e44ec",weight:4,fill:false,interactive:false,renderer:rTopo}).addTo(redeMt);
+  // enquadra a empresa e as GDs por perto (no celular o mapa é pequeno)
+  if(l.length)map.fitBounds([[x[0],x[1]],...l.map(g=>[g[0],g[1]])],{paddingTopLeft:[50,130],paddingBottomRight:[50,40],maxZoom:18});
 }
 function fichaEmp(x){
   const a=(empCache[META.mun]||{a:{}}).a,temTr=x[13]&&D.some(t=>t.id===x[13]);
@@ -1929,18 +1956,19 @@ function fichaEmp(x){
   <dl><dt>Consumo médio (12 meses)</dt><dd>${fmt(x[2],0)} kWh/mês</dd><dt>Pg sem análise de inversão</dt><dd><b>${fmt(x[17],0)} kW</b></dd>
   <dt>Sistema FV p/ zerar consumo</dt><dd>${fmt(x[3])} kWp</dd>
   <dt>Classe · grupo</dt><dd>${esc(x[5])} · ${esc(x[10])}</dd>${x[15]!=null?`<dt>Demanda contratada</dt><dd>${fmt(x[15],0)} kW</dd>`:""}
-  <dt>GD</dt><dd>${GDR[x[6]]}</dd><dt>Rede comporta o sistema</dt><dd>${RED[x[7]]}</dd>
+  <dt>GD</dt><dd>${x[6]===3?"<b>Tem GD</b>":esc(GDR[x[6]])}${gdsDe(x).filter(g=>g[4]===0).length?` · ${fmt(gdsDe(x).filter(g=>g[4]===0).reduce((s,g)=>s+g[2],0),1)} kW`:""}</dd><dt>Rede comporta o sistema</dt><dd>${RED[x[7]]}</dd>
   <dt>Horas sem energia no ano</dt><dd>${fmt(x[12])} h</dd><dt>Trafo · alimentador</dt><dd>${esc(x[13]||"–")} · ${esc(x[14]||"–")}</dd></dl>
   <div class="links"><a href="https://www.google.com/maps?q=${x[0]},${x[1]}" target="_blank" rel="noopener">Abrir no Google Maps</a>
   <a class="gsat" href="${gSat(x[0],x[1])}" target="_blank" rel="noopener">Satélite no Google</a>
   ${temTr?`<button class="ghost" data-tr="${esc(x[13])}">Ver trafo</button>`:""}</div>
+  ${listaGdEmp(x)}
   <div class="base">${x[11]?`Alimentador ${esc(x[14]||"–")} desenhado em azul no mapa${x._km?` (${fmt(x._km)} km de rede MT)`:""}.`
     :temTr?`Trafo ${esc(x[13])} destacado no mapa, com a rede BT em verde e a ligação até a empresa tracejada.`:"Trafo desta empresa não encontrado no mapa."}</div></div></section>`;
 }
 function baixarCsv(){
   const a=(empCache[META.mun]||{a:{}}).a,q=v=>`"${String(v??"").replace(/"/g,'""')}"`;
-  const cab=["Endereço","Bairro","Município","Atividade","CNAE","Classe","Grupo","Rede","Consumo médio 12 meses (kWh/mês)","Pg sem análise de inversão (kW)","Sistema sugerido (kWp)","Demanda contratada (kW)","GD","Rede comporta","Horas sem energia/ano","Trafo","Alimentador","Latitude","Longitude","Google Maps"];
-  const lin=empVis.map(x=>[x[8],x[9],META.munNome.split(",")[0],a[x[4]]||"",x[16],x[5],x[10],x[11]?"MT":"BT",x[2],x[17],String(x[3]).replace(".",","),x[15]??"",GDR[x[6]],RED[x[7]],String(x[12]??"").replace(".",","),x[13],x[14],x[0],x[1],`https://www.google.com/maps?q=${x[0]},${x[1]}`].map(q).join(";"));
+  const cab=["Endereço","Bairro","Município","Atividade","CNAE","Classe","Grupo","Rede","Consumo médio 12 meses (kWh/mês)","Pg sem análise de inversão (kW)","Sistema sugerido (kWp)","Demanda contratada (kW)","GD","GD por perto (não confirmada)","Rede comporta","Horas sem energia/ano","Trafo","Alimentador","Latitude","Longitude","Google Maps"];
+  const lin=empVis.map(x=>[x[8],x[9],META.munNome.split(",")[0],a[x[4]]||"",x[16],x[5],x[10],x[11]?"MT":"BT",x[2],x[17],String(x[3]).replace(".",","),x[15]??"",GDR[x[6]],gdsDe(x).map(g=>`${REL_GD[g[4]]}: ${String(g[2]).replace(".",",")} kW${g[5]!=null?" a "+g[5]+" m":""}`).join(" | "),RED[x[7]],String(x[12]??"").replace(".",","),x[13],x[14],x[0],x[1],`https://www.google.com/maps?q=${x[0]},${x[1]}`].map(q).join(";"));
   const blob=new Blob(["\ufeff"+[cab.map(q).join(";"),...lin].join("\r\n")],{type:"text/csv;charset=utf-8"});
   const l=document.createElement("a");l.href=URL.createObjectURL(blob);l.download=`prospeccao_${META.munNome.split(",")[0].replace(/\W+/g,"_")}.csv`;l.click();setTimeout(()=>URL.revokeObjectURL(l.href),2000);
 }
