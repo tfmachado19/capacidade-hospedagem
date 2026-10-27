@@ -18,6 +18,13 @@ spec.loader.exec_module(tb)
 # <pasta>dados/meta.json, gravado pelo trafos_bdgd.py (--mun todos) junto com os dados.
 DISTS = [("RGE", "RGE", "", "4316907"),
          ("CEEE", "CEEE Equatorial", "ceee/", "4314902")]
+# Cooperativas e permissionárias do RS (dados em rs/<pasta>/dados/; abrem no município padrão do meta.json)
+DISTS += [(k, n, f"rs/{k.lower()}/", None) for k, n in [
+    ("Celetro", "Celetro"), ("Cerfox", "Cerfox"), ("Ceriluz", "Ceriluz"), ("Cermissoes", "Cermissões"),
+    ("Certaja", "Certaja"), ("Certel", "Certel"), ("Certhil", "Certhil"), ("Cooperluz", "Cooperluz"),
+    ("Coopernorte", "Coopernorte"), ("Coopersul", "Coopersul"), ("Coprel", "Coprel"), ("Creluz", "Creluz"),
+    ("Creral", "Creral"), ("Demei", "Demei"), ("Eletrocar", "Eletrocar"), ("Hidropan", "Hidropan"),
+    ("Mux", "Mux Energia"), ("NovaPalma", "Nova Palma")]]
 
 
 def meta_de(pasta):
@@ -28,7 +35,11 @@ def main():
     saida = raiz / (sys.argv[1] if len(sys.argv) > 1 else "beta/index.html")
     metas, muns, dists = [], [], []
     for k, nome, pasta, padrao in DISTS:
+        if not (raiz / pasta / "dados" / "meta.json").exists():
+            print(f"  (sem dados de {nome} em {pasta}dados/, fica de fora)")
+            continue
         m = meta_de(pasta)
+        padrao = padrao or m["default"]
         metas.append(m)
         muns += [dict(x, d=k, k=f"{k}:{x['c']}") for x in m["muns"]]
         dists.append({"k": k, "n": nome, "p": pasta, "padrao": f"{k}:{padrao}"})
@@ -38,7 +49,8 @@ def main():
     meta = dict(metas[0])
     meta.update(muns=muns, dists=dists, default=dists[0]["padrao"], mun=None, bbox=None,
                 bboxAll=[min(x[0] for x in b), min(x[1] for x in b), max(x[2] for x in b), max(x[3] for x in b)],
-                titulo=" e ".join(d["n"] for d in dists), distTexto=" e da ".join(d["n"] for d in dists))
+                titulo=" e ".join(d["n"] for d in dists) if len(dists) <= 3 else "distribuidoras do RS",
+                distTexto=" e da ".join(d["n"] for d in dists) if len(dists) <= 3 else "distribuidora")
     saida.write_text(tb._html("null", meta, meta["titulo"]), encoding="utf-8")
     print(f"{saida}: {len(muns)} municípios de {len(dists)} distribuidoras")
 

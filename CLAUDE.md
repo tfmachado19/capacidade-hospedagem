@@ -19,6 +19,20 @@ nem sempre programadores: explique resultados em linguagem simples.
 - `dados/emp/<código IBGE>.json` — empresas da prospecção (ao ligar a camada de prospecção).
 - `dados/invest.json` — "Usinas de investimento": trafos com 1 UC em alimentador com folga, de toda a
   área (ao abrir a aba Usinas). Gerado por `trafos_bdgd.py` junto com `dados/<código IBGE>.json`.
+  Cada local tem `f` = nº de fases do primário do trafo (FAS_CON_P: 3 = trifásico), usado no filtro
+  "Só trafo trifásico".
+- `dados/alim.json` — visão do estado na aba Usinas: um resumo por alimentador (centro e retângulo dos
+  trafos, folga `capa`, GD, carregamento, nº de trafos `n`, locais com 1 UC `i` e trifásicos `i3`).
+  Folga > 0 = alimentador sem inversão de fluxo. De longe o mapa mostra um círculo por alimentador; de
+  perto (zoom ≥ 12) desenha a rede MT de cada um (`dados/mt/`) e, a partir do zoom 11, os locais.
+- **Cooperativas e permissionárias do RS** (18: Celetro, Cerfox, Ceriluz, Cermissões, Certaja, Certel,
+  Certhil, Cooperluz, Coopernorte, Coopersul, Coprel, Creluz, Creral, Demei, Eletrocar, Hidropan, Mux
+  Energia, Nova Palma): dados em `rs/<chave>/dados/`, mesma estrutura. Lista em `DISTS` do
+  `scripts/unificar.py`. Ainda sem camada de prospecção de empresas nem prédios (aba Medir).
+- `scripts/curvas_padrao.json` — curvas típicas por classe (RE, CO, IN, RU, PP, SP, IP) tiradas da BDGD
+  da RGE por `scripts/curvas_padrao.py`. Usadas quando a BDGD não tem curvas (CRVCRG vazia, caso da
+  maioria das cooperativas) e no lugar de curvas descartadas (pico > 8× a média, `PICO_MAX_CURVA`).
+  Numa BDGD com curvas boas (RGE, CEEE) o resultado não muda.
 - `dados/edif/14/<x>/<y>.json` — contornos de prédios (aba Medir), gerados por `scripts/edificios.py`
   a partir do Overture Maps (s3://overturemaps-us-west-2/release/<versão>/theme=buildings/,
   leitura anônima com pyarrow; DuckDB não baixa extensões no ambiente de nuvem).
@@ -91,6 +105,13 @@ python3 -I scripts/prospeccao.py --bdgd CEEE.zip --ucbt-pj ucbt_pj.zip --ucmt-pj
     --trafos /tmp/ceee/BDGD_trafos_todos.xlsx --nomes gd.parquet --saida /tmp/prosp_ceee --site /tmp/ceee/site_todos
 # copie /tmp/ceee/site_todos/* para ceee/ (mantendo ceee/dados/config.json)
 ```
+Cooperativas e permissionárias do RS (cada uma leva menos de 1 min; achar o item na busca
+`https://www.arcgis.com/sharing/rest/search?q=BDGD%202025-12-31&f=json&num=100`):
+```bash
+python3 -I scripts/trafos_bdgd.py Certel.zip --mun todos --mun-nome "Certel" --gd-aneel gd.parquet --saida /tmp/certel
+# copie /tmp/certel/site_todos/dados para rs/certel/dados e rode python3 scripts/unificar.py
+```
+
 O Overture precisa cobrir também o sul do estado (até lat −33,9: Pelotas, Rio Grande, Chuí).
 
 ## Premissas e armadilhas conhecidas (não "corrigir" sem discutir)

@@ -79,6 +79,14 @@ MESES = ["jan", "fev", "mar", "abr", "mai", "jun", "jul", "ago", "set", "out", "
 KVA_PADRAO = {3, 5, 10, 15, 25, 30, 37.5, 45, 50, 75, 100, 112.5, 150, 200, 225,
               250, 300, 400, 500, 750, 1000, 1500, 2000}
 T0 = time.time()
+PICO_MAX_CURVA = 8.0
+# Curvas típicas por classe (scripts/curvas_padrao.json, tiradas da BDGD da RGE): usadas quando a UC
+# não tem curva própria (várias cooperativas publicam a BDGD com CRVCRG vazia e TIP_CC em branco).
+try:
+    CURVAS_PADRAO = {f"CL_{k}": np.array(v) for k, v in json.loads(
+        (Path(__file__).resolve().parent / "curvas_padrao.json").read_text(encoding="utf-8"))["curvas"].items()}
+except (OSError, ValueError, KeyError):
+    CURVAS_PADRAO = {}
 
 
 def log(msg):
@@ -184,6 +192,29 @@ def montar_curvas(gdb, camada_crv):
         if m > 0:
             curvas[cod] = np.vstack([du, sa, do]) / m      # (3, 96)
     return curvas
+
+
+def classe_curva(clas_sub):
+    """Classe da UC (CLAS_SUB: RE1, CO3, RU2, IN, PP1, SP2, IP, CPR...) → chave da curva padrão."""
+    c = (clas_sub or "").strip().upper()[:2]
+    return {"CP": "CO"}.get(c, c) if c in ("RE", "CO", "CP", "IN", "RU", "PP", "SP", "IP") else ""
+
+
+# Quais TIP_CC trocar pela curva da classe: None = todas (BDGD sem CRVCRG); senão só as curvas
+# descartadas. Assim uma BDGD com curvas próprias boas (RGE, CEEE) não muda de resultado.
+TROCAR_TIP = None
+
+
+def tipologia(tip_cc, classe, curvas):
+    """TIP_CC da UC, ou a curva padrão da classe dela quando a BDGD não tem a curva."""
+    tip_cc = txt(tip_cc)
+    if not isinstance(classe, pd.Series):
+        classe = pd.Series(classe, index=tip_cc.index)
+    chave = "CL_" + classe.astype(str)
+    usar = ~tip_cc.isin(curvas.keys()) & chave.isin(curvas.keys())
+    if TROCAR_TIP is not None:
+        usar &= tip_cc.isin(TROCAR_TIP)
+    return tip_cc.where(~usar, chave)
 
 
 # ---------------------------------------------------------------- cálculo
@@ -328,7 +359,7 @@ def calc_alimentadores(gdb, L, curvas, janela, fp, ctmts=None, gd_kw=None):
         if not L.get(chave):
             continue
         try:
-            d = ler(gdb, L[chave], ["CTMT", "SIT_ATIV", "TIP_CC"] + ENE, where=filtro)
+            d = ler(gdb, L[chave], ["CTMT", "SIT_ATIV", "TIP_CC", "CLAS_SUB"] + ENE, where=filtro)
         except Exception:
             continue
         if "SIT_ATIV" in d.columns:
@@ -336,6 +367,8 @@ def calc_alimentadores(gdb, L, curvas, janela, fp, ctmts=None, gd_kw=None):
         d["TRAFO"] = txt(d["CTMT"])
         d = d[d["TRAFO"].isin(set(ct["COD_ID"]))]
         d["TIP_CC"] = txt(d["TIP_CC"]) if "TIP_CC" in d.columns else ""
+        cl = "IP" if chave == "pip" else (txt(d["CLAS_SUB"]).map(classe_curva) if "CLAS_SUB" in d.columns else "")
+        d["TIP_CC"] = tipologia(d["TIP_CC"], cl, curvas)
         for c in ENE:
             d[c] = pd.to_numeric(d.get(c, 0), errors="coerce").fillna(0)
         partes.append(d[["TRAFO", "TIP_CC"] + ENE])
@@ -435,7 +468,14 @@ def _registros(pts):
         "ca": n(r.get("Carregamento do alimentador (%)"), 1),
         "gda": n(r.get("GD no alimentador (kW)"), 0), "cga": n(r.get("Carregamento de GD do alimentador (%)"), 1),
         "capa": n(r.get("Capacidade disponível p/ GD no alimentador (kW)"), 0),
+        "f": fases(r.get("Fases primário")),
     } for _, r in pts.iterrows()]
+
+
+def fases(fas_con):
+    """FAS_CON (ABC, ABCN, AB, AN...) → nº de fases (1, 2 ou 3); None sem dado."""
+    n = sum(1 for x in "ABC" if x in str(fas_con or "").upper())
+    return n or None
 
 
 def _html(dados_js, meta, titulo):
@@ -533,7 +573,32 @@ def salvar_redes_mt(gdb, L, pasta, tol=0.00003):
     return len(redes)
 
 
-INV_CAMPOS = ("id", "lat", "lon", "kva", "gd", "cmin", "capa", "alim", "sub")
+INV_CAMPOS = ("id", "lat", "lon", "kva", "gd", "cmin", "capa", "alim", "sub", "f")
+
+
+def resumo_alimentadores(pts):
+    """dados/alim.json: [{a, s, lat, lon, b, capa, gda, ca, cga, n, i, i3}] — i = trafos com 1 UC
+    (locais de usina) e i3 = desses, os trifásicos. A folga (capa) > 0 = alimentador sem inversão de fluxo."""
+    col = "Alimentador (CTMT)"
+    p = pts[pts[col].notna() & (pts[col].astype(str) != "")].copy()
+    p["_f"] = p["Fases primário"].map(fases) if "Fases primário" in p.columns else None
+    p["_u1"] = p["Nº UCs"] == 1
+    saida = []
+    for al, g in p.groupby(col):
+        r = g.iloc[0]
+        saida.append({
+            "a": str(al), "s": "" if pd.isna(r.get("Subestação")) else str(r.get("Subestação")),
+            "lat": round(float(g["lat"].median()), 5), "lon": round(float(g["lon"].median()), 5),
+            "b": [round(float(g["lat"].min()), 4), round(float(g["lon"].min()), 4),
+                  round(float(g["lat"].max()), 4), round(float(g["lon"].max()), 4)],
+            "capa": _n(r.get("Capacidade disponível p/ GD no alimentador (kW)"), 0),
+            "gda": _n(r.get("GD no alimentador (kW)"), 0),
+            "ca": _n(r.get("Carregamento do alimentador (%)"), 1),
+            "cga": _n(r.get("Carregamento de GD do alimentador (%)"), 1),
+            "n": int(len(g)), "i": int(g["_u1"].sum()), "i3": int((g["_u1"] & (g["_f"] == 3)).sum()),
+        })
+    saida.sort(key=lambda x: -(x["capa"] or 0))
+    return saida
 
 
 def salvar_site(df, pasta, meta, padrao="4316907"):
@@ -553,6 +618,8 @@ def salvar_site(df, pasta, meta, padrao="4316907"):
     # "Usinas de investimento" (toda a área): trafos com 1 UC em alimentador com folga, maior folga primeiro
     inv.sort(key=lambda r: -r["capa"])
     (pasta / "dados" / "invest.json").write_text(_js(inv), encoding="utf-8")
+    # Visão do estado: um resumo por alimentador (centro e retângulo dos trafos, folga, GD, locais de usina)
+    (pasta / "dados" / "alim.json").write_text(_js(resumo_alimentadores(pts)), encoding="utf-8")
     chave = lambda m: unicodedata.normalize("NFKD", m["n"]).encode("ascii", "ignore").decode().lower()
     muns.sort(key=chave)
     meta.update(muns=muns, bboxAll=_bbox(pts), bbox=None, mun=None,
@@ -605,7 +672,7 @@ def main():
     # 1) Unidades consumidoras BT do município
     log(f"Lendo UCs de BT {'de toda a área' if todos else 'do município ' + a.mun} ...")
     uc = ler_por_municipio(gdb, L["uc"], ["COD_ID", "MUN", "SIT_ATIV", "UNI_TR_MT", "UNI_TR_D",
-                                          "CTMT", "TIP_CC", "CEG_GD"] + ENE, mun)
+                                          "CTMT", "TIP_CC", "CEG_GD", "CLAS_SUB"] + ENE, mun)
     ct = col_trafo(uc)
     if uc.empty or not ct:
         sys.exit("Nenhuma UC encontrada para esse município (confira o código IBGE em --mun).")
@@ -620,7 +687,8 @@ def main():
     log(f"  {len(uc):,} UCs ativas em {len(trafos_mun):,} transformadores")
 
     # 2) Iluminação pública ligada nesses trafos (opcional)
-    partes = [uc[["TRAFO", "TIP_CC"] + ENE]]
+    uc["CL"] = txt(uc["CLAS_SUB"]).map(classe_curva) if "CLAS_SUB" in uc.columns else ""
+    partes = [uc[["TRAFO", "TIP_CC", "CL"] + ENE]]
     if L["pip"]:
         try:
             pip = ler(gdb, L["pip"], ["UNI_TR_MT", "UNI_TR_D", "SIT_ATIV", "TIP_CC"] + ENE)
@@ -631,7 +699,8 @@ def main():
                 pip["TIP_CC"] = txt(pip["TIP_CC"]) if "TIP_CC" in pip.columns else ""
                 for c in ENE:
                     pip[c] = pd.to_numeric(pip.get(c, 0), errors="coerce").fillna(0)
-                partes.append(pip[["TRAFO", "TIP_CC"] + ENE])
+                pip["CL"] = "IP"
+                partes.append(pip[["TRAFO", "TIP_CC", "CL"] + ENE])
                 log(f"  + {len(pip):,} pontos de iluminação pública")
         except Exception as e:
             log(f"  (iluminação pública ignorada: {e})")
@@ -696,6 +765,20 @@ def main():
     # 5) Curvas típicas e carga por trafo
     log("Montando curvas de carga ...")
     curvas = montar_curvas(gdb, L["crv"])
+    # curva com pico > 8× a média é medição isolada/erro (algumas permissionárias): usa a da classe
+    ruins = [k for k, v in curvas.items() if v.max() > PICO_MAX_CURVA]
+    for k in ruins:
+        del curvas[k]
+    if ruins:
+        log(f"  {len(ruins)} curvas descartadas (pico > {PICO_MAX_CURVA:g}× a média)")
+    global TROCAR_TIP
+    TROCAR_TIP = set(ruins) if curvas else None
+    sem_tip = ~cargas["TIP_CC"].isin(curvas.keys())
+    curvas.update(CURVAS_PADRAO)
+    cargas["TIP_CC"] = tipologia(cargas["TIP_CC"], cargas["CL"], curvas)
+    if sem_tip.any() and CURVAS_PADRAO:
+        log(f"  {(sem_tip & cargas['TIP_CC'].str.startswith('CL_')).mean() * 100:.0f}% das UCs sem curva própria: "
+            "usada a curva padrão da classe")
     log(f"  {len(curvas)} tipologias de curva")
     P = cargas[ENE].to_numpy(float) / (DIAS_MES * 24)          # kWh/mês → kW médio
     pares = pd.DataFrame(P, columns=[f"P_{i:02d}" for i in range(1, 13)])
@@ -1198,8 +1281,10 @@ details.mais[open] summary{margin-bottom:6px}
       <div class="row"><label for="invOnde">Onde</label><select id="invOnde"><option value="m">Município selecionado</option><option value="t">Toda a área da __DIST__</option></select></div>
       <div class="row"><label for="invKvaMin">Trafo de</label><select id="invKvaMin"><option value="">mín.</option></select>
         <label for="invKvaMax">até</label><select id="invKvaMax"><option value="">máx.</option></select><span class="base">kVA</span></div>
+      <label class="chk"><input type="checkbox" id="invTri"> Só trafo trifásico</label>
       <label class="chk"><input type="checkbox" id="invTr"> Exigir folga também no trafo</label>
       <label class="chk"><input type="checkbox" id="invMapa" checked> Mostrar os locais no mapa</label>
+      <div class="row"><label for="invAlim">Alimentadores</label><select id="invAlim"><option value="ok">Só os sem inversão de fluxo</option><option value="todos">Todos (verde e vermelho)</option><option value="">Não mostrar</option></select></div>
       <button type="button" class="ghost" id="invCsv">Baixar lista (CSV)</button>
     </div>
     <div class="scroll" id="infoInv"></div>
@@ -1447,9 +1532,10 @@ function desenhar(){
   });
   // por cima dos trafos: locais para usina de investimento (aba Usinas)
   invVis=INV?invFiltro():[];
-  if(INV&&$("invMapa").checked)invVis.forEach(t=>{if(sel&&sel.id===t.id)return;
+  if(INV&&$("invMapa").checked&&(map.getZoom()>=ZOOM_LOCAIS||!$("invAlim").value))invVis.forEach(t=>{if(sel&&sel.id===t.id)return;
     const m=L.circleMarker([t.lat,t.lon],{radius:8,color:"#ffffff",weight:2.5,fillColor:"#1d4ed8",fillOpacity:1});
     m.bindTooltip(()=>dicaInv(t),{direction:"top",offset:[0,-6]});m.on("click",e=>{L.DomEvent.stopPropagation(e);abrirInv(t)});capa.addLayer(m)});
+  if(ALIM)desenharAlim();
 }
 function resumo(){
   const v=base(),pot=+potEl.value||0;
@@ -1662,7 +1748,7 @@ async function desenharEmp(){
 }
 // ---- Usinas de investimento (dados/invest.json, toda a área): trafos com 1 UC cujo alimentador tem folga p/ nova GD
 // linha: {id,lat,lon,kva,gd,cmin,capa,alim,sub,m (código IBGE)}
-let INV=null,invVis=[],invN=30,invErro=false;
+let INV=null,invVis=[],invN=30,invErro=false,ALIM=null;
 // t.d = distribuidora do local (página com várias distribuidoras carrega os locais de todas)
 const nomeMun=t=>((META.muns||[]).find(m=>m.c===t.m&&(!t.d||m.d===t.d))||{n:t.m}).n;
 const nomeDist=k=>((META.dists||[]).find(d=>d.k===k)||{n:k||""}).n;
@@ -1674,6 +1760,9 @@ async function ligarInv(){
       const partes=await Promise.all(fontes.map(async ds=>{const r=await fetch(`${BASE}${ds.p}dados/invest.json`);if(!r.ok)throw 0;
         const l=await r.json();l.forEach(t=>{t.d=ds.k});return l}));
       INV=partes.flat();
+      const al=await Promise.all(fontes.map(async ds=>{try{const r=await fetch(`${BASE}${ds.p}dados/alim.json`);if(!r.ok)return [];
+        const l=await r.json();l.forEach(a=>{a.d=ds.k;a.p=ds.p});return l}catch(e){return []}}));
+      ALIM=al.flat();if(invOnde().todo){const b=META.bboxAll;map.fitBounds([[b[0],b[1]],[b[2],b[3]]])}
       // faixas de potência (kVA) presentes nos locais, para o filtro "Trafo de … até …"
       const vs=[...new Set(INV.map(t=>t.kva).filter(v=>v!=null))].sort((a,b)=>a-b);
       for(const el of [$("invKvaMin"),$("invKvaMax")])vs.forEach(v=>{const o=document.createElement("option");o.value=v;o.textContent=fmtK(v);el.append(o)});
@@ -1684,18 +1773,56 @@ async function ligarInv(){
 }
 // sem potência pretendida: qualquer folga (> 0); com potência: folga ≥ potência. Ordem: maior folga do alimentador
 function invFiltro(){
-  const pot=+potEl.value||0,tr=$("invTr").checked,o=invOnde(),ok=v=>v!=null&&(pot>0?v>=pot:v>0);
+  const pot=+potEl.value||0,tr=$("invTr").checked,tri=$("invTri").checked,o=invOnde(),ok=v=>v!=null&&(pot>0?v>=pot:v>0);
   const onde=t=>o.todo?(!o.dist||t.d===o.dist):(t.m===META.mun&&(!META.dist||t.d===META.dist));
   const k0=$("invKvaMin").value===""?null:+$("invKvaMin").value,k1=$("invKvaMax").value===""?null:+$("invKvaMax").value;
   const faixa=t=>(k0==null||(t.kva!=null&&t.kva>=k0))&&(k1==null||(t.kva!=null&&t.kva<=k1));
-  return INV.filter(t=>onde(t)&&faixa(t)&&ok(t.capa)&&(!tr||ok(t.cap))).sort((a,b)=>b.capa-a.capa||(b.cap??-1)-(a.cap??-1));
+  return INV.filter(t=>onde(t)&&faixa(t)&&ok(t.capa)&&(!tr||ok(t.cap))&&(!tri||t.f===3)).sort((a,b)=>b.capa-a.capa||(b.cap??-1)-(a.cap??-1));
 }
 async function abrirInv(t){
   if(t.m!==META.mun||(t.d&&t.d!==META.dist))await carregarMun((t.d?t.d+":":"")+t.m,false);
   const x=D.find(x=>x.id===t.id);if(x)abrir(x);
 }
+// ---- Alimentadores no mapa (dados/alim.json de cada distribuidora): longe = um círculo por alimentador
+// no centro dos trafos dele; perto (zoom ≥ 12) = traçado da rede MT. Verde = folga p/ nova GD (sem inversão).
+map.createPane("alims");map.getPane("alims").style.zIndex=350;
+const rAlim=L.canvas({pane:"alims"}),camAlim=L.layerGroup().addTo(map),mtTodos={};let geracaoAlim=0;
+function alimOk(a){const pot=+potEl.value||0;return a.capa!=null&&(pot>0?a.capa>=pot:a.capa>0)}
+function alimEscopo(){
+  if(!ALIM)return [];const o=invOnde();
+  if(o.todo)return ALIM.filter(a=>!o.dist||a.d===o.dist);
+  const daqui=new Set(D.map(t=>t.alim));return ALIM.filter(a=>daqui.has(a.a)&&(!META.dist||a.d===META.dist));
+}
+function dicaAlim(a){
+  return `<b>Alimentador ${esc(a.a)}</b>${META.dists?" · "+esc(nomeDist(a.d)):""}${a.s?" · SE "+esc(a.s):""}<br>
+  ${a.capa==null?"Sem dado de carga":alimOk(a)?`Folga p/ nova GD: <b>${fmt(a.capa,0)} kW</b> (sem inversão de fluxo)`:`<b>Sem folga</b> p/ ${(+potEl.value||0)>0?fmt(+potEl.value)+" kW":"nova GD"} (inversão de fluxo)`}<br>
+  GD ligada: ${fmt(a.gda,0)} kW · carregamento ${fmt(a.ca)} %<br>${a.n.toLocaleString("pt-BR")} trafos · ${a.i} com 1 UC (${a.i3} trifásicos)`;
+}
+async function desenharAlim(){
+  const g=++geracaoAlim;camAlim.clearLayers();
+  const modo=$("invAlim").value;if(!ALIM||!modo)return;
+  const lista=alimEscopo().filter(a=>modo==="todos"?a.capa!=null:alimOk(a));
+  const cor=a=>alimOk(a)?"#16a34a":"#dc2626";
+  if(map.getZoom()<12){
+    lista.forEach(a=>{const m=L.circleMarker([a.lat,a.lon],{renderer:rAlim,radius:Math.min(14,4+Math.sqrt(Math.max(a.capa||0,0))/6),
+      color:"#ffffff",weight:1,fillColor:cor(a),fillOpacity:.75});
+      m.bindTooltip(()=>dicaAlim(a),{direction:"top",offset:[0,-6]});
+      m.on("click",e=>{L.DomEvent.stopPropagation(e);map.fitBounds([[a.b[0],a.b[1]],[a.b[2],a.b[3]]],{padding:[20,20]})});camAlim.addLayer(m)});
+    return;
+  }
+  const v=map.getBounds(),perto=lista.filter(a=>a.b[0]<=v.getNorth()&&a.b[2]>=v.getSouth()&&a.b[1]<=v.getEast()&&a.b[3]>=v.getWest()).slice(0,60);
+  await Promise.all(perto.map(async a=>{const f=a.p+String(a.a).replace(/[^\w.-]/g,"_");
+    if(!(f in mtTodos))try{const r=await fetch(`${BASE}${a.p}dados/mt/${String(a.a).replace(/[^\w.-]/g,"_")}.json`);mtTodos[f]=r.ok?await r.json():null}catch(e){mtTodos[f]=null}}));
+  if(g!==geracaoAlim)return;
+  perto.forEach(a=>{const d=mtTodos[a.p+String(a.a).replace(/[^\w.-]/g,"_")];if(!d)return;
+    linhas(d,{renderer:rAlim,color:cor(a),weight:3,opacity:.7},camAlim).forEach(l=>l.bindTooltip(()=>dicaAlim(a),{sticky:true}))});
+}
+// de longe só os alimentadores; os locais (círculos azuis) aparecem ao aproximar
+const ZOOM_LOCAIS=11;let pertoAnt=null;
+map.on("zoomend moveend",()=>{if(!ALIM)return;const pz=map.getZoom()>=ZOOM_LOCAIS;
+  if(pz!==pertoAnt){pertoAnt=pz;desenhar()}else desenharAlim()});
 function dicaInv(t){
-  return `<b>Usina de investimento · trafo ${esc(t.id)}</b><br>${esc(nomeMun(t))}${t.d&&META.dists?" ("+esc(nomeDist(t.d))+")":""} · ${fmt(t.kva,1)} kVA · 1 UC<br>
+  return `<b>Usina de investimento · trafo ${esc(t.id)}</b><br>${esc(nomeMun(t))}${t.d&&META.dists?" ("+esc(nomeDist(t.d))+")":""} · ${fmt(t.kva,1)} kVA${t.f?" "+(t.f===3?"trifásico":t.f===2?"bifásico":"monofásico"):""} · 1 UC<br>
   Alimentador ${esc(t.alim||"–")}: folga <b>${fmt(t.capa,0)} kW</b><br>Trafo comporta: ${fmt(t.cap)} kW`;
 }
 function listaInv(){
@@ -1708,11 +1835,13 @@ function listaInv(){
   return `<section><h2>${todo?esc(o.rotulo):esc(META.munNome.split(",")[0])}</h2>
   <div class="stats"><div class="stat"><b>${invVis.length.toLocaleString("pt-BR")}</b><span>locais</span></div>
   <div class="stat"><b>${na.toLocaleString("pt-BR")}</b><span>alimentadores</span></div>
+  ${ALIM&&todo?(()=>{const l=alimEscopo(),k=l.filter(alimOk).length;return `<div class="stat"><b>${k.toLocaleString("pt-BR")}</b><span>de ${l.length.toLocaleString("pt-BR")} alim. sem inversão</span></div>`})():""}
   <div class="stat"><b>${invVis.length?fmt(invVis[0].capa/1000,2):"–"}</b><span>MW maior folga</span></div></div>
-  <p class="hint">${pot>0?`Alimentador com folga ≥ ${fmt(pot)} kW`:"Qualquer folga no alimentador"}${tr?" e no trafo":""}${($("invKvaMin").value||$("invKvaMax").value)?`; trafo de ${$("invKvaMin").value?fmtK(+$("invKvaMin").value):"qualquer"} a ${$("invKvaMax").value?fmtK(+$("invKvaMax").value):"qualquer"} kVA`:""}. Locais do mesmo alimentador disputam a mesma folga.
-  ${tr?"":"O trafo de um só consumidor costuma ser pequeno: a usina em geral exige trocar ou ampliar o trafo. "}${$("invMapa").checked?"Círculos azuis no mapa.":""}</p>
+  <p class="hint">${pot>0?`Alimentador com folga ≥ ${fmt(pot)} kW`:"Qualquer folga no alimentador"}${tr?" e no trafo":""}${$("invTri").checked?"; só trafo trifásico":""}${($("invKvaMin").value||$("invKvaMax").value)?`; trafo de ${$("invKvaMin").value?fmtK(+$("invKvaMin").value):"qualquer"} a ${$("invKvaMax").value?fmtK(+$("invKvaMax").value):"qualquer"} kVA`:""}. Locais do mesmo alimentador disputam a mesma folga.
+  ${tr?"":"O trafo de um só consumidor costuma ser pequeno: a usina em geral exige trocar ou ampliar o trafo. "}${$("invMapa").checked?($("invAlim").value?"Círculos azuis no mapa ao aproximar.":"Círculos azuis no mapa."):""}</p>
+  ${$("invAlim").value?`<p class="hint"><b style="color:#16a34a">Verde</b>: alimentador sem inversão de fluxo (círculo maior = mais folga)${$("invAlim").value==="todos"?"; <b style=\"color:#dc2626\">vermelho</b>: sem folga":""}. Clique para aproximar; de perto aparece o traçado da rede de cada alimentador.</p>`:""}
   ${invVis.length?"":`<p class="hint">Nenhum local ${todo?"na área":"neste município"} com esses critérios.${todo?"":" Escolha uma opção de área inteira em “Onde”."}</p>`}
-  <div class="near">${invVis.slice(0,invN).map(t=>`<button data-inv="${esc(t.id)}" data-m="${esc(t.m)}" data-d="${esc(t.d||"")}"><span class="dot inv"></span><span><b class="id">${esc(t.id)}</b><br><span class="d">${todo?esc(nomeMun(t))+(META.dists&&!o.dist?" ("+esc(t.d)+")":"")+" · ":""}${esc(t.alim||"–")} · ${fmtK(t.kva)} kVA</span></span><span><b>${fmt(t.capa,0)}</b> <span class="d">kW alim.</span><br><span class="d">trafo ${fmt(t.cap,0)} kW</span></span></button>`).join("")}</div>
+  <div class="near">${invVis.slice(0,invN).map(t=>`<button data-inv="${esc(t.id)}" data-m="${esc(t.m)}" data-d="${esc(t.d||"")}"><span class="dot inv"></span><span><b class="id">${esc(t.id)}</b><br><span class="d">${todo?esc(nomeMun(t))+(META.dists&&!o.dist?" ("+esc(nomeDist(t.d))+")":"")+" · ":""}${esc(t.alim||"–")} · ${fmtK(t.kva)} kVA${t.f?" · "+(t.f===3?"trif.":t.f===2?"bif.":"monof."):""}</span></span><span><b>${fmt(t.capa,0)}</b> <span class="d">kW alim.</span><br><span class="d">trafo ${fmt(t.cap,0)} kW</span></span></button>`).join("")}</div>
   ${invVis.length>invN?`<button type="button" class="ghost" data-mais="1">Mostrar mais (${(invVis.length-invN).toLocaleString("pt-BR")} restantes)</button>`:""}</section>`;
 }
 infoInv.addEventListener("click",e=>{
@@ -1722,8 +1851,8 @@ infoInv.addEventListener("click",e=>{
 });
 function baixarInv(){
   const q=v=>`"${String(v??"").replace(/"/g,'""')}"`,n=v=>v==null?"":String(Math.round(v*10)/10).replace(".",",");
-  const cab=["Trafo","Município","Distribuidora","Alimentador","Subestação","Potência do trafo (kVA)","GD já ligada (kW)","Folga do alimentador p/ nova GD (kW)","Trafo comporta (kW)","Latitude","Longitude","Google Maps"];
-  const lin=invVis.map(t=>[t.id,nomeMun(t),nomeDist(t.d)||META.titulo,t.alim,t.sub,n(t.kva),n(t.gd),n(t.capa),n(t.cap),t.lat,t.lon,`https://www.google.com/maps?q=${t.lat},${t.lon}`].map(q).join(";"));
+  const cab=["Trafo","Município","Distribuidora","Alimentador","Subestação","Fases","Potência do trafo (kVA)","GD já ligada (kW)","Folga do alimentador p/ nova GD (kW)","Trafo comporta (kW)","Latitude","Longitude","Google Maps"];
+  const lin=invVis.map(t=>[t.id,nomeMun(t),nomeDist(t.d)||META.titulo,t.alim,t.sub,t.f||"",n(t.kva),n(t.gd),n(t.capa),n(t.cap),t.lat,t.lon,`https://www.google.com/maps?q=${t.lat},${t.lon}`].map(q).join(";"));
   const blob=new Blob(["\ufeff"+[cab.map(q).join(";"),...lin].join("\r\n")],{type:"text/csv;charset=utf-8"});
   const o=invOnde(),onde=(o.todo?(o.dist?nomeDist(o.dist):"RS"):META.munNome.split(",")[0]).replace(/\W+/g,"_");
   const l=document.createElement("a");l.href=URL.createObjectURL(blob);l.download=`usinas_investimento_${onde}.csv`;l.click();setTimeout(()=>URL.revokeObjectURL(l.href),2000);
@@ -1988,7 +2117,7 @@ if(hKw&&+hKw>0){potEl.value=+hKw;filtraRow.hidden=false}
 if(META.muns){
   $("tabP").hidden=false;$("tabI").hidden=false;$("btInv").hidden=false;
   $("btInv").onclick=()=>{aba("I");abrirPainel();topoPainel()};
-  ["invTr","invMapa","invKvaMin","invKvaMax"].forEach(i=>$(i).addEventListener("change",()=>{invN=30;desenhar();render()}));
+  ["invTr","invTri","invAlim","invMapa","invKvaMin","invKvaMax"].forEach(i=>$(i).addEventListener("change",()=>{invN=30;desenhar();render()}));
   $("invOnde").addEventListener("change",()=>{invN=30;desenhar();render();if(invVis.length)map.fitBounds(invVis.map(t=>[t.lat,t.lon]),{padding:[20,20],maxZoom:15})});
   $("invCsv").addEventListener("click",()=>{if(INV)baixarInv();else ligarInv().then(()=>{if(INV)baixarInv()})});$("empOn").addEventListener("change",()=>{empMexeu=true});
   ["empOn","empAtv","empTen","empGd","empRede"].forEach(i=>$(i).addEventListener("change",()=>{empSel=null;desenharEmp()}));
@@ -1997,8 +2126,8 @@ if(META.muns){
   $("empCsv").addEventListener("click",()=>{if(!$("empOn").checked){$("empOn").checked=true;desenharEmp().then(baixarCsv)}else baixarCsv()});
   document.getElementById("munRow").style.display="";
   if(META.dists){$("distRow").style.display="";
-    $("invOnde").innerHTML='<option value="m">Município selecionado</option><option value="t">Todo o Rio Grande do Sul ('+
-      META.dists.map(d=>esc(d.n)).join(" e ")+')</option>'+META.dists.map(d=>`<option value="t:${d.k}">Toda a ${esc(d.n)}</option>`).join("");
+    $("invOnde").innerHTML='<option value="m">Município selecionado</option><option value="t" selected>Todo o Rio Grande do Sul ('+
+      (META.dists.length>3?META.dists.length+" distribuidoras":META.dists.map(d=>esc(d.n)).join(" e "))+')</option>'+META.dists.map(d=>`<option value="t:${d.k}">Toda a ${esc(d.n)}</option>`).join("");
     distEl.innerHTML='<option value="">Todas</option>'+META.dists.map(d=>`<option value="${d.k}">${esc(d.n)}</option>`).join("");
     distEl.addEventListener("change",()=>{listarMuns();const m=META.muns.find(x=>munK(x)===META.munK);
       if(distEl.value&&(!m||m.d!==distEl.value)){const dd=META.dists.find(d=>d.k===distEl.value);
