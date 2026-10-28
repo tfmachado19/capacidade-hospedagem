@@ -149,6 +149,11 @@ O Overture precisa cobrir também o sul do estado (até lat −33,9: Pelotas, Ri
   fica "não confirmada" (código 1) e vai em `x[18]` = `[[lat, lon, kW, mt, relação, distância m, nº]]`;
   ao abrir a empresa o site desenha essas GDs no mapa ligadas a ela. Local da GD = `PN_CON` → PONNOT;
   potência = base da ANEEL pelo `CEG_GD`. O código 2 ("provável") não é mais usado.
+- **Ficha da empresa (Prospectar):** `x[19]` = consumo de jan a dez (kWh) → gráfico de barras; rede
+  (trafo e alimentador, com a folga de cada um, vindos de `dados/<mun>.json` e `alim.json`) e "Cabe de GD
+  neste local" = menor folga entre trafo e alimentador (BT: teto de 75 kW; MT: também a demanda
+  contratada). Pg só vale como dispensa para microgeração (até 75 kW). Empresas do município aberto
+  entram na busca (por endereço).
 - **pandas novo:** `astype(str)` mantém nulos como nulos. Use a função `txt()` dos scripts,
   que trata isso.
 - Consumo de quem já tem GD é o líquido medido (subestima a carga).

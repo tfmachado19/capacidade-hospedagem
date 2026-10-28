@@ -228,6 +228,11 @@ aside#side h1{font-size:16px}
 .legItem{display:flex;align-items:center;gap:6px;cursor:pointer;font-size:12px}.legItem input{width:15px;height:15px;margin:0;accent-color:var(--accent)}
 .leaflet-control[hidden]{display:none!important}
 .row[hidden]{display:none}
+.graf{margin:10px 0 4px}.graf svg{display:block;margin:4px 0}
+h3.subt{font:700 13px var(--display);text-transform:uppercase;letter-spacing:.06em;margin:12px 0 4px;color:var(--muted)}
+.cabe{border:1px solid var(--line);border-left:4px solid #16a34a;border-radius:8px;padding:8px 10px;margin:8px 0}
+.cabe.nao{border-left-color:#dc2626}
+.pt{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:5px;vertical-align:middle}
 body.medindo .leaflet-control.legenda,body.medindo .leaflet-control.legAlimC{display:none!important}
 @media (max-width:760px){
   aside#side{left:0;right:0;bottom:0;top:auto;width:auto;max-height:62vh;border-radius:14px 14px 0 0;border-bottom:0;grid-row:auto}
@@ -309,14 +314,7 @@ body.medindo .leaflet-control.legenda,body.medindo .leaflet-control.legAlimC{dis
         <button type="button" class="ghost" id="medNovo">Novo contorno</button>
         <button type="button" class="ghost" id="medLimpa">Limpar</button>
       </div>
-      <div class="row" id="medRowInc"><label for="medInc">Inclinação</label>
-        <select id="medInc">
-          <option value="0">0° · laje ou plano</option>
-          <option value="6">6° · fibrocimento / metálica (10%)</option>
-          <option value="17" selected>17° · telha cerâmica (30%)</option>
-          <option value="22">22° · telha cerâmica (40%)</option>
-          <option value="27">27° · telhado íngreme (50%)</option>
-        </select></div>
+      <input type="hidden" id="medInc" value="17"><span id="medRowInc" hidden></span>
       <div class="row" id="medRowSolo" hidden><label for="medPasso">Entre mesas</label><input id="medPasso" type="number" min="2" max="20" step="0.1" value="6"><span class="base">m (centro a centro)</span>
         <label for="medIncS">Inclinação</label><input id="medIncS" type="number" min="0" max="40" step="1" value="20"><span class="base">°</span></div>
       <div class="row"><label for="medMg">Afastamento</label><input id="medMg" type="number" min="0" max="20" step="0.1" value="0.3"><span class="base">m das bordas</span></div>
@@ -538,7 +536,7 @@ async function mostrarAlim(x){
 }
 function selEmp(x){
   empSel=x;fichaFechada=true;aba("P");redeMt.clearLayers();rede.clearLayers();ponto=null;if(pino){map.removeLayer(pino);pino=null}
-  desenharGdEmp(x);
+  desenharGdEmp(x);if(!gdsDe(x).length)map.setView([x[0],x[1]],Math.max(map.getZoom(),18),{animate:false});
   if(x[11]){sel=null;desenhar();render();mostrarAlim(x)}
   else{
     const t=D.find(t=>t.id===x[13]);sel=t||null;desenhar();render();
@@ -802,6 +800,7 @@ async function carregarMun(c,aj=true){
   sel=null;ponto=null;msg="";if(pino){map.removeLayer(pino);pino=null}
   empSel=null;preparar();preencherAlim();desenhar();render();if(aj)ajustar();desenharEmp();
   if(typeof abaAtual!=="undefined"&&abaAtual==="I"&&!INV)ligarInv();
+  dadosEmp();   // empresas do município entram na busca
   try{history.replaceState(null,"","#"+munK(m))}catch(e){}
 }
 // ---- Prospecção de empresas (dados/emp/<município>.json, sob demanda)
@@ -1075,15 +1074,61 @@ function desenharGdEmp(x){
   // enquadra a empresa e as GDs por perto (no celular o mapa é pequeno)
   if(l.length)map.fitBounds([[x[0],x[1]],...l.map(g=>[g[0],g[1]])],{paddingTopLeft:[50,130],paddingBottomRight:[50,40],maxZoom:18});
 }
+// gráfico de barras do consumo mês a mês (x[19] = kWh de jan..dez)
+function graficoConsumo(ene){
+  if(!Array.isArray(ene)||ene.length!==12)return "";
+  const mx=Math.max(...ene,1),mn=Math.min(...ene),W=300,H=96,bw=W/12,M="JFMAMJJASOND";
+  const barras=ene.map((v,i)=>{const h=Math.max(1,(v/mx)*(H-20));return `<rect x="${(i*bw+2.5).toFixed(1)}" y="${(H-14-h).toFixed(1)}" width="${(bw-5).toFixed(1)}" height="${h.toFixed(1)}" rx="2" fill="var(--accent)"><title>${MESES_N[i]}: ${fmt(v,0)} kWh</title></rect>
+    <text x="${(i*bw+bw/2).toFixed(1)}" y="${H-2}" text-anchor="middle" font-size="10" fill="var(--muted)">${M[i]}</text>`}).join("");
+  return `<div class="graf"><div class="base">Consumo mês a mês (kWh) · ${esc(META.base||"")}</div>
+  <svg viewBox="0 0 ${W} ${H}" width="100%" role="img" aria-label="Consumo mensal: máximo ${fmt(mx,0)} kWh, mínimo ${fmt(mn,0)} kWh">${barras}</svg>
+  <div class="base">maior ${fmt(mx,0)} · menor ${fmt(mn,0)} kWh/mês</div></div>`;
+}
+const MESES_N=["jan","fev","mar","abr","mai","jun","jul","ago","set","out","nov","dez"];
+// rede da empresa e quanto de GD cabe no local (trafo e alimentador, estimativa)
+function redeEmp(x){
+  const t=!x[11]&&x[13]?D.find(t=>t.id===x[13]):null;
+  const al=ALIM?ALIM.find(a=>a.a===x[14]&&(!META.dist||a.d===META.dist)):null;
+  const capA=al?al.capa:(t?t.capa:null),capT=t?t.cap:null;
+  const lim=[capA,x[11]?null:capT].filter(v=>v!=null);
+  let cabe=lim.length?Math.max(0,Math.min(...lim)):null;
+  const quem=cabe==null?"":(x[11]||capT==null||(capA!=null&&capA<=capT))?"alimentador":"trafo";
+  if(cabe!=null&&!x[11])cabe=Math.min(cabe,75);
+  let quem2=quem;   // em MT a minigeração fica limitada também pela demanda contratada
+  if(cabe!=null&&x[11]&&x[15]>0&&x[15]<cabe){cabe=x[15];quem2="demanda contratada"}
+  const sug=cabe==null?null:Math.min(cabe,x[3]);
+  const fa=al?faixaAlim(al):-1,cor=fa<0?"#9ca3af":FAIXAS_ALIM[fa].cor;
+  return `<h3 class="subt">Rede</h3><dl>
+  ${x[11]?"":`<dt>Trafo</dt><dd>${esc(x[13]||"–")}${t?` · ${fmt(t.kva,1)} kVA · ${t.ucs} UC${t.ucs>1?"s":""}`:""}</dd>
+  <dt>Folga do trafo p/ GD</dt><dd>${capT==null?"sem dado":fmt(Math.max(0,capT),1)+" kW"}</dd>`}
+  <dt>Alimentador</dt><dd><span class="pt" style="background:${cor}"></span>${esc(x[14]||"–")}${al&&al.s?" · SE "+esc(al.s):""}</dd>
+  <dt>Folga do alimentador p/ GD</dt><dd>${capA==null?"sem dado":fmt(Math.max(0,capA),0)+" kW"}${capA!=null&&capA<=0?" (inversão de fluxo)":""}</dd></dl>
+  <div class="cabe ${cabe>0?"":"nao"}"><div class="base">Cabe de GD neste local (estimativa)</div>
+   <div class="medGrande">${cabe==null?"–":fmt(cabe,1)} <small>kW</small></div>
+   <div class="base">${cabe==null?"Sem dados de carga da rede.":cabe>0?`Limitado ${quem2==="demanda contratada"?"pela demanda contratada":"pelo "+quem2}${!x[11]&&cabe===75?" e pelo teto da microgeração (75 kW)":""}.`
+     :`O ${quem} não tem folga: a conexão deve precisar de estudo de inversão de fluxo.`}
+   ${sug>0?` Sugestão: <b>${fmt(sug,1)} kWp</b> (${sug<x[3]?"o que a rede comporta":"zera o consumo"}).`:""}
+   ${pgTexto(x,cabe)}</div></div>`;
+}
+// Pg: dispensa da análise de inversão de fluxo (REN 1.000 art. 73-A, II) — só para microgeração (até 75 kW)
+function pgTexto(x,cabe){
+  const pg=x[17]||0,micro=Math.min(pg,75);
+  if(x[11])return `Pg ${fmt(pg,0)} kW: em MT é só referência (a dispensa da análise vale para microgeração até 75 kW).`;
+  if(pg<=0)return "";
+  if(cabe!=null&&cabe<=0)return `Mesmo sem folga estimada, até <b>${fmt(micro,0)} kW</b> a distribuidora dispensa a análise de inversão (Pg).`;
+  return `Até <b>${fmt(micro,0)} kW</b> dispensa a análise de inversão (Pg${pg>75?`; o cálculo dá ${fmt(pg,0)} kW, mas vale até 75 kW`:""}).`;
+}
 function fichaEmp(x){
   const a=(empCache[META.mun]||{a:{}}).a,temTr=x[13]&&D.some(t=>t.id===x[13]);
   return `<section><h2>Empresa</h2><div class="card"><div class="top"><span class="id">${esc(x[8]||"–")}</span><span class="pill" style="background:#8e44ec">${x[11]?"MT":"BT"}</span></div>
   <div class="base">${esc(x[9])} · ${esc(a[x[4]]||"")} (CNAE ${esc(x[16])})</div>
-  <dl><dt>Consumo médio (12 meses)</dt><dd>${fmt(x[2],0)} kWh/mês</dd><dt>Pg sem análise de inversão</dt><dd><b>${fmt(x[17],0)} kW</b></dd>
+  <dl><dt>Consumo médio (12 meses)</dt><dd><b>${fmt(x[2],0)} kWh/mês</b></dd>
   <dt>Sistema FV p/ zerar consumo</dt><dd>${fmt(x[3])} kWp</dd>
   <dt>Classe · grupo</dt><dd>${esc(x[5])} · ${esc(x[10])}</dd>${x[15]!=null?`<dt>Demanda contratada</dt><dd>${fmt(x[15],0)} kW</dd>`:""}
-  <dt>GD</dt><dd>${x[6]===3?"<b>Tem GD</b>":esc(GDR[x[6]])}${gdsDe(x).filter(g=>g[4]===0).length?` · ${fmt(gdsDe(x).filter(g=>g[4]===0).reduce((s,g)=>s+g[2],0),1)} kW`:""}</dd><dt>Rede comporta o sistema</dt><dd>${RED[x[7]]}</dd>
-  <dt>Horas sem energia no ano</dt><dd>${fmt(x[12])} h</dd><dt>Trafo · alimentador</dt><dd>${esc(x[13]||"–")} · ${esc(x[14]||"–")}</dd></dl>
+  <dt>GD</dt><dd>${x[6]===3?"<b>Tem GD</b>":esc(GDR[x[6]])}${gdsDe(x).filter(g=>g[4]===0).length?` · ${fmt(gdsDe(x).filter(g=>g[4]===0).reduce((s,g)=>s+g[2],0),1)} kW`:""}</dd>
+  <dt>Horas sem energia no ano</dt><dd>${fmt(x[12])} h</dd></dl>
+  ${graficoConsumo(x[19])}
+  ${redeEmp(x)}
   <div class="links"><a href="https://www.google.com/maps?q=${x[0]},${x[1]}" target="_blank" rel="noopener">Abrir no Google Maps</a>
   <a class="gsat" href="${gSat(x[0],x[1])}" target="_blank" rel="noopener">Satélite no Google</a>
   ${temTr?`<button class="ghost" data-tr="${esc(x[13])}">Ver trafo</button>`:""}</div>
@@ -1127,6 +1172,9 @@ function sugestoes(){
       tp:fmtK(t.kva)+" kVA · "+esc(META.munNome.split(",")[0]),f:()=>{qEl.value="";fecharSug();abrir(t)}}));
     [...new Set(D.map(t=>t.alim).filter(a=>a&&a.toUpperCase().includes(up)))].slice(0,3).forEach(a=>it.push({ic:"⚡",h:"Alimentador "+marca(a),
       tp:esc(META.titulo||""),f:()=>{qEl.value="";fecharSug();aba("C");alimEl.value=a;sel=null;ponto=null;resumoFiltros();desenhar();render();ajustar()}}))}
+  const ec=META.mun&&empCache[META.mun];
+  if(ec&&ec.e&&q.length>=3)ec.e.filter(x=>semAc(x[8]||"").includes(q)).sort((a,b)=>b[2]-a[2]).slice(0,5).forEach(x=>it.push({ic:"◆",h:"Empresa · "+marca(x[8]||""),
+    tp:fmt(x[2],0)+" kWh/mês",f:()=>{qEl.value="";fecharSug();if(!$("empOn").checked){$("empOn").checked=true;empMexeu=true;desenharEmp()}selEmp(x)}}));
   if(!c&&q.length>=4)it.push({ic:"⌕",h:`Buscar o endereço “${esc(txt)}”`,tp:"endereço",f:()=>{fecharSug();buscarEndereco(txt)}});
   sugItens=it;sugIdx=it.length?0:-1;
   sugEl.innerHTML=it.length?it.map((x,i)=>`<li role="option" id="sug${i}" aria-selected="${i===0}"><span class="ic" aria-hidden="true">${x.ic}</span><span>${x.h}</span>${x.tp?`<span class="tp">${x.tp}</span>`:""}</li>`).join("")
@@ -1291,7 +1339,7 @@ function medCfg(){
     C:+$("medC").value||0,L:+$("medL").value||0,mg:Math.max(0,+$("medMg").value||0)};
 }
 // esboço dos módulos dentro do contorno (projeção local em metros, alinhado ao maior lado)
-// telhado: módulos em pé, colados (2 cm), com a queda perpendicular ao maior lado
+// telhado: módulos em pé, 5 cm entre eles, com a queda perpendicular ao maior lado
 // solo: mesas de 2 linhas de módulos em pé, inclinadas, com passo (centro a centro) entre mesas
 function medLayout(pts,c){
   const la0=pts[0][0],lo0=pts[0][1],kx=111320*Math.cos(la0*Math.PI/180),ky=110540;
@@ -1306,7 +1354,7 @@ function medLayout(pts,c){
   const cabe=(x,y,w,h)=>[[x,y],[x+w,y],[x+w,y+h],[x,y+h],[x+w/2,y+h/2]].every(([a,b])=>dentro(a,b)&&borda(a,b)>=c.mg-1e-6);
   const ci=Math.cos(ang),sn=Math.sin(ang),volta=([x,y])=>{const X=x*ci-y*sn,Y=x*sn+y*ci;return [la0+Y/ky,lo0+X/kx]};
   const ret=(x,y,w,h)=>[[x,y],[x+w,y],[x+w,y+h],[x,y+h]].map(volta);
-  const mods=[],mesas=[],LIM=150000,gap=0.02,w=c.L;
+  const mods=[],mesas=[],LIM=150000,gap=0.05,w=c.L;   // 5 cm entre módulos
   if(!(c.C>0&&w>0))return {mods,mesas,n:0};
   if(c.tipo==="solo"){
     const h=c.C*Math.cos(c.incS*Math.PI/180),prof=2*h+gap,passo=Math.max(c.passo,prof);
@@ -1349,7 +1397,7 @@ function medRender(){
     return {i,a,plano:m.area,per:m.per,ret:m.ret,n:lay.n,mesas:lay.mesas.length,cheio:lay.cheio}});
   const kwp=nTot*w/1000,um=linhas.length===1?linhas[0]:null;
   el.innerHTML=`<section><h2>${solo?"Terreno":linhas.length>1?linhas.length+" telhados":"Telhado"}</h2><div class="card">
-   <div><div class="base">${solo?"Área do terreno":"Área "+(linhas.length>1?"somada ":"")+"(com inclinação de "+inc+"°)"}</div><div class="medGrande">${fmt(aTot,1)} <small>m²</small></div></div>
+   <div><div class="base">${solo?"Área do terreno":"Área do telhado"+(linhas.length>1?" (somada)":"")}</div><div class="medGrande">${fmt(aTot,1)} <small>m²</small></div></div>
    <dl>${um?`<dt>Perímetro</dt><dd>${fmt(um.per,1)} m</dd><dt>Medidas (retângulo envolvente)</dt><dd>${fmt(um.ret.c,1)} × ${fmt(um.ret.l,1)} m</dd>`
      :linhas.map(l=>`<dt>Telhado ${l.i+1}</dt><dd>${fmt(l.a,1)} m² · ${l.n} módulos</dd>`).join("")}</dl></div></section>
    <section><h2>Sistema que cabe (pelo esboço)</h2><div class="card">
@@ -1363,7 +1411,7 @@ function medRender(){
    <button type="button" class="ghost" id="medEdita">${med.editando||med.modo==="desenho"?"Parar de editar":"Ajustar cantos"}</button>
    <button type="button" class="ghost" id="medCopia">Copiar medidas</button></div>
    <p class="hint">${solo?`Esboço de mesas com 2 linhas de módulos em pé, inclinadas ${fmt(c.incS,0)}°, a ${fmt(c.passo,1)} m entre centros, afastadas ${fmt(c.mg,1)} m da divisa.`
-     :`Esboço com os módulos em pé, alinhados ao maior lado do telhado, afastados ${fmt(c.mg,1)} m das bordas.`}
+     :`Esboço com os módulos em pé, alinhados ao maior lado do telhado, afastados ${fmt(c.mg,1)} m das bordas (telhado considerado com ${c.inc}° de inclinação).`}
    É uma estimativa: sombras, orientação e obstáculos mudam o resultado. Geração pela média do RS (~1.150 kWh/kWp por ano).</p></div></section>`;
   $("medEdita").onclick=()=>{if(med.modo==="desenho")medModo("pronto",true);else{med.editando=!med.editando;medDesenhar();medRender()}};
   $("medCopia").onclick=()=>{const t=`${solo?"Terreno":"Telhado"}: ${fmt(aTot,1)} m². Cabem ${nTot} módulos de ${w} W = ${fmt(kwp,2)} kWp (~${fmt(kwp*1150/12,0)} kWh/mês).`;

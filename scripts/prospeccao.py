@@ -260,7 +260,8 @@ def salvar_site_emp(emp, site):
     """dados/emp/<código IBGE>.json: {"a": {divisão: nome}, "e": [[lat, lon, kWh/mês, kWp, divisão, classe,
     gd, rede, endereço, bairro, grupo, mt, DIC, trafo, alimentador, demanda contratada, CNAE, Pg, GDs], ...]}
     gd: 0 sem GD, 1 GD por perto não confirmada, 3 tem GD (certo) · rede: 0 sem dado, 1 não, 2 parcial, 3 sim
-    GDs: [[lat, lon, kW, mt, relação, distância m, nº]] (ver gd_da_empresa); vazio quando não há"""
+    GDs: [[lat, lon, kW, mt, relação, distância m, nº]] (ver gd_da_empresa); vazio quando não há
+    consumo: [kWh de jan, fev, ..., dez] (ENE_01..12 da base PJ, data-base da BDGD)"""
     pasta = Path(site) / "dados" / "emp"
     pasta.mkdir(parents=True, exist_ok=True)
     emp = emp.dropna(subset=["Latitude", "Longitude"])
@@ -276,12 +277,12 @@ def salvar_site_emp(emp, site):
         "dic": emp["Horas sem energia no ano (DIC)"].round(1),
         "tr": emp.get("Trafo", pd.Series("", index=emp.index)).fillna(""), "al": emp["Alimentador"].fillna(""),
         "dem": emp.get("Demanda contratada (kW)", pd.Series(np.nan, index=emp.index)), "cnae": emp["CNAE"],
-        "gdl": emp["_gdl"]})
+        "gdl": emp["_gdl"], "ene": emp["_ene"]})
     n = 0
     for mun, g in linhas.groupby("mun"):
         divs = sorted(set(g["div"]) - {""})
         e = [[r.lat, r.lon, int(r.kwh), r.kwp, r.div, r.cls, int(r.gd), int(r.rede), r.end, r.brr, r.gru,
-              int(r.mt), r1(r.dic), r.tr, r.al, r1(r.dem, 0), r.cnae, int(r.pg), r.gdl or []]
+              int(r.mt), r1(r.dic), r.tr, r.al, r1(r.dem, 0), r.cnae, int(r.pg), r.gdl or [], r.ene]
              for r in g.itertuples(index=False)]
         d = {"a": {k: CNAE_DIV.get(k, k) for k in divs}, "e": e}
         (pasta / f"{mun}.json").write_text(json.dumps(d, ensure_ascii=False, separators=(",", ":")), encoding="utf-8")
@@ -395,6 +396,7 @@ def main():
         out["Longitude"] = pd.to_numeric(d["POINT_X"], errors="coerce")
         texto, codigo, lista = info_gd(d)
         out["GD"], out["_gd"], out["_gdl"] = texto, codigo, lista
+        out["_ene"] = [[int(round(v)) for v in linha] for linha in E.to_numpy()]   # consumo jan..dez (kWh)
         out["Google Maps"] = [f"https://www.google.com/maps?q={la:.6f},{lo:.6f}" if pd.notna(la) else ""
                               for la, lo in zip(out["Latitude"], out["Longitude"])]
         return out.sort_values("Consumo anual (kWh)", ascending=False)
@@ -485,7 +487,7 @@ def main():
     with pd.ExcelWriter(arq, engine="openpyxl") as w:
         for nome, tab in (("Empresas BT", e_bt), ("Empresas MT", e_mt), ("Bairros", bai),
                           ("Atividades", atv), ("Municípios", mun), ("Leia-me", leiame)):
-            tab = tab.drop(columns=[c for c in ("_gd", "_gdl") if c in tab.columns])
+            tab = tab.drop(columns=[c for c in ("_gd", "_gdl", "_ene") if c in tab.columns])
             for c in tab.columns:          # caracteres de controle (cadastro com erro) que o Excel não aceita
                 if not pd.api.types.is_numeric_dtype(tab[c]):
                     tab[c] = tab[c].map(lambda v: ILEGAL.sub("", v) if isinstance(v, str) else v)
