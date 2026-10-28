@@ -1308,6 +1308,21 @@ body.medindo .leaflet-control.legenda,body.medindo .leaflet-control.legAlimC{dis
     </div>
     <div class="scroll" id="infoEmp"></div>
   </section>
+  <section class="aba" id="abaG" role="tabpanel" aria-labelledby="tabG" hidden>
+    <div class="painel">
+      <p class="pergunta">GDs existentes</p>
+      <p class="hint">Geração distribuída já ligada em todo o estado. Local = ponto de conexão na BDGD (poste ou estrutura); potência, classe e modalidade = base de GD da ANEEL. Cor = faixa de potência (a legenda filtra). O mapa mostra as maiores de cada área; aproxime para ver as pequenas.</p>
+      <details class="menu filtroDist" data-aba="G"><summary>Distribuidoras <span class="base"></span></summary>
+        <div class="acoes"><button type="button" class="ghost" data-dist-todas>Todas</button><button type="button" class="ghost" data-dist-nenhuma>Nenhuma</button></div>
+        <div class="dlist"></div></details>
+      <div class="row"><label for="gdTen">Rede</label><select id="gdTen"><option value="">BT e MT</option><option value="0">BT</option><option value="1">MT</option></select>
+        <label for="gdMod">Modalidade</label><select id="gdMod"><option value="">Todas</option></select></div>
+      <div class="row"><label for="gdCl">Classe</label><select id="gdCl"><option value="">Todas</option></select>
+        <label for="gdAno">Ligada desde</label><select id="gdAno"><option value="">qualquer ano</option><option value="2026">2026</option><option value="2025">2025</option><option value="2024">2024</option><option value="2023">2023</option><option value="2022">2022</option><option value="2021">2021</option><option value="2020">2020</option><option value="2019">2019</option><option value="2018">2018</option><option value="2017">2017</option><option value="2016">2016</option><option value="2015">2015</option><option value="2014">2014</option><option value="2013">2013</option><option value="2012">2012</option></select></div>
+      <button type="button" class="ghost" id="gdCsv">Baixar lista (CSV)</button>
+    </div>
+    <div class="scroll" id="infoGd"></div>
+  </section>
   <section class="aba" id="abaM" role="tabpanel" aria-labelledby="tabM" hidden>
     <div class="painel">
       <p class="pergunta">Medir telhado ou terreno</p>
@@ -1439,6 +1454,7 @@ caixa("topleft","abasMapa",`<nav class="tabs" role="tablist" aria-label="Seçõe
   <button type="button" role="tab" id="tabC" data-tab="C" aria-selected="false" aria-controls="abaC">Consultar</button>
   <button type="button" role="tab" id="tabP" data-tab="P" aria-selected="false" aria-controls="abaP" hidden>Prospectar</button>
   <button type="button" role="tab" id="tabI" data-tab="I" aria-selected="false" aria-controls="abaI" hidden>Usinas</button>
+  <button type="button" role="tab" id="tabG" data-tab="G" aria-selected="false" aria-controls="abaG" hidden>GDs</button>
   <button type="button" role="tab" id="tabM" data-tab="M" aria-selected="false" aria-controls="abaM">Medir</button>
   <button type="button" role="tab" id="tabS" data-tab="S" aria-selected="false" aria-controls="abaS">Sobre</button></nav>`);
 caixa("bottomright","mapbox",`<b>Dados de ${esc(META.base)}</b> · estimativa para triagem`);
@@ -1906,7 +1922,7 @@ function baixarCsvEst(){
 let INV=null,invVis=[],invN=30,invErro=false,ALIM=null;
 const invLayer=L.layerGroup().addTo(map);
 // filtro de distribuidoras (Prospectar e Usinas): conjunto das desmarcadas
-const distOff={P:new Set(),I:new Set()};
+const distOff={P:new Set(),I:new Set(),G:new Set()};
 function montarFiltroDist(){
   document.querySelectorAll(".filtroDist").forEach(el=>{const k=el.dataset.aba;
     if(!META.dists){el.hidden=true;return}
@@ -1920,7 +1936,78 @@ function montarFiltroDist(){
 }
 function resumoDist(k){const el=document.querySelector(`.filtroDist[data-aba="${k}"]`);if(!el||!META.dists)return;
   const n=META.dists.length,on=n-distOff[k].size;el.querySelector("summary .base").textContent=on===n?"· todas":`· ${on} de ${n}`}
-function aoMudarDist(k){resumoDist(k);if(k==="P"){empSel=null;desenharEmp()}else{invN=30;desenhar();render()}}
+function aoMudarDist(k){resumoDist(k);if(k==="P"){empSel=null;desenharEmp()}else if(k==="G"){gdSel=null;desenharGd()}else{invN=30;desenhar();render()}}
+// ---- aba GDs: geração distribuída existente (dados/gd_estado.json de cada distribuidora)
+// linha: [lat, lon, kW, mt, classe, modalidade, ano−2000, fonte, distribuidora]
+const FAIXAS_GD=[{min:1000,cor:"#7f1d1d",t:"1 MW ou mais"},{min:75,cor:"#dc2626",t:"75 kW a 1 MW"},{min:30,cor:"#f97316",t:"30 a 75 kW"},
+  {min:10,cor:"#eab308",t:"10 a 30 kW"},{min:-Infinity,cor:"#fde047",t:"até 10 kW"}];
+const faixaGd=r=>FAIXAS_GD.findIndex(f=>r[2]>=f.min),gdOff=new Set();
+let GDE=null,gdErro=false,gdVis=[],gdTela=0,gdCarregando=null,gdSel=null,geracaoGd=0,GDN={cl:[],mo:[],fo:[]};const GD_MAX=4000;
+const gdLayer=L.layerGroup().addTo(map);
+const legGdCtl=caixa("bottomright","mapbox legAlimC legGdC","");legGdCtl.getContainer().hidden=true;
+function carregarGd(){
+  if(GDE||gdErro)return Promise.resolve();if(gdCarregando)return gdCarregando;
+  $("infoGd").innerHTML=`<p class="hint">Carregando as GDs do estado…</p>`;
+  gdCarregando=(async()=>{try{const fontes=META.dists||[{k:"",p:""}];
+    const partes=await Promise.all(fontes.map(async ds=>{try{const r=await fetch(`${BASE}${ds.p}dados/gd_estado.json`);if(!r.ok)return [];
+      const d=await r.json();if(d.cl)GDN=d;d.g.forEach(x=>{x[7]=x[7]||0;x[8]=ds.k});return d.g}catch(e){return []}}));
+    GDE=partes.flat().sort((a,b)=>b[2]-a[2]);
+    for(const [id,lista] of [["gdMod",GDN.mo],["gdCl",GDN.cl]]){const el=$(id);el.length=1;lista.forEach((t,i)=>{const o=document.createElement("option");o.value=i;o.textContent=t;el.append(o)})}
+  }catch(e){gdErro=true}})();
+  return gdCarregando;
+}
+function gdFiltro(semCor){
+  const ten=$("gdTen").value,mo=$("gdMod").value,cl=$("gdCl").value,ano=$("gdAno").value;
+  return GDE.filter(r=>(ten===""||r[3]===+ten)&&(mo===""||r[5]===+mo)&&(cl===""||r[4]===+cl)&&(ano===""||r[6]+2000>=+ano)
+    &&!distOff.G.has(r[8])&&(semCor||!gdOff.has(faixaGd(r))));
+}
+async function desenharGd(){
+  const g=++geracaoGd;gdLayer.clearLayers();
+  if(!META.muns||abaAtual!=="G"){legGdCtl.getContainer().hidden=true;return}
+  await carregarGd();if(g!==geracaoGd)return;gdLayer.clearLayers();if(!GDE||abaAtual!=="G"){renderGd();return}
+  const base0=gdFiltro(true),n=FAIXAS_GD.map(()=>0),kwF=FAIXAS_GD.map(()=>0);base0.forEach(r=>{const i=faixaGd(r);n[i]++;kwF[i]+=r[2]});
+  const el=legGdCtl.getContainer();el.hidden=false;
+  el.innerHTML=gdLegHtml=`<div class="legAlim"><b>GDs por potência</b>${FAIXAS_GD.map((f,i)=>`<label><input type="checkbox" data-gdf="${i}" ${gdOff.has(i)?"":"checked"}><i style="background:${f.cor}"></i>${f.t}<span class="n">${n[i].toLocaleString("pt-BR")}</span></label>`).join("")}</div>`;
+  gdVis=base0.filter(r=>!gdOff.has(faixaGd(r)));
+  const b=map.getBounds().pad(.05),tela=gdVis.filter(r=>b.contains([r[0],r[1]]));gdTela=tela.length;const z=map.getZoom();
+  tela.slice(0,GD_MAX).forEach(r=>{const i=faixaGd(r),m=L.circleMarker([r[0],r[1]],{radius:Math.max(2.5,([9,7,6,5,4][i]+(z>=14?1:0))*(z<9?.55:z<11?.8:1)),color:"#451a03",weight:z<10?.4:1,fillColor:FAIXAS_GD[i].cor,fillOpacity:.9});
+    m.bindTooltip(()=>dicaGd(r),{direction:"top",offset:[0,-6]});m.on("click",e=>{L.DomEvent.stopPropagation(e);gdSel=r;abrirPainel();desenharGd()});gdLayer.addLayer(m)});
+  if(gdSel)L.circleMarker([gdSel[0],gdSel[1]],{radius:13,color:"#111827",weight:3,fill:false,interactive:false}).addTo(gdLayer);
+  renderGd();
+}
+let gdLegHtml="";
+function dicaGd(r){
+  return `<b>GD ${fmt(r[2],r[2]<10?1:0)} kW</b> (${r[3]?"MT":"BT"})<br>${esc(GDN.cl[r[4]]||"")} · ${esc(GDN.mo[r[5]]||"")}<br>
+  ${esc(GDN.fo[r[7]]||"")}${r[6]?` · ligada em ${2000+r[6]}`:""}${META.dists?"<br>"+esc(nomeDist(r[8])):""}`;
+}
+function renderGd(){
+  const el=$("infoGd");if(!el)return;
+  if(gdErro){el.innerHTML=`<p class="msg">Não consegui carregar as GDs. Tente recarregar a página.</p>`;return}
+  if(!GDE){return}
+  const kw=gdVis.reduce((s,r)=>s+r[2],0),mt=gdVis.filter(r=>r[3]).length,rem=gdVis.filter(r=>r[5]===1).length;
+  let h="";
+  if(gdSel){const r=gdSel,aqui=GDE.filter(x=>x[0]===r[0]&&x[1]===r[1]),tot=aqui.reduce((s,x)=>s+x[2],0);
+    h+=`<section><h2>GD</h2><div class="card"><div class="top"><span class="id">${fmt(r[2],r[2]<10?1:0)} kW</span><span class="pill" style="background:${FAIXAS_GD[faixaGd(r)].cor};color:#111">${r[3]?"MT":"BT"}</span></div>
+    <dl><dt>Classe</dt><dd>${esc(GDN.cl[r[4]]||"–")}</dd><dt>Modalidade</dt><dd>${esc(GDN.mo[r[5]]||"–")}</dd>
+    <dt>Fonte</dt><dd>${esc(GDN.fo[r[7]]||"–")}</dd><dt>Ligada em</dt><dd>${r[6]?2000+r[6]:"–"}</dd>
+    ${META.dists?`<dt>Distribuidora</dt><dd>${esc(nomeDist(r[8]))}</dd>`:""}
+    ${aqui.length>1?`<dt>Neste mesmo ponto</dt><dd>${aqui.length} GDs · ${fmt(tot,1)} kW</dd>`:""}</dl>
+    <div class="links"><a href="https://www.google.com/maps?q=${r[0]},${r[1]}" target="_blank" rel="noopener">Abrir no Google Maps</a>
+    <a class="gsat" href="${gSat(r[0],r[1])}" target="_blank" rel="noopener">Satélite no Google</a></div>
+    <div class="base">O local é o poste ou a estrutura de conexão (não o telhado). Coordenada aproximada (~10 m).</div></div></section>`}
+  h+=`<section><h2>GDs · ${META.dists?"Rio Grande do Sul":esc(META.titulo||"")}${distOff.G.size?` · ${META.dists.length-distOff.G.size} de ${META.dists.length} distribuidoras`:""}</h2>
+  <div class="stats"><div class="stat"><b>${gdVis.length.toLocaleString("pt-BR")}</b><span>GDs</span></div>
+  <div class="stat"><b>${fmt(kw/1000,1)}</b><span>MW</span></div><div class="stat"><b>${mt.toLocaleString("pt-BR")}</b><span>em MT</span></div></div>
+  <p class="hint">${gdTela>GD_MAX?`O mapa mostra as ${GD_MAX.toLocaleString("pt-BR")} maiores de ${gdTela.toLocaleString("pt-BR")} nesta área; aproxime para ver as outras. `:""}${gdVis.length?`${fmt(rem/gdVis.length*100,0)}% em autoconsumo remoto. `:""}Clique numa GD para ver os dados.</p></section>
+  <section class="legenda soCel">${gdLegHtml}</section>`;
+  el.innerHTML=h;
+}
+function baixarGd(){
+  const q=v=>`"${String(v??"").replace(/"/g,'""')}"`,cab=["Potência (kW)","Rede","Classe","Modalidade","Fonte","Ano de conexão","Distribuidora","Latitude","Longitude","Google Maps"];
+  const lin=gdVis.map(r=>[String(r[2]).replace(".",","),r[3]?"MT":"BT",GDN.cl[r[4]],GDN.mo[r[5]],GDN.fo[r[7]],r[6]?2000+r[6]:"",nomeDist(r[8])||META.titulo,r[0],r[1],`https://www.google.com/maps?q=${r[0]},${r[1]}`].map(q).join(";"));
+  const blob=new Blob(["\ufeff"+[cab.map(q).join(";"),...lin].join("\r\n")],{type:"text/csv;charset=utf-8"});
+  const l=document.createElement("a");l.href=URL.createObjectURL(blob);l.download="gds_RS.csv";l.click();setTimeout(()=>URL.revokeObjectURL(l.href),2000);
+}
 // t.d = distribuidora do local (página com várias distribuidoras carrega os locais de todas)
 const nomeMun=t=>((META.muns||[]).find(m=>m.c===t.m&&(!t.d||m.d===t.d))||{n:t.m}).n;
 const nomeDist=k=>((META.dists||[]).find(d=>d.k===k)||{n:k||""}).n;
@@ -1985,12 +2072,14 @@ function legendaAlim(lista){
 }
 // cliques nas legendas (no mapa ou, no celular, dentro do painel): mostram/escondem aquela cor
 function cliqueLegenda(e){
-  const c=e.target.closest("input[data-faixa],input[data-cls],input[data-gdc]");if(!c)return;
+  const c=e.target.closest("input[data-faixa],input[data-cls],input[data-gdc],input[data-gdf]");if(!c)return;
+  if(c.dataset.gdf!=null){const i=+c.dataset.gdf;c.checked?gdOff.delete(i):gdOff.add(i);desenharGd();return}
   if(c.dataset.faixa!=null){const i=+c.dataset.faixa;c.checked?faixaOff.delete(i):faixaOff.add(i);desenharAlim();render()}
   else if(c.dataset.cls!=null){const k=c.dataset.cls;c.checked?classeOff.delete(k):classeOff.add(k);desenhar();render()}
   else{const k=+c.dataset.gdc;c.checked?empOff.delete(k):empOff.add(k);desenharEmp()}
 }
 for(const el of [legAlimCtl.getContainer(),legCtl.getContainer(),info,infoEmp,infoInv])el.addEventListener("change",cliqueLegenda);
+for(const el of [legGdCtl.getContainer(),$("infoGd")])el.addEventListener("change",cliqueLegenda);
 function alimEscopo(){
   if(!ALIM)return [];
   return abaAtual==="I"?ALIM.filter(a=>!distOff.I.has(a.d)):ALIM;
@@ -2069,7 +2158,7 @@ async function desenharAlim(){
 // de longe só os alimentadores; os locais (círculos azuis) aparecem ao aproximar
 let tMover=null;
 map.on("zoomend moveend",()=>{clearTimeout(tMover);tMover=setTimeout(()=>{
-  if(abaAtual==="C"&&ALIM)desenharAlim();else if(abaAtual==="P")desenharEmp()},150)});
+  if(abaAtual==="C"&&ALIM)desenharAlim();else if(abaAtual==="P")desenharEmp();else if(abaAtual==="G")desenharGd()},150)});
 function dicaInv(t){
   return `<b>Usina de investimento · trafo ${esc(t.id)}</b><br>${esc(nomeMun(t))}${t.d&&META.dists?" ("+esc(nomeDist(t.d))+")":""} · ${fmt(t.kva,1)} kVA${t.f?" "+(t.f===3?"trifásico":t.f===2?"bifásico":"monofásico"):""} · 1 UC<br>
   Alimentador ${esc(t.alim||"–")}: folga <b>${fmt(t.capa,0)} kW</b><br>Trafo comporta: ${fmt(t.cap)} kW`;
@@ -2307,9 +2396,10 @@ function limparFiltros(){
     ["invKvaMin",""],["invKvaMax",""]])if($(id))$(id).value=v;
   $("empKwh").value=1000;
   for(const [id,v] of [["uc1",false],["alimOk",false],["invSemGd",true],["invTri",false],["invTr",false],["invMapa",true],["filtra",true]])if($(id))$(id).checked=v;
-  faixaOff.clear();classeOff.clear();empOff.clear();empOff.add(2);distOff.P.clear();distOff.I.clear();
-  document.querySelectorAll(".filtroDist input[data-dist]").forEach(c=>c.checked=true);resumoDist("P");resumoDist("I");
-  invN=30;limparAba();resumoFiltros();desenhar();desenharEmp();render();
+  faixaOff.clear();classeOff.clear();empOff.clear();empOff.add(2);distOff.P.clear();distOff.I.clear();distOff.G.clear();gdOff.clear();gdSel=null;
+  for(const id of ["gdTen","gdMod","gdCl","gdAno"])$(id).value="";
+  document.querySelectorAll(".filtroDist input[data-dist]").forEach(c=>c.checked=true);resumoDist("P");resumoDist("I");resumoDist("G");
+  invN=30;limparAba();resumoFiltros();desenhar();desenharEmp();desenharGd();render();
   try{history.replaceState(null,"",META.munK?"#"+META.munK:location.pathname)}catch(e){}
 }
 document.getElementById("limpaTudo").addEventListener("click",limparFiltros);
@@ -2517,23 +2607,24 @@ let empMexeu=false;
 // cada aba mostra só o que é dela: trocar de aba limpa o mapa e a seleção da anterior
 function aba(k){
   const antes=abaAtual;abaAtual=k;
-  ["C","P","I","M","S"].forEach(x=>{$("aba"+x).hidden=x!==k;$("tab"+x).setAttribute("aria-selected",x===k)});
+  ["C","P","I","G","M","S"].forEach(x=>{$("aba"+x).hidden=x!==k;$("tab"+x).setAttribute("aria-selected",x===k)});
   if(k==="M"&&antes!=="M")medEntrar();else if(antes==="M"&&k!=="M")medSair();
   if(k!==antes&&typeof invLayer!=="undefined"){limparAba();
-    if((k==="P"||k==="I")&&META.bboxAll){const b=META.bboxAll;map.fitBounds([[b[0],b[1]],[b[2],b[3]]])}   // estado todo
+    if((k==="P"||k==="I"||k==="G")&&META.bboxAll){const b=META.bboxAll;map.fitBounds([[b[0],b[1]],[b[2],b[3]]])}   // estado todo
     camadasDaAba()}
   if(k==="I"&&!INV&&!invErro&&META.muns)ligarInv();
   marcarAbas();
 }
 function limparAba(){
-  sel=null;ponto=null;if(pino){map.removeLayer(pino);pino=null}empSel=null;alimSel=null;invSel=null;msg="";
+  sel=null;ponto=null;if(pino){map.removeLayer(pino);pino=null}empSel=null;alimSel=null;invSel=null;gdSel=null;msg="";
   faixaOff.clear();rede.clearLayers();redeMt.clearLayers();alimDest.clearLayers();map.closePopup();fichaFechada=false;
 }
 function camadasDaAba(){
   const k=abaAtual,vis=(c,on)=>{if(on){if(!map.hasLayer(c))c.addTo(map)}else if(map.hasLayer(c))map.removeLayer(c)};
-  vis(capa,k==="C");vis(camAlim,k==="C");vis(alimDest,k==="C"||k==="I");vis(empLayer,k==="P");vis(invLayer,k==="I");
+  vis(capa,k==="C");vis(camAlim,k==="C");vis(alimDest,k==="C"||k==="I");vis(empLayer,k==="P");vis(invLayer,k==="I");vis(gdLayer,k==="G");
   vis(rede,k==="C"||k==="P"||k==="I");vis(redeMt,k==="P"||k==="I");
-  legEmpCtl.getContainer().hidden=k!=="P";if(k!=="C"&&k!=="I")legAlimCtl.getContainer().hidden=true;
+  legEmpCtl.getContainer().hidden=k!=="P";legGdCtl.getContainer().hidden=k!=="G";if(k!=="C"&&k!=="I")legAlimCtl.getContainer().hidden=true;
+  if(k==="G")desenharGd();
   desenhar();desenharEmp();render();
 }
 // botões das seções no alto do mapa: abrem o painel naquela seção; tocar de novo na seção aberta fecha
@@ -2578,7 +2669,9 @@ munBusca.addEventListener("blur",()=>setTimeout(()=>{fecharMuns();munBusca.value
 const [hMun,hTr,hKw]=location.hash.slice(1).split("/").map(s=>{try{return decodeURIComponent(s)}catch(e){return s}});
 if(hKw&&+hKw>0){potEl.value=+hKw;filtraRow.hidden=false}
 if(META.muns){
-  $("tabP").hidden=false;$("tabI").hidden=false;$("btInv").hidden=false;
+  $("tabP").hidden=false;$("tabI").hidden=false;$("tabG").hidden=false;
+  ["gdTen","gdMod","gdCl","gdAno"].forEach(i=>$(i).addEventListener("change",()=>{gdSel=null;desenharGd()}));
+  $("gdCsv").addEventListener("click",()=>{if(GDE)baixarGd()});$("btInv").hidden=false;
   $("btInv").onclick=()=>{aba("I");abrirPainel();topoPainel()};
   ["invTr","invTri","invSemGd","invAlim","invMapa","invKvaMin","invKvaMax"].forEach(i=>$(i).addEventListener("change",()=>{invN=30;desenhar();render()}));
   montarFiltroDist();

@@ -46,6 +46,11 @@ nem sempre programadores: explique resultados em linguagem simples.
   `scripts/emp_estado.py` a partir de `dados/emp/` — rode depois do `prospeccao.py`); o mapa desenha
   as 4.000 maiores da área visível. Ao clicar, a ficha vem do arquivo do município (`índice`).
   A GD das empresas é filtrada pela legenda (sem GD / por perto / tem GD; "tem GD" começa desligado).
+- **Aba GDs:** GDs existentes de todo o estado, com filtro de distribuidoras, rede, modalidade, classe e
+  ano, e legenda por faixa de potência. Lê `<pasta>dados/gd_estado.json` (gerado por `scripts/gd_estado.py
+  BDGD.zip gd.parquet <pasta>dados`): local = PN_CON → PONNOT (poste/estrutura, 4 casas ≈ 10 m);
+  potência/classe/modalidade/fonte = base de GD da ANEEL pelo CEG_GD. O mapa desenha as 4.000 maiores
+  da área visível. Não há medição horária pública de alimentador ou trafo (só energia mensal).
 - **Aba Medir:** só desenho à mão. Telhado (vários telhados somados, módulos em pé alinhados ao maior
   lado) ou Solo (mesas de 2 linhas de módulos, passo centro a centro editável, padrão 6 m).
   O resultado é a contagem do esboço (`medLayout`). Os contornos de prédios (`dados/edif/`) não são
