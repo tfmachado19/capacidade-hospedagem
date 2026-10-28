@@ -1075,6 +1075,7 @@ aside::-webkit-scrollbar{width:10px}aside::-webkit-scrollbar-thumb{background:va
 #q{flex:1}
 #pot{width:84px;flex:none;border-left:1px solid var(--line);padding-left:10px;font-family:var(--mono)}
 .bm-linha button{padding:9px 14px;flex:none}
+#limpaTudo{display:flex;align-items:center;gap:5px;padding:9px 11px}
 .leaflet-control.buscaMapa{z-index:1001}
 .buscaMapa:focus-within .bm-linha{border-color:var(--accent);box-shadow:0 0 0 2px var(--accent),0 2px 10px rgba(0,0,0,.22)}
 #sugLista{position:absolute;z-index:1000;left:0;right:0;top:calc(100% + 4px);margin:0;padding:4px 0;list-style:none;background:var(--panel);
@@ -1196,7 +1197,7 @@ details.mais[open] summary{margin-bottom:6px}
   .dica{max-width:220px;font-size:13px}
   .toggle{display:inline-block}
   .buscaMapa{width:calc(100vw - 76px)}
-  #pot{width:64px}.bm-linha button{padding:9px 10px}
+  #pot{width:64px}.bm-linha button{padding:9px 10px}#limpaTudo span{display:none}
   header{padding:12px max(16px,env(safe-area-inset-left,0px)) 10px max(16px,env(safe-area-inset-right,0px))}
   .scroll{padding-left:16px;padding-right:16px}
 }
@@ -1432,7 +1433,8 @@ caixa("topleft","buscaMapa",`<form id="f" role="search" autocomplete="off"><div 
   <input id="q" type="search" placeholder="Cidade, endereço, coordenada ou trafo" aria-label="Buscar cidade, endereço, coordenada, trafo ou alimentador"
     role="combobox" aria-expanded="false" aria-controls="sugLista" aria-autocomplete="list" spellcheck="false">
   <input id="pot" type="number" min="0" step="0.1" placeholder="kW" aria-label="Potência pretendida (kW)" inputmode="decimal">
-  <button type="submit">Buscar</button></div><ul id="sugLista" role="listbox" aria-label="Sugestões" hidden></ul></form>`);
+  <button type="submit">Buscar</button>
+  <button type="button" class="ghost" id="limpaTudo" title="Limpar busca e filtros"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true"><path d="M3 12a9 9 0 1 0 3-6.7"/><path d="M3 4v5h5"/></svg><span>Limpar</span></button></div><ul id="sugLista" role="listbox" aria-label="Sugestões" hidden></ul></form>`);
 caixa("topleft","abasMapa",`<nav class="tabs" role="tablist" aria-label="Seções">
   <button type="button" role="tab" id="tabC" data-tab="C" aria-selected="false" aria-controls="abaC">Consultar</button>
   <button type="button" role="tab" id="tabP" data-tab="P" aria-selected="false" aria-controls="abaP" hidden>Prospectar</button>
@@ -1839,7 +1841,7 @@ function empFiltro(d,semCor){
   return d.e.filter(x=>x[2]>=kmin&&(!atv||x[4]===atv)&&(ten===""||x[11]===+ten)&&(gd===""||(gd==="c"?x[6]===3:x[6]<=+gd))&&(rd===""||x[7]>=+rd)
     &&(semCor||!empOff.has(grupoGd(x))));
 }
-// linha do estado: [lat, lon, kWh/mês, divisão, gd, rede, mt, município, índice no arquivo do município, endereço, distribuidora]
+// linha do estado: [lat, lon, kWh/mês, divisão, gd, rede, mt, município, índice no arquivo do município, endereço, Pg kW, distribuidora]
 let EST=null,estErro=false,estVis=[],estTela=0,estCarregando=null;const EST_MAX=4000;
 const grupoEst=r=>r[4]===3?2:(r[4]>0?1:0);
 function carregarEst(){
@@ -1859,7 +1861,7 @@ let estNomes={};
 function estFiltro(semCor){
   const atv=$("empAtv").value,kmin=Math.max(1000,+$("empKwh").value||0),ten=$("empTen").value,gd=$("empGd").value,rd=$("empRede").value;
   return EST.filter(r=>r[2]>=kmin&&(!atv||r[3]===atv)&&(ten===""||r[6]===+ten)&&(gd===""||(gd==="c"?r[4]===3:r[4]<=+gd))&&(rd===""||r[5]>=+rd)
-    &&!distOff.P.has(r[10])&&(semCor||!empOff.has(grupoEst(r))));
+    &&!distOff.P.has(r[11])&&(semCor||!empOff.has(grupoEst(r))));
 }
 let geracaoEmp=0;
 async function desenharEmp(){
@@ -1879,20 +1881,23 @@ async function desenharEmp(){
   if(empSel){const x=empSel;L.circleMarker([x[0],x[1]],{radius:9,color:"#8e44ec",weight:3,fill:false,interactive:false}).addTo(empLayer)}
   render();
 }
+// Pg na etiqueta: dispensa da análise de inversão só vale para microgeração (até 75 kW)
+function pgDica(pg,mt){if(pg==null)return "";
+  return mt?`Pg ${fmt(pg,0)} kW (MT: só referência)<br>`:`Pg sem análise de inversão: <b>${fmt(Math.min(pg,75),0)} kW</b>${pg>75?` (cálculo ${fmt(pg,0)} kW; vale até 75)`:""}<br>`}
 function dicaEst(r){
-  return `<b>${esc(r[9]||"–")}</b> (${r[6]?"MT":"BT"})<br>${esc(nomeMun({m:r[7],d:r[10]}))}${META.dists?" · "+esc(nomeDist(r[10])):""}<br>${esc(estNomes[r[3]]||"")}<br>
-  Consumo médio: <b>${fmt(r[2],0)} kWh/mês</b><br>GD: ${GDR[r[4]]} · Rede comporta: ${RED[r[5]]}`;
+  return `<b>${esc(r[9]||"–")}</b> (${r[6]?"MT":"BT"})<br>${esc(nomeMun({m:r[7],d:r[11]}))}${META.dists?" · "+esc(nomeDist(r[11])):""}<br>${esc(estNomes[r[3]]||"")}<br>
+  Consumo médio: <b>${fmt(r[2],0)} kWh/mês</b><br>${pgDica(r[10],r[6])}GD: ${GDR[r[4]]} · Rede comporta: ${RED[r[5]]}`;
 }
 // abre a ficha completa: carrega o município da empresa (trafos e empresas) e mostra a empresa
 async function abrirEmpEst(r){
-  const k=(r[10]?r[10]+":":"")+r[7];
+  const k=(r[11]?r[11]+":":"")+r[7];
   if(k!==META.munK)await carregarMun(k,false);
   const d=await dadosEmp(),x=d&&d.e[r[8]];if(x){selEmp(x);desenharEmp()}
 }
 function baixarCsvEst(){
   const q=v=>`"${String(v??"").replace(/"/g,'""')}"`;
-  const cab=["Endereço","Município","Distribuidora","Atividade","Rede","Consumo médio 12 meses (kWh/mês)","GD","Rede comporta","Latitude","Longitude","Google Maps"];
-  const lin=estVis.map(r=>[r[9],nomeMun({m:r[7],d:r[10]}),nomeDist(r[10])||META.titulo,estNomes[r[3]]||"",r[6]?"MT":"BT",r[2],GDR[r[4]],RED[r[5]],r[0],r[1],`https://www.google.com/maps?q=${r[0]},${r[1]}`].map(q).join(";"));
+  const cab=["Endereço","Município","Distribuidora","Atividade","Rede","Consumo médio 12 meses (kWh/mês)","Pg sem análise de inversão (kW)","GD","Rede comporta","Latitude","Longitude","Google Maps"];
+  const lin=estVis.map(r=>[r[9],nomeMun({m:r[7],d:r[11]}),nomeDist(r[11])||META.titulo,estNomes[r[3]]||"",r[6]?"MT":"BT",r[2],r[10]??"",GDR[r[4]],RED[r[5]],r[0],r[1],`https://www.google.com/maps?q=${r[0]},${r[1]}`].map(q).join(";"));
   const blob=new Blob(["\ufeff"+[cab.map(q).join(";"),...lin].join("\r\n")],{type:"text/csv;charset=utf-8"});
   const l=document.createElement("a");l.href=URL.createObjectURL(blob);l.download="prospeccao_RS.csv";l.click();setTimeout(()=>URL.revokeObjectURL(l.href),2000);
 }
@@ -2111,7 +2116,7 @@ function dicaTrafo(t){
 function dicaEmp(x){
   const a=(empCache[META.mun]||{a:{}}).a;
   return `<b>${esc(x[8]||"–")}</b> (${x[11]?"MT":"BT"})<br>${esc(x[9])} · ${esc(a[x[4]]||"")}<br>
-  Consumo médio 12 meses: <b>${fmt(x[2],0)} kWh</b><br>Pg sem análise de inversão: <b>${fmt(x[17],0)} kW</b><br>
+  Consumo médio 12 meses: <b>${fmt(x[2],0)} kWh</b><br>${pgDica(x[17],x[11])}
   GD: ${GDR[x[6]]} · Rede comporta: ${RED[x[7]]}`;
 }
 // computador: painel no topo; celular: rola a gaveta até a resposta/ficha da aba aberta
@@ -2250,8 +2255,8 @@ function sugestoes(){
       tp:fmtK(t.kva)+" kVA · "+esc(META.munNome.split(",")[0]),f:()=>{qEl.value="";fecharSug();abrir(t)}}));
     [...new Set(D.map(t=>t.alim).filter(a=>a&&a.toUpperCase().includes(up)))].slice(0,3).forEach(a=>it.push({ic:"⚡",h:"Alimentador "+marca(a),
       tp:esc(META.titulo||""),f:()=>{qEl.value="";fecharSug();aba("C");alimEl.value=a;sel=null;ponto=null;resumoFiltros();desenhar();render();ajustar()}}))}
-  if(EST&&q.length>=3){let n=0;for(const r of EST){if(n>=5)break;if(!distOff.P.has(r[10])&&semAc(r[9]||"").includes(q)){n++;
-    it.push({ic:"◆",h:"Empresa · "+marca(r[9]||""),tp:esc(nomeMun({m:r[7],d:r[10]}))+" · "+fmt(r[2],0)+" kWh/mês",
+  if(EST&&q.length>=3){let n=0;for(const r of EST){if(n>=5)break;if(!distOff.P.has(r[11])&&semAc(r[9]||"").includes(q)){n++;
+    it.push({ic:"◆",h:"Empresa · "+marca(r[9]||""),tp:esc(nomeMun({m:r[7],d:r[11]}))+" · "+fmt(r[2],0)+" kWh/mês",
       f:()=>{qEl.value="";fecharSug();aba("P");abrirPainel();abrirEmpEst(r)}})}}}
   if(!c&&q.length>=4)it.push({ic:"⌕",h:`Buscar o endereço “${esc(txt)}”`,tp:"endereço",f:()=>{fecharSug();buscarEndereco(txt)}});
   sugItens=it;sugIdx=it.length?0:-1;
@@ -2295,6 +2300,19 @@ document.getElementById("f").addEventListener("submit",async e=>{
 });
 const uc1El=document.getElementById("uc1"),filtraEl=document.getElementById("filtra"),filtraRow=document.getElementById("filtraRow");
 // resumo dos filtros ativos no título do menu (útil com o menu recolhido)
+// botão "Limpar" ao lado de Buscar: volta todos os filtros ao padrão e tira a seleção do mapa
+function limparFiltros(){
+  qEl.value="";fecharSug();potEl.value="";filtraRow.hidden=true;
+  for(const [id,v] of [["alim",""],["kvaMin",""],["kvaMax",""],["invAlim","todos"],["empAtv",""],["empTen",""],["empRede",""],
+    ["invKvaMin",""],["invKvaMax",""]])if($(id))$(id).value=v;
+  $("empKwh").value=1000;
+  for(const [id,v] of [["uc1",false],["alimOk",false],["invSemGd",true],["invTri",false],["invTr",false],["invMapa",true],["filtra",true]])if($(id))$(id).checked=v;
+  faixaOff.clear();classeOff.clear();empOff.clear();empOff.add(2);distOff.P.clear();distOff.I.clear();
+  document.querySelectorAll(".filtroDist input[data-dist]").forEach(c=>c.checked=true);resumoDist("P");resumoDist("I");
+  invN=30;limparAba();resumoFiltros();desenhar();desenharEmp();render();
+  try{history.replaceState(null,"",META.munK?"#"+META.munK:location.pathname)}catch(e){}
+}
+document.getElementById("limpaTudo").addEventListener("click",limparFiltros);
 function resumoFiltros(){
   const f=[];
   if(alimEl.value)f.push(alimEl.value);
