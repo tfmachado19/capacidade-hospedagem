@@ -33,6 +33,14 @@ nem sempre programadores: explique resultados em linguagem simples.
   da RGE por `scripts/curvas_padrao.py`. Usadas quando a BDGD não tem curvas (CRVCRG vazia, caso da
   maioria das cooperativas) e no lugar de curvas descartadas (pico > 8× a média, `PICO_MAX_CURVA`).
   Numa BDGD com curvas boas (RGE, CEEE) o resultado não muda.
+- **Layout sem barra lateral:** mapa em tela cheia; seções (Consultar, Prospectar, Usinas, Medir, Sobre)
+  são botões no alto do mapa (`.abasMapa`) e o conteúdo abre num painel flutuante (`aside#side`, classe
+  `fechado`). Abre no estado inteiro com todos os alimentadores em escala de cores pela folga
+  (`FAIXAS_ALIM`); as legendas filtram por cor (alimentadores, trafos e empresas).
+- **Aba Medir:** só desenho à mão. Telhado (vários telhados somados, módulos em pé alinhados ao maior
+  lado) ou Solo (mesas de 2 linhas de módulos, passo centro a centro editável, padrão 6 m).
+  O resultado é a contagem do esboço (`medLayout`). Os contornos de prédios (`dados/edif/`) não são
+  mais usados pela página.
 - `dados/edif/14/<x>/<y>.json` — contornos de prédios (aba Medir), gerados por `scripts/edificios.py`
   a partir do Overture Maps (s3://overturemaps-us-west-2/release/<versão>/theme=buildings/,
   leitura anônima com pyarrow; DuckDB não baixa extensões no ambiente de nuvem).
