@@ -1479,29 +1479,36 @@ let gTiles=null,gKey="",gSessao="";
 const gLogo=L.control({position:"bottomright"});
 gLogo.onAdd=()=>{const d=L.DomUtil.create("div","glogo");
   d.innerHTML='<img alt="Google" src="https://maps.gstatic.com/mapfiles/api-3/images/google_white5.png">';return d};
+// sessão da Map Tiles API por tipo de mapa (guardada no navegador até perto de expirar)
+async function sessaoGoogle(tipo){
+  const ck="gSessao_"+tipo;
+  try{const ant=JSON.parse(localStorage.getItem(ck)||"null");if(ant&&ant.k===gKey&&ant.exp*1000>Date.now()+864e5)return ant.s}catch(e){}
+  const r=await fetch(`https://tile.googleapis.com/v1/createSession?key=${gKey}`,{method:"POST",headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({mapType:tipo,language:"pt-BR",region:"BR"})});
+  const j=await r.json();if(!j.session)throw new Error(JSON.stringify(j.error||j));
+  try{localStorage.setItem(ck,JSON.stringify({s:j.session,exp:+j.expiry,k:gKey}))}catch(e){}
+  return j.session;
+}
+let gMapa=null;
 async function iniciarGoogle(){
   try{const c=await (await fetch(BETA?"config.json":"dados/config.json",{cache:"no-store"})).json();gKey=(c.googleMapsKey||"").trim()}catch(e){return}
   if(!gKey)return;
-  try{
-    const ant=JSON.parse(localStorage.getItem("gSessao")||"null");
-    if(ant&&ant.k===gKey&&ant.exp*1000>Date.now()+864e5)gSessao=ant.s;
-  }catch(e){}
-  if(!gSessao){
-    try{const r=await fetch(`https://tile.googleapis.com/v1/createSession?key=${gKey}`,{method:"POST",headers:{"Content-Type":"application/json"},
-        body:JSON.stringify({mapType:"satellite",language:"pt-BR",region:"BR"})});
-      const j=await r.json();if(!j.session)throw new Error(JSON.stringify(j.error||j));
-      gSessao=j.session;try{localStorage.setItem("gSessao",JSON.stringify({s:j.session,exp:+j.expiry,k:gKey}))}catch(e){}
-    }catch(e){console.warn("Google Map Tiles:",e);return}
-  }
+  try{gSessao=await sessaoGoogle("satellite")}catch(e){console.warn("Google Map Tiles (satélite):",e);return}
   gTiles=L.tileLayer(`https://tile.googleapis.com/v1/2dtiles/{z}/{x}/{y}?session=${gSessao}&key=${gKey}`,
     {maxZoom:21,maxNativeZoom:21,attribution:"Imagens © Google"});
   camadas.addBaseLayer(gTiles,"Satélite Google");
+  try{const s=await sessaoGoogle("roadmap");   // mapa de ruas do Google
+    gMapa=L.tileLayer(`https://tile.googleapis.com/v1/2dtiles/{z}/{x}/{y}?session=${s}&key=${gKey}`,{maxZoom:21,maxNativeZoom:21,attribution:"Mapa © Google"});
+    camadas.addBaseLayer(gMapa,"Mapa Google")}catch(e){console.warn("Google Map Tiles (mapa):",e)}
 }
 iniciarGoogle();
 let tAtrib=null;
 async function atribGoogle(){
-  if(!gTiles||!map.hasLayer(gTiles)){if(gLogo._map)gLogo.remove();return}
+  // logo do Google obrigatório com qualquer camada do Google (termos da Map Tiles API)
+  const algum=(gTiles&&map.hasLayer(gTiles))||(gMapa&&map.hasLayer(gMapa));
+  if(!algum){if(gLogo._map)gLogo.remove();return}
   if(!gLogo._map)gLogo.addTo(map);
+  if(!gTiles||!map.hasLayer(gTiles))return;
   const b=map.getBounds();
   try{const j=await (await fetch(`https://tile.googleapis.com/tile/v1/viewport?session=${gSessao}&key=${gKey}&zoom=${map.getZoom()}`+
       `&north=${b.getNorth()}&south=${b.getSouth()}&east=${b.getEast()}&west=${b.getWest()}`)).json();
