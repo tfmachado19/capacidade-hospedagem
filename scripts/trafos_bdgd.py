@@ -1224,6 +1224,8 @@ aside#side h1{font-size:16px}
 .legAlim .n{margin-left:auto;font:11px var(--mono);color:var(--muted)}
 .legAlim[hidden]{display:none}
 .legenda div.legAlim{display:grid;gap:2px;align-items:stretch}
+.dlist{display:grid;grid-template-columns:1fr 1fr;gap:2px 10px;max-height:220px;overflow:auto}
+.dlist .chk{font-size:12px}
 .legItem{display:flex;align-items:center;gap:6px;cursor:pointer;font-size:12px}.legItem input{width:15px;height:15px;margin:0;accent-color:var(--accent)}
 .leaflet-control[hidden]{display:none!important}
 .row[hidden]{display:none}
@@ -1284,19 +1286,23 @@ body.medindo .leaflet-control.legenda,body.medindo .leaflet-control.legAlimC{dis
     </div>
     <label class="chk"><input type="checkbox" id="uc1"> Só trafos com 1 unidade consumidora</label>
     <label class="chk"><input type="checkbox" id="alimOk"> Só trafos cujo alimentador comporta a GD pretendida</label>
+    <div class="row"><label for="invAlim">Alimentadores</label><select id="invAlim"><option value="todos">Todos (escala de cores)</option><option value="ok">Só os sem inversão de fluxo</option><option value="">Não mostrar</option></select></div>
     </details>
     <div class="scroll" id="info"></div>
   </section>
   <section class="aba" id="abaP" role="tabpanel" aria-labelledby="tabP" hidden>
     <div id="prosp" class="painel">
       <p class="pergunta">Empresas com perfil para GD</p>
-      <label class="chk"><input type="checkbox" id="empOn"> Mostrar empresas no mapa</label>
-      <label class="chk"><input type="checkbox" id="empHideTr"> Esconder os trafos do mapa</label>
+      <p class="hint">Todo o estado, a partir de 1.000 kWh/mês. O mapa mostra as maiores de cada área; aproxime para ver mais.</p>
+      <input type="checkbox" id="empOn" checked hidden><input type="checkbox" id="empHideTr" hidden>
+      <details class="menu filtroDist" data-aba="P"><summary>Distribuidoras <span class="base"></span></summary>
+        <div class="acoes"><button type="button" class="ghost" data-dist-todas>Todas</button><button type="button" class="ghost" data-dist-nenhuma>Nenhuma</button></div>
+        <div class="dlist"></div></details>
       <div class="row"><label for="empAtv">Atividade</label><select id="empAtv"><option value="">Todas</option></select></div>
-      <div class="row"><label for="empKwh">Consumo mín.</label><input id="empKwh" type="number" min="0" step="100" value="1000"><span class="base">kWh/mês</span>
+      <div class="row"><label for="empKwh">Consumo mín.</label><input id="empKwh" type="number" min="1000" step="100" value="1000"><span class="base">kWh/mês</span>
         <label for="empTen">Rede</label><select id="empTen"><option value="">BT e MT</option><option value="0">BT</option><option value="1">MT</option></select></div>
-      <div class="row"><label for="empGd">GD</label><select id="empGd"><option value="0">Sem GD (nem por perto)</option><option value="1">Sem GD confirmada</option><option value="c">Só com GD</option><option value="">Todas</option></select>
-        <label for="empRede">Rede comporta</label><select id="empRede"><option value="">Qualquer</option><option value="3">Sim</option><option value="2">Sim ou parcial</option></select></div>
+      <select id="empGd" hidden><option value="">Todas</option></select>
+      <div class="row"><label for="empRede">Rede comporta</label><select id="empRede"><option value="">Qualquer</option><option value="3">Sim</option><option value="2">Sim ou parcial</option></select></div>
       <button type="button" class="ghost" id="empCsv">Baixar lista (CSV)</button>
     </div>
     <div class="scroll" id="infoEmp"></div>
@@ -1326,15 +1332,16 @@ body.medindo .leaflet-control.legenda,body.medindo .leaflet-control.legAlimC{dis
   <section class="aba" id="abaI" role="tabpanel" aria-labelledby="tabI" hidden>
     <div class="painel">
       <p class="pergunta">Usinas de investimento</p>
-      <p class="hint">Locais para usina: trafos com um único consumidor, sem GD cadastrada, em alimentador que comporta a potência informada na busca (kW), do maior para o menor.</p>
-      <div class="row"><label for="invOnde">Onde</label><select id="invOnde"><option value="m">Município selecionado</option><option value="t">Toda a área da __DIST__</option></select></div>
+      <p class="hint">Locais para usina em todo o estado: trafos com um único consumidor, sem GD cadastrada, em alimentador que comporta a potência informada na busca (kW). Cor = folga do alimentador.</p>
+      <details class="menu filtroDist" data-aba="I"><summary>Distribuidoras <span class="base"></span></summary>
+        <div class="acoes"><button type="button" class="ghost" data-dist-todas>Todas</button><button type="button" class="ghost" data-dist-nenhuma>Nenhuma</button></div>
+        <div class="dlist"></div></details>
       <div class="row"><label for="invKvaMin">Trafo de</label><select id="invKvaMin"><option value="">mín.</option></select>
         <label for="invKvaMax">até</label><select id="invKvaMax"><option value="">máx.</option></select><span class="base">kVA</span></div>
       <label class="chk"><input type="checkbox" id="invSemGd" checked> Só trafos sem GD cadastrada</label>
       <label class="chk"><input type="checkbox" id="invTri"> Só trafo trifásico</label>
       <label class="chk"><input type="checkbox" id="invTr"> Exigir folga também no trafo</label>
       <label class="chk"><input type="checkbox" id="invMapa" checked> Mostrar os locais no mapa</label>
-      <div class="row"><label for="invAlim">Alimentadores</label><select id="invAlim"><option value="todos">Todos (escala de cores)</option><option value="ok">Só os sem inversão de fluxo</option><option value="">Não mostrar</option></select></div>
       <button type="button" class="ghost" id="invCsv">Baixar lista (CSV)</button>
     </div>
     <div class="scroll" id="infoInv"></div>
@@ -1595,11 +1602,12 @@ function desenhar(){
     m.bindTooltip(()=>dicaTrafo(t),{direction:"top",offset:[0,-6]});
     m.on("click",e=>{L.DomEvent.stopPropagation(e);abrir(t)});capa.addLayer(m);marcas.set(t.id,m);
   });
-  // por cima dos trafos: locais para usina de investimento (aba Usinas)
-  invVis=INV?invFiltro():[];
-  if(INV&&abaAtual==="I"&&$("invMapa").checked&&(map.getZoom()>=ZOOM_LOCAIS||!$("invAlim").value))invVis.forEach(t=>{if(sel&&sel.id===t.id)return;
-    const m=L.circleMarker([t.lat,t.lon],{radius:8,color:"#ffffff",weight:2.5,fillColor:"#1d4ed8",fillOpacity:1});
-    m.bindTooltip(()=>dicaInv(t),{direction:"top",offset:[0,-6]});m.on("click",e=>{L.DomEvent.stopPropagation(e);abrirInv(t)});capa.addLayer(m)});
+  // aba Usinas: locais de todo o estado, pintados pela folga do alimentador (camada própria)
+  invLayer.clearLayers();invVis=INV?invFiltro():[];
+  if(INV&&abaAtual==="I"){legendaAlim(invVis);
+    if($("invMapa").checked)invVis.filter(t=>!faixaOff.has(faixaAlim(t))).forEach(t=>{const s=invSel===t;
+      const m=L.circleMarker([t.lat,t.lon],{radius:s?11:7,color:s?cssVar("--ink"):"#ffffff",weight:s?3:1.5,fillColor:corAlim(t),fillOpacity:1});
+      m.bindTooltip(()=>dicaInv(t),{direction:"top",offset:[0,-6]});m.on("click",e=>{L.DomEvent.stopPropagation(e);abrirInv(t)});invLayer.addLayer(m)})}
   if(ALIM)desenharAlim();
 }
 function resumo(){
@@ -1727,7 +1735,7 @@ function render(){
   if(sel&&!desk.matches)h+=`<section><h2>Transformador</h2>${ficha(sel)}</section>`;
   if(ponto)h+=listaProx(ponto[0],ponto[1]);
   // legenda: no canto do mapa (computador) ou dentro da gaveta (celular, onde o mapa é pequeno)
-  const leg=legenda();legCtl.getContainer().innerHTML=leg;legCtl.getContainer().hidden=!D.length;
+  const leg=legenda();legCtl.getContainer().innerHTML=leg;legCtl.getContainer().hidden=!(D.length&&abaAtual==="C");
   if(alimSel)h=fichaAlim(alimSel)+h;
   h+=(D.length?resumo()+`<section class="legenda soCel">${leg}</section>`:inicio())+
     (ALIM&&$("invAlim").value?`<section class="legenda soCel">${htmlLegAlim(alimEscopo())}</section>`:"")+rodape();info.innerHTML=h;
@@ -1753,7 +1761,7 @@ function marcarPonto(lat,lon,rotulo){
   // o trafo do ponto é o mais próximo, mesmo que não comporte a potência (a resposta diz se cabe)
   const p=maisProximo(lat,lon);sel=p?p.t:null;msg="";map.setView([lat,lon],18,{animate:false});desenhar();render();mostrarRede(sel);abrirPainel();topoPainel();
 }
-map.on("click",e=>{if(abaAtual==="M")medClique(e.latlng);else pontoGlobal(e.latlng.lat,e.latlng.lng)});
+map.on("click",e=>{if(abaAtual==="M")medClique(e.latlng);else if(abaAtual==="C")pontoGlobal(e.latlng.lat,e.latlng.lng)});
 let abaAtual="C";
 // Área inteira: troca de município sob demanda (dados/<código>.json)
 // Várias distribuidoras (META.dists): cada município tem d (distribuidora) e k (chave única "d:código");
@@ -1790,7 +1798,7 @@ async function carregarMun(c,aj=true){
   catch(e){msg="Não consegui carregar os dados de "+m.n+".";render();return}
   if(dd&&dd.k!==META.dist){   // trocou de distribuidora: limpa o que é dela
     if(!META.dists){INV=null;invErro=false;invVis=[]}for(const o of [btCache,mtCache,empCache])for(const k in o)delete o[k];$("empAtv").dataset.mun="";
-    const op=!META.dists&&$("invOnde").querySelector('option[value="t"]');if(op)op.textContent="Toda a área da "+dd.n}
+  }
   DB=db;META.dist=dd?dd.k:null;META.munK=munK(m);if(dd)META.titulo=dd.n;
   if(distEl.value&&dd&&distEl.value!==dd.k){distEl.value=dd.k;listarMuns()}
   META.mun=m.c;META.bbox=m.b;META.munNome=m.n+", RS";munEl.value=munK(m);
@@ -1816,7 +1824,7 @@ async function dadosEmp(){
 }
 // empresas por situação de GD: 0 sem GD (oportunidade), 1 GD por perto (não confirmada), 2 tem GD
 const CORES_GD=[{cor:"#7c3aed",t:"sem GD"},{cor:"#c4b5fd",t:"GD por perto, não confirmada"},{cor:"#9ca3af",t:"tem GD"}];
-const grupoGd=x=>x[6]===3?2:(x[6]>0?1:0),empOff=new Set();
+const grupoGd=x=>x[6]===3?2:(x[6]>0?1:0),empOff=new Set([2]);   // a legenda filtra a GD; "tem GD" começa desligado
 const legEmpCtl=caixa("bottomright","mapbox legAlimC legEmpC","");legEmpCtl.getContainer().hidden=true;
 legEmpCtl.getContainer().addEventListener("change",cliqueLegenda);
 function htmlLegEmp(lista){
@@ -1831,29 +1839,89 @@ function empFiltro(d,semCor){
   return d.e.filter(x=>x[2]>=kmin&&(!atv||x[4]===atv)&&(ten===""||x[11]===+ten)&&(gd===""||(gd==="c"?x[6]===3:x[6]<=+gd))&&(rd===""||x[7]>=+rd)
     &&(semCor||!empOff.has(grupoGd(x))));
 }
+// linha do estado: [lat, lon, kWh/mês, divisão, gd, rede, mt, município, índice no arquivo do município, endereço, distribuidora]
+let EST=null,estErro=false,estVis=[],estTela=0,estCarregando=null;const EST_MAX=4000;
+const grupoEst=r=>r[4]===3?2:(r[4]>0?1:0);
+function carregarEst(){
+  if(EST||estErro)return Promise.resolve();
+  if(estCarregando)return estCarregando;
+  infoEmp.innerHTML=`<p class="hint">Carregando as empresas do estado…</p>`;
+  estCarregando=(async()=>{try{const fontes=META.dists||[{k:"",p:""}],nomes={};
+    const partes=await Promise.all(fontes.map(async ds=>{try{const r=await fetch(`${BASE}${ds.p}dados/emp_estado.json`);if(!r.ok)return [];
+      const d=await r.json();Object.assign(nomes,d.a);d.e.forEach(x=>x.push(ds.k));return d.e}catch(e){return []}}));
+    EST=partes.flat().sort((a,b)=>b[2]-a[2]);
+    const sa=$("empAtv");sa.length=1;Object.entries(nomes).sort((x,y)=>x[1].localeCompare(y[1],"pt"))
+      .forEach(([k,v])=>{const o=document.createElement("option");o.value=k;o.textContent=v;sa.append(o)});estNomes=nomes;
+  }catch(e){estErro=true}})();
+  return estCarregando;
+}
+let estNomes={};
+function estFiltro(semCor){
+  const atv=$("empAtv").value,kmin=Math.max(1000,+$("empKwh").value||0),ten=$("empTen").value,gd=$("empGd").value,rd=$("empRede").value;
+  return EST.filter(r=>r[2]>=kmin&&(!atv||r[3]===atv)&&(ten===""||r[6]===+ten)&&(gd===""||(gd==="c"?r[4]===3:r[4]<=+gd))&&(rd===""||r[5]>=+rd)
+    &&!distOff.P.has(r[10])&&(semCor||!empOff.has(grupoEst(r))));
+}
+let geracaoEmp=0;
 async function desenharEmp(){
-  empLayer.clearLayers();empVis=[];
-  if(!META.muns||!$("empOn").checked){legEmpCtl.getContainer().hidden=true;render();return}
-  const d=await dadosEmp();if(!d)return;
-  const sa=$("empAtv");
-  if(sa.dataset.mun!==META.mun){const ant=sa.value;sa.length=1;
-    Object.entries(d.a).sort((x,y)=>x[1].localeCompare(y[1],"pt")).forEach(([k,v])=>{const o=document.createElement("option");o.value=k;o.textContent=v;sa.append(o)});
-    sa.value=ant in d.a?ant:"";sa.dataset.mun=META.mun}
-  empVis=empFiltro(d);
-  legendaEmp(d);
-  empVis.forEach(x=>{const m=L.circleMarker([x[0],x[1]],{radius:x[11]?8:6,color:"#3d1a78",weight:1.5,fillColor:CORES_GD[grupoGd(x)].cor,fillOpacity:.95});
-    m.bindTooltip(()=>dicaEmp(x),{direction:"top",offset:[0,-6]});
-    m.on("click",e=>{L.DomEvent.stopPropagation(e);selEmp(x)});empLayer.addLayer(m)});
+  const g=++geracaoEmp;empLayer.clearLayers();
+  if(!META.muns||abaAtual!=="P"){legEmpCtl.getContainer().hidden=true;return}
+  await carregarEst();if(g!==geracaoEmp)return;   // só vale o pedido mais recente
+  empLayer.clearLayers();if(!EST||abaAtual!=="P"){render();return}
+  const base0=estFiltro(true),n=[0,0,0];base0.forEach(r=>n[grupoEst(r)]++);
+  empLegHtml=`<div class="legAlim"><b>Empresas por GD</b>${CORES_GD.map((c,i)=>`<label><input type="checkbox" data-gdc="${i}" ${empOff.has(i)?"":"checked"}><i style="background:${c.cor}"></i>${c.t}<span class="n">${n[i].toLocaleString("pt-BR")}</span></label>`).join("")}</div>`;
+  const el=legEmpCtl.getContainer();el.hidden=false;el.innerHTML=empLegHtml;
+  estVis=base0.filter(r=>!empOff.has(grupoEst(r)));
+  const b=map.getBounds().pad(.05),tela=estVis.filter(r=>b.contains([r[0],r[1]]));estTela=tela.length;
+  const z=map.getZoom();
+  tela.slice(0,EST_MAX).forEach(r=>{const m=L.circleMarker([r[0],r[1]],{radius:(r[6]?2:0)+(z<10?3:z<13?5:6),color:"#3d1a78",weight:z<10?.5:1.2,fillColor:CORES_GD[grupoEst(r)].cor,fillOpacity:.9});
+    m.bindTooltip(()=>dicaEst(r),{direction:"top",offset:[0,-6]});
+    m.on("click",e=>{L.DomEvent.stopPropagation(e);abrirEmpEst(r)});empLayer.addLayer(m)});
+  if(empSel){const x=empSel;L.circleMarker([x[0],x[1]],{radius:9,color:"#8e44ec",weight:3,fill:false,interactive:false}).addTo(empLayer)}
   render();
+}
+function dicaEst(r){
+  return `<b>${esc(r[9]||"–")}</b> (${r[6]?"MT":"BT"})<br>${esc(nomeMun({m:r[7],d:r[10]}))}${META.dists?" · "+esc(nomeDist(r[10])):""}<br>${esc(estNomes[r[3]]||"")}<br>
+  Consumo médio: <b>${fmt(r[2],0)} kWh/mês</b><br>GD: ${GDR[r[4]]} · Rede comporta: ${RED[r[5]]}`;
+}
+// abre a ficha completa: carrega o município da empresa (trafos e empresas) e mostra a empresa
+async function abrirEmpEst(r){
+  const k=(r[10]?r[10]+":":"")+r[7];
+  if(k!==META.munK)await carregarMun(k,false);
+  const d=await dadosEmp(),x=d&&d.e[r[8]];if(x){selEmp(x);desenharEmp()}
+}
+function baixarCsvEst(){
+  const q=v=>`"${String(v??"").replace(/"/g,'""')}"`;
+  const cab=["Endereço","Município","Distribuidora","Atividade","Rede","Consumo médio 12 meses (kWh/mês)","GD","Rede comporta","Latitude","Longitude","Google Maps"];
+  const lin=estVis.map(r=>[r[9],nomeMun({m:r[7],d:r[10]}),nomeDist(r[10])||META.titulo,estNomes[r[3]]||"",r[6]?"MT":"BT",r[2],GDR[r[4]],RED[r[5]],r[0],r[1],`https://www.google.com/maps?q=${r[0]},${r[1]}`].map(q).join(";"));
+  const blob=new Blob(["\ufeff"+[cab.map(q).join(";"),...lin].join("\r\n")],{type:"text/csv;charset=utf-8"});
+  const l=document.createElement("a");l.href=URL.createObjectURL(blob);l.download="prospeccao_RS.csv";l.click();setTimeout(()=>URL.revokeObjectURL(l.href),2000);
 }
 // ---- Usinas de investimento (dados/invest.json, toda a área): trafos com 1 UC cujo alimentador tem folga p/ nova GD
 // linha: {id,lat,lon,kva,gd,cmin,capa,alim,sub,m (código IBGE)}
 let INV=null,invVis=[],invN=30,invErro=false,ALIM=null;
+const invLayer=L.layerGroup().addTo(map);
+// filtro de distribuidoras (Prospectar e Usinas): conjunto das desmarcadas
+const distOff={P:new Set(),I:new Set()};
+function montarFiltroDist(){
+  document.querySelectorAll(".filtroDist").forEach(el=>{const k=el.dataset.aba;
+    if(!META.dists){el.hidden=true;return}
+    el.querySelector(".dlist").innerHTML=META.dists.map(d=>`<label class="chk"><input type="checkbox" data-dist="${esc(d.k)}" checked> ${esc(d.n)}</label>`).join("");
+    el.addEventListener("change",e=>{const c=e.target.closest("input[data-dist]");if(!c)return;
+      c.checked?distOff[k].delete(c.dataset.dist):distOff[k].add(c.dataset.dist);aoMudarDist(k)});
+    el.addEventListener("click",e=>{const b=e.target.closest("[data-dist-todas],[data-dist-nenhuma]");if(!b)return;
+      const off=b.hasAttribute("data-dist-nenhuma");
+      el.querySelectorAll("input[data-dist]").forEach(c=>{c.checked=!off;off?distOff[k].add(c.dataset.dist):distOff[k].delete(c.dataset.dist)});aoMudarDist(k)});
+    resumoDist(k)});
+}
+function resumoDist(k){const el=document.querySelector(`.filtroDist[data-aba="${k}"]`);if(!el||!META.dists)return;
+  const n=META.dists.length,on=n-distOff[k].size;el.querySelector("summary .base").textContent=on===n?"· todas":`· ${on} de ${n}`}
+function aoMudarDist(k){resumoDist(k);if(k==="P"){empSel=null;desenharEmp()}else{invN=30;desenhar();render()}}
 // t.d = distribuidora do local (página com várias distribuidoras carrega os locais de todas)
 const nomeMun=t=>((META.muns||[]).find(m=>m.c===t.m&&(!t.d||m.d===t.d))||{n:t.m}).n;
 const nomeDist=k=>((META.dists||[]).find(d=>d.k===k)||{n:k||""}).n;
 // "m" = município aberto; "t" = toda a área; "t:RGE" = toda a área de uma distribuidora
-function invOnde(){const v=$("invOnde").value;return {todo:v[0]==="t",dist:v.slice(2),rotulo:$("invOnde").selectedOptions[0].textContent}}
+// Usinas: sempre o estado todo; as distribuidoras escolhidas no filtro (distOff.I = desmarcadas)
+function invOnde(){return {todo:true,dist:"",rotulo:META.dists?"Rio Grande do Sul":"Toda a área"}}
 async function ligarInv(){
   if(!INV&&!invErro){infoInv.innerHTML=`<p class="hint">Carregando os locais…</p>`;
     try{const fontes=META.dists||[{k:"",p:""}];
@@ -1862,7 +1930,7 @@ async function ligarInv(){
       INV=partes.flat();
       const al=await Promise.all(fontes.map(async ds=>{try{const r=await fetch(`${BASE}${ds.p}dados/alim.json`);if(!r.ok)return [];
         const l=await r.json();l.forEach(a=>{a.d=ds.k;a.p=ds.p});return l}catch(e){return []}}));
-      ALIM=al.flat();if(invOnde().todo){const b=META.bboxAll;map.fitBounds([[b[0],b[1]],[b[2],b[3]]])}
+      ALIM=al.flat();
       // faixas de potência (kVA) presentes nos locais, para o filtro "Trafo de … até …"
       const vs=[...new Set(INV.map(t=>t.kva).filter(v=>v!=null))].sort((a,b)=>a-b);
       for(const el of [$("invKvaMin"),$("invKvaMax")])vs.forEach(v=>{const o=document.createElement("option");o.value=v;o.textContent=fmtK(v);el.append(o)});
@@ -1874,14 +1942,20 @@ async function ligarInv(){
 // sem potência pretendida: qualquer folga (> 0); com potência: folga ≥ potência. Ordem: maior folga do alimentador
 function invFiltro(){
   const pot=+potEl.value||0,tr=$("invTr").checked,tri=$("invTri").checked,semGd=$("invSemGd").checked,o=invOnde(),ok=v=>v!=null&&(pot>0?v>=pot:v>0);
-  const onde=t=>o.todo?(!o.dist||t.d===o.dist):(t.m===META.mun&&(!META.dist||t.d===META.dist));
+  const onde=t=>!distOff.I.has(t.d||"");
   const k0=$("invKvaMin").value===""?null:+$("invKvaMin").value,k1=$("invKvaMax").value===""?null:+$("invKvaMax").value;
   const faixa=t=>(k0==null||(t.kva!=null&&t.kva>=k0))&&(k1==null||(t.kva!=null&&t.kva<=k1));
   return INV.filter(t=>onde(t)&&faixa(t)&&ok(t.capa)&&(!tr||ok(t.cap))&&(!tri||t.f===3)&&(!semGd||!(t.gd>0))).sort((a,b)=>b.capa-a.capa||(b.cap??-1)-(a.cap??-1));
 }
+// abre o local sem sair da aba Usinas: ficha do trafo no painel e o alimentador dele em destaque
+let invSel=null;
 async function abrirInv(t){
   if(t.m!==META.mun||(t.d&&t.d!==META.dist))await carregarMun((t.d?t.d+":":"")+t.m,false);
-  const x=D.find(x=>x.id===t.id);if(x)abrir(x);
+  const x=D.find(x=>x.id===t.id);invSel=t;sel=x||null;fichaFechada=false;
+  map.setView([t.lat,t.lon],Math.max(map.getZoom(),16),{animate:false});
+  const a=ALIM&&ALIM.find(a=>a.a===t.alim&&a.d===t.d);alimSel=null;
+  if(a)destacarAlim(a);
+  if(x)mostrarRede(x);desenhar();render();abrirPainel();topoPainel();
 }
 // ---- Alimentadores no mapa (dados/alim.json de cada distribuidora): longe = um círculo por alimentador
 // no centro dos trafos dele; perto (zoom ≥ 12) = traçado da rede MT. Verde = folga p/ nova GD (sem inversão).
@@ -1913,9 +1987,8 @@ function cliqueLegenda(e){
 }
 for(const el of [legAlimCtl.getContainer(),legCtl.getContainer(),info,infoEmp,infoInv])el.addEventListener("change",cliqueLegenda);
 function alimEscopo(){
-  if(!ALIM)return [];const o=invOnde();
-  if(o.todo)return ALIM.filter(a=>!o.dist||a.d===o.dist);
-  const daqui=new Set(D.map(t=>t.alim));return ALIM.filter(a=>daqui.has(a.a)&&(!META.dist||a.d===META.dist));
+  if(!ALIM)return [];
+  return abaAtual==="I"?ALIM.filter(a=>!distOff.I.has(a.d)):ALIM;
 }
 function dicaAlim(a){
   return `<b>Alimentador ${esc(a.a)}</b>${META.dists?" · "+esc(nomeDist(a.d)):""}${a.s?" · SE "+esc(a.s):""}<br>
@@ -1929,10 +2002,11 @@ function selAlim(a,voar=true){
   aba("C");abrirPainel();if(voar)map.fitBounds([[a.b[0],a.b[1]],[a.b[2],a.b[3]]],{padding:[30,30]});
   destacarAlim();desenhar();render();topoPainel();
 }
-async function destacarAlim(){
-  alimDest.clearLayers();const a=alimSel;if(!a)return;const f=String(a.a).replace(/[^\w.-]/g,"_"),k=a.p+f;
+let alimDestAtual=null;
+async function destacarAlim(a=alimSel){
+  alimDest.clearLayers();alimDestAtual=a;if(!a)return;const f=String(a.a).replace(/[^\w.-]/g,"_"),k=a.p+f;
   if(!(k in mtTodos))try{const r=await fetch(`${BASE}${a.p}dados/mt/${f}.json`);mtTodos[k]=r.ok?await r.json():null}catch(e){mtTodos[k]=null}
-  if(alimSel!==a||!mtTodos[k])return;
+  if(alimDestAtual!==a||!mtTodos[k])return;
   linhas(mtTodos[k],{color:"#111827",weight:7,opacity:.35,interactive:false,renderer:rTopo},alimDest);
   linhas(mtTodos[k],{color:corAlim(a),weight:4,opacity:1,interactive:false,renderer:rTopo},alimDest);
 }
@@ -1967,6 +2041,7 @@ function inicio(){
 }
 async function desenharAlim(){
   const g=++geracaoAlim;camAlim.clearLayers();
+  if(abaAtual!=="C")return;          // alimentadores só na aba Consultar
   const modo=$("invAlim").value;if(!ALIM||!modo){legendaAlim([]);return}
   const escopo=alimEscopo().filter(a=>modo==="todos"?a.capa!=null:alimOk(a));legendaAlim(escopo);
   const lista=escopo.filter(a=>!faixaOff.has(faixaAlim(a)));
@@ -1987,9 +2062,9 @@ async function desenharAlim(){
       l.on("click",e=>{L.DomEvent.stopPropagation(e);selAlim(a,false)})})});
 }
 // de longe só os alimentadores; os locais (círculos azuis) aparecem ao aproximar
-const ZOOM_LOCAIS=11;let pertoAnt=null;
-map.on("zoomend moveend",()=>{if(!ALIM)return;const pz=map.getZoom()>=ZOOM_LOCAIS;
-  if(pz!==pertoAnt){pertoAnt=pz;desenhar()}else desenharAlim()});
+let tMover=null;
+map.on("zoomend moveend",()=>{clearTimeout(tMover);tMover=setTimeout(()=>{
+  if(abaAtual==="C"&&ALIM)desenharAlim();else if(abaAtual==="P")desenharEmp()},150)});
 function dicaInv(t){
   return `<b>Usina de investimento · trafo ${esc(t.id)}</b><br>${esc(nomeMun(t))}${t.d&&META.dists?" ("+esc(nomeDist(t.d))+")":""} · ${fmt(t.kva,1)} kVA${t.f?" "+(t.f===3?"trifásico":t.f===2?"bifásico":"monofásico"):""} · 1 UC<br>
   Alimentador ${esc(t.alim||"–")}: folga <b>${fmt(t.capa,0)} kW</b><br>Trafo comporta: ${fmt(t.cap)} kW`;
@@ -1998,19 +2073,19 @@ function listaInv(){
   if(!META.muns)return "";
   if(invErro)return `<p class="msg">Não consegui carregar a lista de locais. Tente recarregar a página.</p>`;
   if(!INV)return "";
-  const o=invOnde(),todo=o.todo;
-  if(!todo&&!META.mun)return `<p class="hint">Carregando o município…</p>`;
+  const o=invOnde(),todo=true;
   const pot=+potEl.value||0,tr=$("invTr").checked,na=new Set(invVis.map(t=>t.d+"|"+t.alim)).size;
-  return `<section><h2>${todo?esc(o.rotulo):esc(META.munNome.split(",")[0])}</h2>
+  const fichaLocal=invSel&&sel?`<section><h2>Local de usina</h2>${ficha(sel)}</section>`:"";
+  return `${fichaLocal}<section><h2>${esc(o.rotulo)}${distOff.I.size?` · ${(META.dists.length-distOff.I.size)} de ${META.dists.length} distribuidoras`:""}</h2>
   <div class="stats"><div class="stat"><b>${invVis.length.toLocaleString("pt-BR")}</b><span>locais</span></div>
   <div class="stat"><b>${na.toLocaleString("pt-BR")}</b><span>alimentadores</span></div>
   ${ALIM&&todo?(()=>{const l=alimEscopo(),k=l.filter(alimOk).length;return `<div class="stat"><b>${k.toLocaleString("pt-BR")}</b><span>de ${l.length.toLocaleString("pt-BR")} alim. sem inversão</span></div>`})():""}
   <div class="stat"><b>${invVis.length?fmt(invVis[0].capa/1000,2):"–"}</b><span>MW maior folga</span></div></div>
   <p class="hint">${pot>0?`Alimentador com folga ≥ ${fmt(pot)} kW`:"Qualquer folga no alimentador"}${tr?" e no trafo":""}${$("invSemGd").checked?"; sem GD no trafo":""}${$("invTri").checked?"; só trafo trifásico":""}${($("invKvaMin").value||$("invKvaMax").value)?`; trafo de ${$("invKvaMin").value?fmtK(+$("invKvaMin").value):"qualquer"} a ${$("invKvaMax").value?fmtK(+$("invKvaMax").value):"qualquer"} kVA`:""}. Locais do mesmo alimentador disputam a mesma folga.
-  ${tr?"":"O trafo de um só consumidor costuma ser pequeno: a usina em geral exige trocar ou ampliar o trafo. "}${$("invMapa").checked?($("invAlim").value?"Círculos azuis no mapa ao aproximar.":"Círculos azuis no mapa."):""}</p>
-  ${$("invAlim").value?`<p class="hint"><b style="color:#16a34a">Verde</b>: alimentador sem inversão de fluxo (círculo maior = mais folga)${$("invAlim").value==="todos"?"; <b style=\"color:#dc2626\">vermelho</b>: sem folga":""}. Clique para aproximar; de perto aparece o traçado da rede de cada alimentador.</p>`:""}
-  ${invVis.length?"":`<p class="hint">Nenhum local ${todo?"na área":"neste município"} com esses critérios.${todo?"":" Escolha uma opção de área inteira em “Onde”."}</p>`}
-  <div class="near">${invVis.slice(0,invN).map(t=>`<button data-inv="${esc(t.id)}" data-m="${esc(t.m)}" data-d="${esc(t.d||"")}"><span class="dot inv"></span><span><b class="id">${esc(t.id)}</b><br><span class="d">${todo?esc(nomeMun(t))+(META.dists&&!o.dist?" ("+esc(nomeDist(t.d))+")":"")+" · ":""}${esc(t.alim||"–")} · ${fmtK(t.kva)} kVA${t.f?" · "+(t.f===3?"trif.":t.f===2?"bif.":"monof."):""}</span></span><span><b>${fmt(t.capa,0)}</b> <span class="d">kW alim.</span><br><span class="d">trafo ${fmt(t.cap,0)} kW</span></span></button>`).join("")}</div>
+  ${tr?"":"O trafo de um só consumidor costuma ser pequeno: a usina em geral exige trocar ou ampliar o trafo. "}No mapa, a cor de cada local é a folga do alimentador (legenda no canto, que também filtra). Clique num local para ver o trafo e o alimentador.</p>
+  ${invVis.length?"":`<p class="hint">Nenhum local com esses critérios.</p>`}
+  <div class="near">${invVis.slice(0,invN).map(t=>`<button data-inv="${esc(t.id)}" data-m="${esc(t.m)}" data-d="${esc(t.d||"")}"><span class="dot" style="background:${corAlim(t)}"></span><span><b class="id">${esc(t.id)}</b><br><span class="d">${esc(nomeMun(t))+(META.dists?" ("+esc(nomeDist(t.d))+")":"")+" · "}${esc(t.alim||"–")} · ${fmtK(t.kva)} kVA${t.f?" · "+(t.f===3?"trif.":t.f===2?"bif.":"monof."):""}</span></span><span><b>${fmt(t.capa,0)}</b> <span class="d">kW alim.</span><br><span class="d">trafo ${fmt(t.cap,0)} kW</span></span></button>`).join("")}</div>
+  <section class="legenda soCel">${htmlLegAlim(invVis)}</section>
   ${invVis.length>invN?`<button type="button" class="ghost" data-mais="1">Mostrar mais (${(invVis.length-invN).toLocaleString("pt-BR")} restantes)</button>`:""}</section>`;
 }
 infoInv.addEventListener("click",e=>{
@@ -2046,11 +2121,14 @@ function topoPainel(){
   side.scrollTop+=a.getBoundingClientRect().top-side.getBoundingClientRect().top-8;
 }
 function resumoEmp(){
-  if(!META.muns||!$("empOn").checked)return "";
-  const kwp=empVis.reduce((s,x)=>s+x[3],0),kwh=empVis.reduce((s,x)=>s+x[2],0);
-  return `<section><h2>Prospecção</h2><div class="stats"><div class="stat"><b>${empVis.length.toLocaleString("pt-BR")}</b><span>empresas</span></div>
-  <div class="stat"><b>${fmt(kwh/1000,1)}</b><span>MWh/mês</span></div><div class="stat"><b>${fmt(kwp/1000,2)}</b><span>MWp sugerido</span></div></div>
-  <p class="hint">Círculos roxos = empresas (maiores = MT; claros = já têm GD confirmada; ao abrir uma empresa, as GDs por perto aparecem no mapa). Toque numa empresa para ver os dados.
+  if(!META.muns)return "";
+  if(estErro)return `<p class="msg">Não consegui carregar as empresas. Tente recarregar a página.</p>`;
+  if(!EST)return "";
+  const kwh=estVis.reduce((s,r)=>s+r[2],0),kwp=estVis.reduce((s,r)=>s+Math.min(r[2]*12/1150,r[6]?3000:75),0);
+  return `<section><h2>Prospecção · ${META.dists?"Rio Grande do Sul":esc(META.titulo||"")}${distOff.P.size?` · ${META.dists.length-distOff.P.size} de ${META.dists.length} distribuidoras`:""}</h2>
+  <div class="stats"><div class="stat"><b>${estVis.length.toLocaleString("pt-BR")}</b><span>empresas</span></div>
+  <div class="stat"><b>${fmt(kwh/1000,1)}</b><span>MWh/mês</span></div><div class="stat"><b>${fmt(kwp/1000,1)}</b><span>MWp sugerido</span></div></div>
+  <p class="hint">${estTela>EST_MAX?`O mapa mostra as ${EST_MAX.toLocaleString("pt-BR")} maiores de ${estTela.toLocaleString("pt-BR")} nesta área; aproxime para ver as outras. `:""}Cor = situação de GD (legenda no canto, que filtra); círculos maiores = MT. Toque numa empresa para ver o consumo mês a mês, a rede e quanto cabe de GD.
   Pg = consumo médio 12 meses ÷ (16% × 24 × 30) × FA da classe, arredondado para cima (REN 1.000, art. 73-A, II; Manual de Inversão de Fluxo, item 8.12). Vale para microgeração até 75 kW.</p></section>`;
 }
 const REL_GD=["da empresa","mesmo ponto de conexão (com outras unidades)","mesmo poste","em MT, perto"];
@@ -2136,6 +2214,7 @@ function fichaEmp(x){
     :temTr?`Trafo ${esc(x[13])} destacado no mapa, com a rede BT em verde e a ligação até a empresa tracejada.`:"Trafo desta empresa não encontrado no mapa."}</div></div></section>`;
 }
 function baixarCsv(){
+  if(EST){baixarCsvEst();return}
   const a=(empCache[META.mun]||{a:{}}).a,q=v=>`"${String(v??"").replace(/"/g,'""')}"`;
   const cab=["Endereço","Bairro","Município","Atividade","CNAE","Classe","Grupo","Rede","Consumo médio 12 meses (kWh/mês)","Pg sem análise de inversão (kW)","Sistema sugerido (kWp)","Demanda contratada (kW)","GD","GD por perto (não confirmada)","Rede comporta","Horas sem energia/ano","Trafo","Alimentador","Latitude","Longitude","Google Maps"];
   const lin=empVis.map(x=>[x[8],x[9],META.munNome.split(",")[0],a[x[4]]||"",x[16],x[5],x[10],x[11]?"MT":"BT",x[2],x[17],String(x[3]).replace(".",","),x[15]??"",GDR[x[6]],gdsDe(x).map(g=>`${REL_GD[g[4]]}: ${String(g[2]).replace(".",",")} kW${g[5]!=null?" a "+g[5]+" m":""}`).join(" | "),RED[x[7]],String(x[12]??"").replace(".",","),x[13],x[14],x[0],x[1],`https://www.google.com/maps?q=${x[0]},${x[1]}`].map(q).join(";"));
@@ -2171,9 +2250,9 @@ function sugestoes(){
       tp:fmtK(t.kva)+" kVA · "+esc(META.munNome.split(",")[0]),f:()=>{qEl.value="";fecharSug();abrir(t)}}));
     [...new Set(D.map(t=>t.alim).filter(a=>a&&a.toUpperCase().includes(up)))].slice(0,3).forEach(a=>it.push({ic:"⚡",h:"Alimentador "+marca(a),
       tp:esc(META.titulo||""),f:()=>{qEl.value="";fecharSug();aba("C");alimEl.value=a;sel=null;ponto=null;resumoFiltros();desenhar();render();ajustar()}}))}
-  const ec=META.mun&&empCache[META.mun];
-  if(ec&&ec.e&&q.length>=3)ec.e.filter(x=>semAc(x[8]||"").includes(q)).sort((a,b)=>b[2]-a[2]).slice(0,5).forEach(x=>it.push({ic:"◆",h:"Empresa · "+marca(x[8]||""),
-    tp:fmt(x[2],0)+" kWh/mês",f:()=>{qEl.value="";fecharSug();if(!$("empOn").checked){$("empOn").checked=true;empMexeu=true;desenharEmp()}selEmp(x)}}));
+  if(EST&&q.length>=3){let n=0;for(const r of EST){if(n>=5)break;if(!distOff.P.has(r[10])&&semAc(r[9]||"").includes(q)){n++;
+    it.push({ic:"◆",h:"Empresa · "+marca(r[9]||""),tp:esc(nomeMun({m:r[7],d:r[10]}))+" · "+fmt(r[2],0)+" kWh/mês",
+      f:()=>{qEl.value="";fecharSug();aba("P");abrirPainel();abrirEmpEst(r)}})}}}
   if(!c&&q.length>=4)it.push({ic:"⌕",h:`Buscar o endereço “${esc(txt)}”`,tp:"endereço",f:()=>{fecharSug();buscarEndereco(txt)}});
   sugItens=it;sugIdx=it.length?0:-1;
   sugEl.innerHTML=it.length?it.map((x,i)=>`<li role="option" id="sug${i}" aria-selected="${i===0}"><span class="ic" aria-hidden="true">${x.ic}</span><span>${x.h}</span>${x.tp?`<span class="tp">${x.tp}</span>`:""}</li>`).join("")
@@ -2244,21 +2323,13 @@ const medAtrib="Prédios © OpenStreetMap contributors, Overture Maps";
 function medEntrar(){
   med.estavaSat=map.hasLayer(sat)||(gTiles&&map.hasLayer(gTiles));
   if(!med.estavaSat){map.removeLayer(osm);(gTiles||sat).addTo(map);map.fire("baselayerchange")}
-  if(map.hasLayer(capa)){map.removeLayer(capa);med.trafosOcultos=true}
-  if(map.hasLayer(empLayer)){map.removeLayer(empLayer);med.empOcultas=true}
-  // os alimentadores saem durante a medição (o toque na rede abriria a ficha em vez de marcar um canto)
-  for(const c of [camAlim,alimDest])if(map.hasLayer(c))map.removeLayer(c);
+  // as outras camadas saem pelo camadasDaAba() (o toque na rede abriria a ficha em vez de marcar um canto)
   if(!med.pts.length)med.modo="desenho";
   document.body.classList.add("medindo");
   if(map.getZoom()<18&&map.getZoom()>=14)map.setZoom(18);
   medRender();
 }
-function medSair(){
-  if(med.trafosOcultos&&!$("empHideTr").checked)capa.addTo(map);
-  if(med.empOcultas)empLayer.addTo(map);
-  med.trafosOcultos=med.empOcultas=false;
-  camAlim.addTo(map);alimDest.addTo(map);document.body.classList.remove("medindo");
-}
+function medSair(){document.body.classList.remove("medindo")}
 function tileZ14(lat,lon){const n=16384,la=lat*Math.PI/180;
   return [Math.floor((lon+180)/360*n),Math.floor((1-Math.log(Math.tan(la)+1/Math.cos(la))/Math.PI)/2*n)]}
 async function edificios(lat,lon){
@@ -2425,17 +2496,27 @@ $("medLimpa").onclick=()=>{med.areas=[];med.pts=[];med.editando=false;medModo("d
 $("medTel").onclick=()=>medTipo("telhado");$("medSolo").onclick=()=>medTipo("solo");
 // abas do painel
 let empMexeu=false;
+// cada aba mostra só o que é dela: trocar de aba limpa o mapa e a seleção da anterior
 function aba(k){
   const antes=abaAtual;abaAtual=k;
   ["C","P","I","M","S"].forEach(x=>{$("aba"+x).hidden=x!==k;$("tab"+x).setAttribute("aria-selected",x===k)});
   if(k==="M"&&antes!=="M")medEntrar();else if(antes==="M"&&k!=="M")medSair();
-  // na primeira vez que abre Prospectar, já liga as empresas no mapa
-  if(k==="P"&&!empMexeu&&!$("empOn").checked&&META.muns){empMexeu=true;$("empOn").checked=true;desenharEmp()}
+  if(k!==antes&&typeof invLayer!=="undefined"){limparAba();
+    if((k==="P"||k==="I")&&META.bboxAll){const b=META.bboxAll;map.fitBounds([[b[0],b[1]],[b[2],b[3]]])}   // estado todo
+    camadasDaAba()}
   if(k==="I"&&!INV&&!invErro&&META.muns)ligarInv();
-  // locais de usina só na aba Usinas; legenda das empresas só na aba Prospectar
-  if((k==="I")!==(antes==="I")&&INV)desenhar();
-  if(typeof legEmpCtl!=="undefined")legEmpCtl.getContainer().hidden=!(k==="P"&&$("empOn").checked);
   marcarAbas();
+}
+function limparAba(){
+  sel=null;ponto=null;if(pino){map.removeLayer(pino);pino=null}empSel=null;alimSel=null;invSel=null;msg="";
+  faixaOff.clear();rede.clearLayers();redeMt.clearLayers();alimDest.clearLayers();map.closePopup();fichaFechada=false;
+}
+function camadasDaAba(){
+  const k=abaAtual,vis=(c,on)=>{if(on){if(!map.hasLayer(c))c.addTo(map)}else if(map.hasLayer(c))map.removeLayer(c)};
+  vis(capa,k==="C");vis(camAlim,k==="C");vis(alimDest,k==="C"||k==="I");vis(empLayer,k==="P");vis(invLayer,k==="I");
+  vis(rede,k==="C"||k==="P"||k==="I");vis(redeMt,k==="P"||k==="I");
+  legEmpCtl.getContainer().hidden=k!=="P";if(k!=="C"&&k!=="I")legAlimCtl.getContainer().hidden=true;
+  desenhar();desenharEmp();render();
 }
 // botões das seções no alto do mapa: abrem o painel naquela seção; tocar de novo na seção aberta fecha
 document.querySelectorAll(".abasMapa .tabs button").forEach(b=>b.onclick=()=>{
@@ -2482,16 +2563,13 @@ if(META.muns){
   $("tabP").hidden=false;$("tabI").hidden=false;$("btInv").hidden=false;
   $("btInv").onclick=()=>{aba("I");abrirPainel();topoPainel()};
   ["invTr","invTri","invSemGd","invAlim","invMapa","invKvaMin","invKvaMax"].forEach(i=>$(i).addEventListener("change",()=>{invN=30;desenhar();render()}));
-  $("invOnde").addEventListener("change",()=>{invN=30;desenhar();render();if(invVis.length)map.fitBounds(invVis.map(t=>[t.lat,t.lon]),{padding:[20,20],maxZoom:15})});
+  montarFiltroDist();
   $("invCsv").addEventListener("click",()=>{if(INV)baixarInv();else ligarInv().then(()=>{if(INV)baixarInv()})});$("empOn").addEventListener("change",()=>{empMexeu=true});
   ["empOn","empAtv","empTen","empGd","empRede"].forEach(i=>$(i).addEventListener("change",()=>{empSel=null;desenharEmp()}));
   $("empKwh").addEventListener("input",()=>{empSel=null;desenharEmp()});
-  $("empHideTr").addEventListener("change",()=>{if($("empHideTr").checked)map.removeLayer(capa);else capa.addTo(map)});
   $("empCsv").addEventListener("click",()=>{if(!$("empOn").checked){$("empOn").checked=true;desenharEmp().then(baixarCsv)}else baixarCsv()});
 
   if(META.dists){
-    $("invOnde").innerHTML='<option value="m">Município selecionado</option><option value="t" selected>Todo o Rio Grande do Sul ('+
-      (META.dists.length>3?META.dists.length+" distribuidoras":META.dists.map(d=>esc(d.n)).join(" e "))+')</option>'+META.dists.map(d=>`<option value="t:${d.k}">Toda a ${esc(d.n)}</option>`).join("");
     distEl.innerHTML='<option value="">Todas</option>'+META.dists.map(d=>`<option value="${d.k}">${esc(d.n)}</option>`).join("");
     distEl.addEventListener("change",()=>{listarMuns();const m=META.muns.find(x=>munK(x)===META.munK);
       if(distEl.value&&(!m||m.d!==distEl.value)){const dd=META.dists.find(d=>d.k===distEl.value);

@@ -37,6 +37,15 @@ nem sempre programadores: explique resultados em linguagem simples.
   são botões no alto do mapa (`.abasMapa`) e o conteúdo abre num painel flutuante (`aside#side`, classe
   `fechado`). Abre no estado inteiro com todos os alimentadores em escala de cores pela folga
   (`FAIXAS_ALIM`); as legendas filtram por cor (alimentadores, trafos e empresas).
+- **Abas isoladas:** cada aba mostra só as suas camadas (`camadasDaAba()`); trocar de aba limpa a
+  seleção e o mapa da anterior (`limparAba()`). Consultar = alimentadores + trafos; Prospectar = empresas;
+  Usinas = locais (cor pela folga do alimentador) + alimentador do local aberto; Medir = só o desenho.
+- **Prospectar e Usinas no estado todo**, com filtro de distribuidoras (`.filtroDist`, `distOff.P/I`).
+  Prospectar lê `<pasta>dados/emp_estado.json` de cada distribuidora (empresas ≥ 1.000 kWh/mês:
+  `[lat, lon, kWh, divisão, gd, rede, mt, município, índice, endereço]`, gerado por
+  `scripts/emp_estado.py` a partir de `dados/emp/` — rode depois do `prospeccao.py`); o mapa desenha
+  as 4.000 maiores da área visível. Ao clicar, a ficha vem do arquivo do município (`índice`).
+  A GD das empresas é filtrada pela legenda (sem GD / por perto / tem GD; "tem GD" começa desligado).
 - **Aba Medir:** só desenho à mão. Telhado (vários telhados somados, módulos em pé alinhados ao maior
   lado) ou Solo (mesas de 2 linhas de módulos, passo centro a centro editável, padrão 6 m).
   O resultado é a contagem do esboço (`medLayout`). Os contornos de prédios (`dados/edif/`) não são
