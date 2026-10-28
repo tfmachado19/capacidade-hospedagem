@@ -201,14 +201,44 @@ details.mais[open] summary{margin-bottom:6px}
   .scroll{padding-left:16px;padding-right:16px}
 }
 @media (prefers-reduced-motion:reduce){*{transition:none!important}}
+/* sem barra lateral: mapa em tela cheia; o conteúdo abre num painel flutuante (fecha no ✕) */
+body{display:block}
+#map{position:fixed;inset:0;width:auto;height:auto}
+aside#side{position:fixed;z-index:1100;left:10px;top:118px;width:390px;height:auto;max-height:calc(100vh - 130px);
+  border:1px solid var(--line);border-radius:12px;box-shadow:0 10px 30px rgba(0,0,0,.3)}
+aside#side.fechado{display:none}
+aside#side header{padding:12px 14px 10px;gap:6px}
+aside#side h1{font-size:16px}
+.toggle{display:inline-block;padding:6px 11px}
+.abasMapa .tabs{display:flex;gap:6px;margin:0;flex-wrap:wrap}
+.abasMapa .tabs button{background:var(--panel);color:var(--ink);border:1px solid var(--line);border-radius:18px;padding:6px 12px;
+  min-height:36px;box-shadow:0 1px 5px rgba(0,0,0,.2);font:600 13px var(--body);text-transform:none;letter-spacing:0}
+.abasMapa .tabs button[aria-selected="true"]{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+.abasMapa .tabs button[hidden]{display:none}
+/* escala de folga dos alimentadores (legenda que filtra) */
+.legAlim{display:grid;gap:2px;min-width:190px}
+.legAlim b{font:700 12px var(--display);text-transform:uppercase;letter-spacing:.05em;margin-bottom:2px}
+.legAlim label{display:flex;align-items:center;gap:7px;font-size:12px;cursor:pointer;padding:2px 0}
+.legAlim input{width:15px;height:15px;margin:0;accent-color:var(--accent)}
+.legAlim i{width:13px;height:13px;border-radius:50%;flex:none;border:1px solid rgba(0,0,0,.25)}
+.legAlim .n{margin-left:auto;font:11px var(--mono);color:var(--muted)}
+.legAlim[hidden]{display:none}
+.legenda div.legAlim{display:grid;gap:2px;align-items:stretch}
+.legItem{display:flex;align-items:center;gap:6px;cursor:pointer;font-size:12px}.legItem input{width:15px;height:15px;margin:0;accent-color:var(--accent)}
+.leaflet-control[hidden]{display:none!important}
+@media (max-width:760px){
+  aside#side{left:0;right:0;bottom:0;top:auto;width:auto;max-height:62vh;border-radius:14px 14px 0 0;border-bottom:0;grid-row:auto}
+  .abasMapa .tabs{gap:4px}.abasMapa .tabs button{padding:5px 9px;font-size:12px;min-height:32px}
+  .leaflet-control.legAlimC{display:none}
+}
 </style>
 </head>
 <body>
-<aside id="side">
+<aside id="side" class="fechado">
   <header>
     <div class="brand">
       <h1>Capacidade de Hospedagem · <span id="titulo">distribuidoras do RS</span></h1>
-      <button class="ghost toggle" id="tog" aria-expanded="true">Painel</button>
+      <button class="ghost toggle" id="tog" aria-label="Fechar o painel">✕</button>
     </div>
     <div class="base">Dados da BDGD de 31/12/2025</div>
     <div class="row" id="distRow" style="display:none">
@@ -224,13 +254,6 @@ details.mais[open] summary{margin-bottom:6px}
       </div>
       <select id="mun" hidden aria-hidden="true" tabindex="-1"></select>
     </div>
-    <nav class="tabs" role="tablist" aria-label="Seções">
-      <button type="button" role="tab" id="tabC" data-tab="C" aria-selected="true" aria-controls="abaC">Consultar</button>
-      <button type="button" role="tab" id="tabP" data-tab="P" aria-selected="false" aria-controls="abaP" hidden>Prospectar</button>
-      <button type="button" role="tab" id="tabI" data-tab="I" aria-selected="false" aria-controls="abaI" hidden>Usinas</button>
-      <button type="button" role="tab" id="tabM" data-tab="M" aria-selected="false" aria-controls="abaM">Medir</button>
-      <button type="button" role="tab" id="tabS" data-tab="S" aria-selected="false" aria-controls="abaS">Sobre os dados</button>
-    </nav>
   </header>
   <section class="aba" id="abaC" role="tabpanel" aria-labelledby="tabC">
     <div class="consulta">
@@ -298,14 +321,15 @@ details.mais[open] summary{margin-bottom:6px}
   <section class="aba" id="abaI" role="tabpanel" aria-labelledby="tabI" hidden>
     <div class="painel">
       <p class="pergunta">Usinas de investimento</p>
-      <p class="hint">Trafos com um único consumidor, ligados a alimentador com folga para nova GD, do maior para o menor.</p>
+      <p class="hint">Locais para usina: trafos com um único consumidor, sem GD cadastrada, em alimentador que comporta a potência informada na busca (kW), do maior para o menor.</p>
       <div class="row"><label for="invOnde">Onde</label><select id="invOnde"><option value="m">Município selecionado</option><option value="t">Toda a área da distribuidora</option></select></div>
       <div class="row"><label for="invKvaMin">Trafo de</label><select id="invKvaMin"><option value="">mín.</option></select>
         <label for="invKvaMax">até</label><select id="invKvaMax"><option value="">máx.</option></select><span class="base">kVA</span></div>
+      <label class="chk"><input type="checkbox" id="invSemGd" checked> Só trafos sem GD cadastrada</label>
       <label class="chk"><input type="checkbox" id="invTri"> Só trafo trifásico</label>
       <label class="chk"><input type="checkbox" id="invTr"> Exigir folga também no trafo</label>
       <label class="chk"><input type="checkbox" id="invMapa" checked> Mostrar os locais no mapa</label>
-      <div class="row"><label for="invAlim">Alimentadores</label><select id="invAlim"><option value="ok">Só os sem inversão de fluxo</option><option value="todos">Todos (verde e vermelho)</option><option value="">Não mostrar</option></select></div>
+      <div class="row"><label for="invAlim">Alimentadores</label><select id="invAlim"><option value="todos">Todos (escala de cores)</option><option value="ok">Só os sem inversão de fluxo</option><option value="">Não mostrar</option></select></div>
       <button type="button" class="ghost" id="invCsv">Baixar lista (CSV)</button>
     </div>
     <div class="scroll" id="infoInv"></div>
@@ -397,8 +421,15 @@ caixa("topleft","buscaMapa",`<form id="f" role="search" autocomplete="off"><div 
     role="combobox" aria-expanded="false" aria-controls="sugLista" aria-autocomplete="list" spellcheck="false">
   <input id="pot" type="number" min="0" step="0.1" placeholder="kW" aria-label="Potência pretendida (kW)" inputmode="decimal">
   <button type="submit">Buscar</button></div><ul id="sugLista" role="listbox" aria-label="Sugestões" hidden></ul></form>`);
-caixa("topleft","mapbox",`<b>Dados de ${esc(META.base)}</b> · estimativa para triagem`);
-const legCtl=caixa("bottomleft","mapbox legenda","");
+caixa("topleft","abasMapa",`<nav class="tabs" role="tablist" aria-label="Seções">
+  <button type="button" role="tab" id="tabC" data-tab="C" aria-selected="false" aria-controls="abaC">Consultar</button>
+  <button type="button" role="tab" id="tabP" data-tab="P" aria-selected="false" aria-controls="abaP" hidden>Prospectar</button>
+  <button type="button" role="tab" id="tabI" data-tab="I" aria-selected="false" aria-controls="abaI" hidden>Usinas</button>
+  <button type="button" role="tab" id="tabM" data-tab="M" aria-selected="false" aria-controls="abaM">Medir</button>
+  <button type="button" role="tab" id="tabS" data-tab="S" aria-selected="false" aria-controls="abaS">Sobre</button></nav>`);
+caixa("bottomright","mapbox",`<b>Dados de ${esc(META.base)}</b> · estimativa para triagem`);
+const legCtl=caixa("bottomright","mapbox legenda","");
+const classeOff=new Set();   // classes de trafo escondidas pela legenda
 const DICAS=["Digite na busca do mapa a cidade ou o endereço (ou clique no mapa) e a potência que quer ligar. O painel diz se cabe.",
   "Clique num trafo para abrir a ficha, com a capacidade e os botões para compartilhar e baixar em PDF.",
   "Na aba Prospectar estão as empresas com perfil para GD. Em Sobre os dados, como os números são calculados."];
@@ -546,7 +577,8 @@ function base(){
   return D.filter(t=>(!a||t.alim===a)&&(!u||t.ucs===1)&&(!ao||alimComporta(t))&&(k0==null||(t.kva!=null&&t.kva>=k0))&&(k1==null||(t.kva!=null&&t.kva<=k1)));
 }
 function filtrando(){return (+potEl.value||0)>0&&filtraEl.checked}
-function visiveis(){const v=base(),pot=+potEl.value||0;return filtrando()?v.filter(t=>t.cap!=null&&t.cap>=pot):v}
+function visiveis(){const v0=base(),pot=+potEl.value||0,v=classeOff.size?v0.filter(t=>!classeOff.has(classe(t,pot))):v0;
+  return filtrando()?v.filter(t=>t.cap!=null&&t.cap>=pot):v}
 function desenhar(){
   if(!sel)rede.clearLayers();
   if(!empSel)redeMt.clearLayers();
@@ -560,7 +592,7 @@ function desenhar(){
   });
   // por cima dos trafos: locais para usina de investimento (aba Usinas)
   invVis=INV?invFiltro():[];
-  if(INV&&$("invMapa").checked&&(map.getZoom()>=ZOOM_LOCAIS||!$("invAlim").value))invVis.forEach(t=>{if(sel&&sel.id===t.id)return;
+  if(INV&&abaAtual==="I"&&$("invMapa").checked&&(map.getZoom()>=ZOOM_LOCAIS||!$("invAlim").value))invVis.forEach(t=>{if(sel&&sel.id===t.id)return;
     const m=L.circleMarker([t.lat,t.lon],{radius:8,color:"#ffffff",weight:2.5,fillColor:"#1d4ed8",fillOpacity:1});
     m.bindTooltip(()=>dicaInv(t),{direction:"top",offset:[0,-6]});m.on("click",e=>{L.DomEvent.stopPropagation(e);abrirInv(t)});capa.addLayer(m)});
   if(ALIM)desenharAlim();
@@ -587,7 +619,7 @@ function resumo(){
 function legenda(){
   const v=base(),pot=+potEl.value||0,n={ok:0,mid:0,low:0,none:0,nd:0},r=pot>0?ROTP:ROT;v.forEach(t=>n[classe(t,pot)]++);
   return `<b>${pot>0?"Para "+fmt(pot)+" kW":"Capacidade p/ nova GD"}</b>`+
-    Object.keys(r).map(k=>`<div>${icone(k)}${r[k]} <span class="base">(${n[k].toLocaleString("pt-BR")})</span></div>`).join("");
+    Object.keys(r).map(k=>`<label class="legItem"><input type="checkbox" data-cls="${k}" ${classeOff.has(k)?"":"checked"}>${icone(k)}${r[k]} <span class="base">(${n[k].toLocaleString("pt-BR")})</span></label>`).join("");
 }
 // resposta direta: a potência pretendida cabe no trafo mais próximo do ponto?
 function maisProximo(lat,lon){let m=null;base().forEach(t=>{const d=dist(lat,lon,t.lat,t.lon);if(!m||d<m.d)m={t,d}});return m}
@@ -690,9 +722,11 @@ function render(){
   if(sel&&!desk.matches)h+=`<section><h2>Transformador</h2>${ficha(sel)}</section>`;
   if(ponto)h+=listaProx(ponto[0],ponto[1]);
   // legenda: no canto do mapa (computador) ou dentro da gaveta (celular, onde o mapa é pequeno)
-  const leg=legenda();legCtl.getContainer().innerHTML=leg;
-  h+=resumo()+`<section class="legenda soCel">${leg}</section>`+rodape();info.innerHTML=h;
-  infoEmp.innerHTML=(empSel?fichaEmp(empSel):"")+resumoEmp();
+  const leg=legenda();legCtl.getContainer().innerHTML=leg;legCtl.getContainer().hidden=!D.length;
+  if(alimSel)h=fichaAlim(alimSel)+h;
+  h+=(D.length?resumo()+`<section class="legenda soCel">${leg}</section>`:inicio())+
+    (ALIM&&$("invAlim").value?`<section class="legenda soCel">${htmlLegAlim(alimEscopo())}</section>`:"")+rodape();info.innerHTML=h;
+  infoEmp.innerHTML=(empSel?fichaEmp(empSel):"")+resumoEmp()+($("empOn").checked&&empLegHtml?`<section class="legenda soCel">${empLegHtml}</section>`:"");
   infoInv.innerHTML=listaInv();
   atualizarFicha();
 }
@@ -705,11 +739,11 @@ function clique(e){
 info.addEventListener("click",clique);infoEmp.addEventListener("click",clique);
 info.addEventListener("click",e=>{const b=e.target.closest("button[data-mun]");if(b)carregarMun(b.dataset.mun)});
 function abrir(t,voar=true){
-  sel=t;msg="";empSel=null;fichaFechada=false;if(!desk.matches)aba("C");
+  sel=t;msg="";empSel=null;fichaFechada=false;alimSel=null;alimDest.clearLayers();if(!desk.matches)aba("C");
   try{history.replaceState(null,"","#"+[META.mun||"",t.id].map(encodeURIComponent).join("/"))}catch(e){}
-  if(voar)map.setView([t.lat,t.lon],Math.max(map.getZoom(),17),{animate:false});desenhar();render();mostrarRede(t);topoPainel();abrirPainel()}
+  if(voar)map.setView([t.lat,t.lon],Math.max(map.getZoom(),17),{animate:false});desenhar();render();mostrarRede(t);if(!desk.matches){abrirPainel();topoPainel()}}
 function marcarPonto(lat,lon,rotulo){
-  ponto=[lat,lon];empSel=null;fichaFechada=false;aba("C");if(pino)map.removeLayer(pino);
+  ponto=[lat,lon];empSel=null;fichaFechada=false;alimSel=null;alimDest.clearLayers();aba("C");if(pino)map.removeLayer(pino);
   pino=L.marker([lat,lon]).addTo(map).bindTooltip(rotulo||"Ponto consultado");
   // o trafo do ponto é o mais próximo, mesmo que não comporte a potência (a resposta diz se cabe)
   const p=maisProximo(lat,lon);sel=p?p.t:null;msg="";map.setView([lat,lon],18,{animate:false});desenhar();render();mostrarRede(sel);abrirPainel();topoPainel();
@@ -774,20 +808,34 @@ async function dadosEmp(){
   if(!(c in empCache)){try{const r=await fetch(`${DB}dados/emp/${c}.json`);empCache[c]=r.ok?await r.json():{a:{},e:[]}}catch(e){empCache[c]={a:{},e:[]}}}
   return empCache[c];
 }
-function empFiltro(d){
+// empresas por situação de GD: 0 sem GD (oportunidade), 1 GD por perto (não confirmada), 2 tem GD
+const CORES_GD=[{cor:"#7c3aed",t:"sem GD"},{cor:"#c4b5fd",t:"GD por perto, não confirmada"},{cor:"#9ca3af",t:"tem GD"}];
+const grupoGd=x=>x[6]===3?2:(x[6]>0?1:0),empOff=new Set();
+const legEmpCtl=caixa("bottomright","mapbox legAlimC legEmpC","");legEmpCtl.getContainer().hidden=true;
+legEmpCtl.getContainer().addEventListener("change",cliqueLegenda);
+function htmlLegEmp(lista){
+  const n=[0,0,0];lista.forEach(x=>n[grupoGd(x)]++);
+  return `<div class="legAlim"><b>Empresas por GD</b>${CORES_GD.map((c,i)=>`<label><input type="checkbox" data-gdc="${i}" ${empOff.has(i)?"":"checked"}><i style="background:${c.cor}"></i>${c.t}<span class="n">${n[i].toLocaleString("pt-BR")}</span></label>`).join("")}</div>`;
+}
+let empLegHtml="";
+function legendaEmp(d){const base0=empFiltro(d,true);empLegHtml=htmlLegEmp(base0);
+  const el=legEmpCtl.getContainer();el.hidden=!($("empOn").checked&&abaAtual==="P");el.innerHTML=empLegHtml}
+function empFiltro(d,semCor){
   const atv=$("empAtv").value,kmin=+$("empKwh").value||0,ten=$("empTen").value,gd=$("empGd").value,rd=$("empRede").value;
-  return d.e.filter(x=>x[2]>=kmin&&(!atv||x[4]===atv)&&(ten===""||x[11]===+ten)&&(gd===""||(gd==="c"?x[6]===3:x[6]<=+gd))&&(rd===""||x[7]>=+rd));
+  return d.e.filter(x=>x[2]>=kmin&&(!atv||x[4]===atv)&&(ten===""||x[11]===+ten)&&(gd===""||(gd==="c"?x[6]===3:x[6]<=+gd))&&(rd===""||x[7]>=+rd)
+    &&(semCor||!empOff.has(grupoGd(x))));
 }
 async function desenharEmp(){
   empLayer.clearLayers();empVis=[];
-  if(!META.muns||!$("empOn").checked){render();return}
+  if(!META.muns||!$("empOn").checked){legEmpCtl.getContainer().hidden=true;render();return}
   const d=await dadosEmp();if(!d)return;
   const sa=$("empAtv");
   if(sa.dataset.mun!==META.mun){const ant=sa.value;sa.length=1;
     Object.entries(d.a).sort((x,y)=>x[1].localeCompare(y[1],"pt")).forEach(([k,v])=>{const o=document.createElement("option");o.value=k;o.textContent=v;sa.append(o)});
     sa.value=ant in d.a?ant:"";sa.dataset.mun=META.mun}
   empVis=empFiltro(d);
-  empVis.forEach(x=>{const m=L.circleMarker([x[0],x[1]],{radius:x[11]?8:6,color:"#3d1a78",weight:1.5,fillColor:x[6]===3?"#b9a6d9":"#8e44ec",fillOpacity:.95});
+  legendaEmp(d);
+  empVis.forEach(x=>{const m=L.circleMarker([x[0],x[1]],{radius:x[11]?8:6,color:"#3d1a78",weight:1.5,fillColor:CORES_GD[grupoGd(x)].cor,fillOpacity:.95});
     m.bindTooltip(()=>dicaEmp(x),{direction:"top",offset:[0,-6]});
     m.on("click",e=>{L.DomEvent.stopPropagation(e);selEmp(x)});empLayer.addLayer(m)});
   render();
@@ -819,11 +867,11 @@ async function ligarInv(){
 }
 // sem potência pretendida: qualquer folga (> 0); com potência: folga ≥ potência. Ordem: maior folga do alimentador
 function invFiltro(){
-  const pot=+potEl.value||0,tr=$("invTr").checked,tri=$("invTri").checked,o=invOnde(),ok=v=>v!=null&&(pot>0?v>=pot:v>0);
+  const pot=+potEl.value||0,tr=$("invTr").checked,tri=$("invTri").checked,semGd=$("invSemGd").checked,o=invOnde(),ok=v=>v!=null&&(pot>0?v>=pot:v>0);
   const onde=t=>o.todo?(!o.dist||t.d===o.dist):(t.m===META.mun&&(!META.dist||t.d===META.dist));
   const k0=$("invKvaMin").value===""?null:+$("invKvaMin").value,k1=$("invKvaMax").value===""?null:+$("invKvaMax").value;
   const faixa=t=>(k0==null||(t.kva!=null&&t.kva>=k0))&&(k1==null||(t.kva!=null&&t.kva<=k1));
-  return INV.filter(t=>onde(t)&&faixa(t)&&ok(t.capa)&&(!tr||ok(t.cap))&&(!tri||t.f===3)).sort((a,b)=>b.capa-a.capa||(b.cap??-1)-(a.cap??-1));
+  return INV.filter(t=>onde(t)&&faixa(t)&&ok(t.capa)&&(!tr||ok(t.cap))&&(!tri||t.f===3)&&(!semGd||!(t.gd>0))).sort((a,b)=>b.capa-a.capa||(b.cap??-1)-(a.cap??-1));
 }
 async function abrirInv(t){
   if(t.m!==META.mun||(t.d&&t.d!==META.dist))await carregarMun((t.d?t.d+":":"")+t.m,false);
@@ -834,6 +882,30 @@ async function abrirInv(t){
 map.createPane("alims");map.getPane("alims").style.zIndex=350;
 const rAlim=L.canvas({pane:"alims"}),camAlim=L.layerGroup().addTo(map),mtTodos={};let geracaoAlim=0;
 function alimOk(a){const pot=+potEl.value||0;return a.capa!=null&&(pot>0?a.capa>=pot:a.capa>0)}
+// faixas de folga p/ nova GD (kW): verde-escuro = cabe mais GD … vermelho = sem folga (inversão de fluxo)
+const FAIXAS_ALIM=[{min:3000,cor:"#065f46",t:"3 MW ou mais"},{min:1000,cor:"#16a34a",t:"1 a 3 MW"},{min:500,cor:"#84cc16",t:"500 kW a 1 MW"},
+  {min:200,cor:"#eab308",t:"200 a 500 kW"},{min:1,cor:"#f97316",t:"até 200 kW"},{min:-Infinity,cor:"#dc2626",t:"sem folga (inversão)"}];
+const faixaOff=new Set();
+function faixaAlim(a){if(a.capa==null)return -1;if(a.capa<=0)return FAIXAS_ALIM.length-1;return FAIXAS_ALIM.findIndex(f=>a.capa>=f.min)}
+function corAlim(a){const i=faixaAlim(a);return i<0?"#9ca3af":FAIXAS_ALIM[i].cor}
+const legAlimCtl=caixa("bottomright","mapbox legAlimC","");
+function htmlLegAlim(lista){
+  const n=FAIXAS_ALIM.map((_,i)=>lista.filter(a=>faixaAlim(a)===i).length);
+  return `<div class="legAlim"><b>Folga p/ GD no alimentador</b>${FAIXAS_ALIM.map((f,i)=>
+    ($("invAlim").value==="ok"&&i===FAIXAS_ALIM.length-1)?"":`<label><input type="checkbox" data-faixa="${i}" ${faixaOff.has(i)?"":"checked"}><i style="background:${f.cor}"></i>${f.t}<span class="n">${n[i].toLocaleString("pt-BR")}</span></label>`).join("")}</div>`;
+}
+function legendaAlim(lista){
+  const el=legAlimCtl.getContainer();if(!ALIM||!$("invAlim").value){el.hidden=true;return}
+  el.hidden=false;el.innerHTML=htmlLegAlim(lista);
+}
+// cliques nas legendas (no mapa ou, no celular, dentro do painel): mostram/escondem aquela cor
+function cliqueLegenda(e){
+  const c=e.target.closest("input[data-faixa],input[data-cls],input[data-gdc]");if(!c)return;
+  if(c.dataset.faixa!=null){const i=+c.dataset.faixa;c.checked?faixaOff.delete(i):faixaOff.add(i);desenharAlim();render()}
+  else if(c.dataset.cls!=null){const k=c.dataset.cls;c.checked?classeOff.delete(k):classeOff.add(k);desenhar();render()}
+  else{const k=+c.dataset.gdc;c.checked?empOff.delete(k):empOff.add(k);desenharEmp()}
+}
+for(const el of [legAlimCtl.getContainer(),legCtl.getContainer(),info,infoEmp,infoInv])el.addEventListener("change",cliqueLegenda);
 function alimEscopo(){
   if(!ALIM)return [];const o=invOnde();
   if(o.todo)return ALIM.filter(a=>!o.dist||a.d===o.dist);
@@ -844,16 +916,60 @@ function dicaAlim(a){
   ${a.capa==null?"Sem dado de carga":alimOk(a)?`Folga p/ nova GD: <b>${fmt(a.capa,0)} kW</b> (sem inversão de fluxo)`:`<b>Sem folga</b> p/ ${(+potEl.value||0)>0?fmt(+potEl.value)+" kW":"nova GD"} (inversão de fluxo)`}<br>
   GD ligada: ${fmt(a.gda,0)} kW · carregamento ${fmt(a.ca)} %<br>${a.n.toLocaleString("pt-BR")} trafos · ${a.i} com 1 UC (${a.i3} trifásicos)`;
 }
+// ficha do alimentador: clique no círculo (longe) ou na rede (perto)
+let alimSel=null;const alimDest=L.layerGroup().addTo(map);
+function selAlim(a,voar=true){
+  alimSel=a;sel=null;ponto=null;if(pino){map.removeLayer(pino);pino=null}
+  aba("C");abrirPainel();if(voar)map.fitBounds([[a.b[0],a.b[1]],[a.b[2],a.b[3]]],{padding:[30,30]});
+  destacarAlim();desenhar();render();topoPainel();
+}
+async function destacarAlim(){
+  alimDest.clearLayers();const a=alimSel;if(!a)return;const f=String(a.a).replace(/[^\w.-]/g,"_"),k=a.p+f;
+  if(!(k in mtTodos))try{const r=await fetch(`${BASE}${a.p}dados/mt/${f}.json`);mtTodos[k]=r.ok?await r.json():null}catch(e){mtTodos[k]=null}
+  if(alimSel!==a||!mtTodos[k])return;
+  linhas(mtTodos[k],{color:"#111827",weight:7,opacity:.35,interactive:false,renderer:rTopo},alimDest);
+  linhas(mtTodos[k],{color:corAlim(a),weight:4,opacity:1,interactive:false,renderer:rTopo},alimDest);
+}
+function fichaAlim(a){
+  const i=faixaAlim(a),f=i<0?{cor:"#9ca3af",t:"sem dado de carga"}:FAIXAS_ALIM[i],aqui=META.dist===a.d&&D.some(t=>t.alim===a.a);
+  return `<section><h2>Alimentador ${esc(a.a)}</h2><div class="card"><div class="top"><span class="id">${esc(nomeDist(a.d)||META.titulo||"")}${a.s?" · SE "+esc(a.s):""}</span>
+  <span class="pill" style="background:${f.cor}">${esc(f.t)}</span></div>
+  <dl><dt>Folga p/ nova GD</dt><dd><b>${a.capa==null?"–":fmt(Math.max(0,a.capa),0)+" kW"}</b>${a.capa!=null&&a.capa<=0?" (inversão de fluxo)":""}</dd>
+  <dt>GD já ligada</dt><dd>${fmt(a.gda,0)} kW</dd><dt>Carregamento</dt><dd>${fmt(a.ca)} %</dd><dt>Carregamento de GD</dt><dd>${fmt(a.cga)} %</dd>
+  <dt>Trafos</dt><dd>${a.n.toLocaleString("pt-BR")}</dd><dt>Trafos com 1 consumidor</dt><dd>${a.i} (${a.i3} trifásicos)</dd></dl>
+  <div class="links">${aqui&&alimEl.value===a.a?"":`<button type="button" data-alimver="1">Ver os trafos deste alimentador</button>`}
+  <button type="button" class="ghost" data-alimfecha="1">Fechar</button></div>
+  <div class="base">Folga = menor valor entre a carga mínima de dia do alimentador e a capacidade do cabo de saída, descontada a GD já ligada. Estimativa para triagem.</div></div></section>`;
+}
+async function verTrafosAlim(a){
+  const cand=META.muns.filter(m=>m.d===a.d&&dentro(m.b,a.lat,a.lon));
+  let m=cand[0];
+  if(cand.length>1){let dm=Infinity;for(const c of cand){let d;try{d=await dadosMun(c)}catch(e){continue}
+    const n=d.filter(t=>t.alim===a.a).length;if(n>0&&-n<dm){dm=-n;m=c}}}
+  if(!m)return;
+  if(munK(m)!==META.munK)await carregarMun(munK(m),false);
+  if([...alimEl.options].some(o=>o.value===a.a)){alimEl.value=a.a;resumoFiltros()}
+  desenhar();render();ajustar();
+}
+info.addEventListener("click",e=>{
+  if(e.target.closest("[data-alimver]")&&alimSel)verTrafosAlim(alimSel);
+  if(e.target.closest("[data-alimfecha]")){alimSel=null;alimDest.clearLayers();render()}});
+function inicio(){
+  return `<section><h2>${META.dists?"Rio Grande do Sul":esc(META.titulo||"")}</h2>
+  <p class="hint">O mapa mostra os alimentadores pintados pela folga para nova GD. Clique num alimentador para ver os números dele,
+  busque uma cidade ou endereço no alto, ou clique no mapa para consultar um ponto. Aproxime para ver a rede de cada alimentador.</p></section>`;
+}
 async function desenharAlim(){
   const g=++geracaoAlim;camAlim.clearLayers();
-  const modo=$("invAlim").value;if(!ALIM||!modo)return;
-  const lista=alimEscopo().filter(a=>modo==="todos"?a.capa!=null:alimOk(a));
-  const cor=a=>alimOk(a)?"#16a34a":"#dc2626";
+  const modo=$("invAlim").value;if(!ALIM||!modo){legendaAlim([]);return}
+  const escopo=alimEscopo().filter(a=>modo==="todos"?a.capa!=null:alimOk(a));legendaAlim(escopo);
+  const lista=escopo.filter(a=>!faixaOff.has(faixaAlim(a)));
+  const cor=corAlim;
   if(map.getZoom()<12){
     lista.forEach(a=>{const m=L.circleMarker([a.lat,a.lon],{renderer:rAlim,radius:Math.min(14,4+Math.sqrt(Math.max(a.capa||0,0))/6),
       color:"#ffffff",weight:1,fillColor:cor(a),fillOpacity:.75});
       m.bindTooltip(()=>dicaAlim(a),{direction:"top",offset:[0,-6]});
-      m.on("click",e=>{L.DomEvent.stopPropagation(e);map.fitBounds([[a.b[0],a.b[1]],[a.b[2],a.b[3]]],{padding:[20,20]})});camAlim.addLayer(m)});
+      m.on("click",e=>{L.DomEvent.stopPropagation(e);selAlim(a)});camAlim.addLayer(m)});
     return;
   }
   const v=map.getBounds(),perto=lista.filter(a=>a.b[0]<=v.getNorth()&&a.b[2]>=v.getSouth()&&a.b[1]<=v.getEast()&&a.b[3]>=v.getWest()).slice(0,60);
@@ -861,7 +977,8 @@ async function desenharAlim(){
     if(!(f in mtTodos))try{const r=await fetch(`${BASE}${a.p}dados/mt/${String(a.a).replace(/[^\w.-]/g,"_")}.json`);mtTodos[f]=r.ok?await r.json():null}catch(e){mtTodos[f]=null}}));
   if(g!==geracaoAlim)return;
   perto.forEach(a=>{const d=mtTodos[a.p+String(a.a).replace(/[^\w.-]/g,"_")];if(!d)return;
-    linhas(d,{renderer:rAlim,color:cor(a),weight:3,opacity:.7},camAlim).forEach(l=>l.bindTooltip(()=>dicaAlim(a),{sticky:true}))});
+    linhas(d,{renderer:rAlim,color:cor(a),weight:3,opacity:.7},camAlim).forEach(l=>{l.bindTooltip(()=>dicaAlim(a),{sticky:true});
+      l.on("click",e=>{L.DomEvent.stopPropagation(e);selAlim(a,false)})})});
 }
 // de longe só os alimentadores; os locais (círculos azuis) aparecem ao aproximar
 const ZOOM_LOCAIS=11;let pertoAnt=null;
@@ -883,7 +1000,7 @@ function listaInv(){
   <div class="stat"><b>${na.toLocaleString("pt-BR")}</b><span>alimentadores</span></div>
   ${ALIM&&todo?(()=>{const l=alimEscopo(),k=l.filter(alimOk).length;return `<div class="stat"><b>${k.toLocaleString("pt-BR")}</b><span>de ${l.length.toLocaleString("pt-BR")} alim. sem inversão</span></div>`})():""}
   <div class="stat"><b>${invVis.length?fmt(invVis[0].capa/1000,2):"–"}</b><span>MW maior folga</span></div></div>
-  <p class="hint">${pot>0?`Alimentador com folga ≥ ${fmt(pot)} kW`:"Qualquer folga no alimentador"}${tr?" e no trafo":""}${$("invTri").checked?"; só trafo trifásico":""}${($("invKvaMin").value||$("invKvaMax").value)?`; trafo de ${$("invKvaMin").value?fmtK(+$("invKvaMin").value):"qualquer"} a ${$("invKvaMax").value?fmtK(+$("invKvaMax").value):"qualquer"} kVA`:""}. Locais do mesmo alimentador disputam a mesma folga.
+  <p class="hint">${pot>0?`Alimentador com folga ≥ ${fmt(pot)} kW`:"Qualquer folga no alimentador"}${tr?" e no trafo":""}${$("invSemGd").checked?"; sem GD no trafo":""}${$("invTri").checked?"; só trafo trifásico":""}${($("invKvaMin").value||$("invKvaMax").value)?`; trafo de ${$("invKvaMin").value?fmtK(+$("invKvaMin").value):"qualquer"} a ${$("invKvaMax").value?fmtK(+$("invKvaMax").value):"qualquer"} kVA`:""}. Locais do mesmo alimentador disputam a mesma folga.
   ${tr?"":"O trafo de um só consumidor costuma ser pequeno: a usina em geral exige trocar ou ampliar o trafo. "}${$("invMapa").checked?($("invAlim").value?"Círculos azuis no mapa ao aproximar.":"Círculos azuis no mapa."):""}</p>
   ${$("invAlim").value?`<p class="hint"><b style="color:#16a34a">Verde</b>: alimentador sem inversão de fluxo (círculo maior = mais folga)${$("invAlim").value==="todos"?"; <b style=\"color:#dc2626\">vermelho</b>: sem folga":""}. Clique para aproximar; de perto aparece o traçado da rede de cada alimentador.</p>`:""}
   ${invVis.length?"":`<p class="hint">Nenhum local ${todo?"na área":"neste município"} com esses critérios.${todo?"":" Escolha uma opção de área inteira em “Onde”."}</p>`}
@@ -1057,8 +1174,11 @@ kvaMinEl.addEventListener("change",aoMudarPot);kvaMaxEl.addEventListener("change
 document.getElementById("alimOk").addEventListener("change",aoMudarPot);filtraEl.addEventListener("change",aoMudarPot);
 alimEl.addEventListener("change",()=>{sel=null;resumoFiltros();desenhar();render();ajustar()});
 const side=document.getElementById("side"),tog=document.getElementById("tog");
-tog.onclick=()=>{side.classList.toggle("min");tog.setAttribute("aria-expanded",!side.classList.contains("min"));setTimeout(()=>map.invalidateSize(),50)};
-function abrirPainel(){if(side.classList.contains("min")){side.classList.remove("min");setTimeout(()=>map.invalidateSize(),50)}}
+function painelAberto(){return !side.classList.contains("fechado")}
+function marcarAbas(){document.querySelectorAll(".abasMapa .tabs button").forEach(b=>b.setAttribute("aria-selected",painelAberto()&&b.dataset.tab===abaAtual))}
+function abrirPainel(){side.classList.remove("fechado");marcarAbas()}
+function fecharPainel(){side.classList.add("fechado");marcarAbas()}
+tog.onclick=fecharPainel;
 function ajustar(){const v=visiveis();if(v.length)map.fitBounds(v.map(t=>[t.lat,t.lon]),{padding:[20,20]})}
 matchMedia("(prefers-color-scheme:dark)").addEventListener?.("change",()=>desenhar());
 // ---- Medir telhado: contornos de prédios (dados/edif/14/<x>/<y>.json) ou desenho à mão
@@ -1187,8 +1307,14 @@ function aba(k){
   // na primeira vez que abre Prospectar, já liga as empresas no mapa
   if(k==="P"&&!empMexeu&&!$("empOn").checked&&META.muns){empMexeu=true;$("empOn").checked=true;desenharEmp()}
   if(k==="I"&&!INV&&!invErro&&META.muns)ligarInv();
+  // locais de usina só na aba Usinas; legenda das empresas só na aba Prospectar
+  if((k==="I")!==(antes==="I")&&INV)desenhar();
+  if(typeof legEmpCtl!=="undefined")legEmpCtl.getContainer().hidden=!(k==="P"&&$("empOn").checked);
+  marcarAbas();
 }
-document.querySelectorAll(".tabs button").forEach(b=>b.onclick=()=>aba(b.dataset.tab));
+// botões das seções no alto do mapa: abrem o painel naquela seção; tocar de novo na seção aberta fecha
+document.querySelectorAll(".abasMapa .tabs button").forEach(b=>b.onclick=()=>{
+  if(b.dataset.tab===abaAtual&&painelAberto()){fecharPainel();return}aba(b.dataset.tab);abrirPainel();topoPainel()});
 const munEl=document.getElementById("mun"),distEl=document.getElementById("dist");
 // lista de municípios conforme o filtro de distribuidora ("" = todas); nomes repetidos levam a distribuidora
 function listarMuns(){
@@ -1230,7 +1356,7 @@ if(hKw&&+hKw>0){potEl.value=+hKw;filtraRow.hidden=false}
 if(META.muns){
   $("tabP").hidden=false;$("tabI").hidden=false;$("btInv").hidden=false;
   $("btInv").onclick=()=>{aba("I");abrirPainel();topoPainel()};
-  ["invTr","invTri","invAlim","invMapa","invKvaMin","invKvaMax"].forEach(i=>$(i).addEventListener("change",()=>{invN=30;desenhar();render()}));
+  ["invTr","invTri","invSemGd","invAlim","invMapa","invKvaMin","invKvaMax"].forEach(i=>$(i).addEventListener("change",()=>{invN=30;desenhar();render()}));
   $("invOnde").addEventListener("change",()=>{invN=30;desenhar();render();if(invVis.length)map.fitBounds(invVis.map(t=>[t.lat,t.lon]),{padding:[20,20],maxZoom:15})});
   $("invCsv").addEventListener("click",()=>{if(INV)baixarInv();else ligarInv().then(()=>{if(INV)baixarInv()})});$("empOn").addEventListener("change",()=>{empMexeu=true});
   ["empOn","empAtv","empTen","empGd","empRede"].forEach(i=>$(i).addEventListener("change",()=>{empSel=null;desenharEmp()}));
@@ -1248,8 +1374,11 @@ if(META.muns){
   listarMuns();
   munEl.addEventListener("change",()=>carregarMun(munEl.value));
   const b=META.bboxAll;map.fitBounds([[b[0],b[1]],[b[2],b[3]]]);
-  carregarMun((h=>h?munK(h):META.default)(META.muns.find(m=>munK(m)===hMun)||
-    META.muns.find(m=>m.c===hMun&&(!META.dists||m.d===META.dists[0].k))||META.muns.find(m=>m.c===hMun))).then(()=>{const t=hTr&&D.find(x=>String(x.id)===hTr);if(t)abrir(t)});
+  // abre no estado inteiro com todos os alimentadores; um município só com link (#município/trafo/kW)
+  const hm=META.muns.find(m=>munK(m)===hMun)||META.muns.find(m=>m.c===hMun&&(!META.dists||m.d===META.dists[0].k))||META.muns.find(m=>m.c===hMun);
+  if(hm)carregarMun(munK(hm)).then(()=>{const t=hTr&&D.find(x=>String(x.id)===hTr);if(t)abrir(t)});
+  else{if(META.dists){META.munNome="Rio Grande do Sul";document.getElementById("titulo").textContent="Rio Grande do Sul"}desenhar();render()}
+  ligarInv();
 }else{desenhar();render();ajustar();const t=hTr&&D.find(x=>String(x.id)===hTr);if(t)abrir(t)}
 </script>
 </body>
