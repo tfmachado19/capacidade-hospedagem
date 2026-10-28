@@ -622,9 +622,10 @@ function desenhar(){
     m.on("click",e=>{L.DomEvent.stopPropagation(e);abrir(t)});capa.addLayer(m);marcas.set(t.id,m);
   });
   // aba Usinas: locais de todo o estado, pintados pela folga do alimentador (camada própria)
-  invLayer.clearLayers();invVis=INV?invFiltro():[];
-  if(INV&&abaAtual==="I"){legendaAlim(invVis);
-    if($("invMapa").checked)invVis.filter(t=>!faixaOff.has(faixaAlim(t))).forEach(t=>{const s=invSel===t;
+  // legenda conta todos os locais do filtro; mapa, lista e CSV ficam só com as cores marcadas
+  invLayer.clearLayers();const invTodos=INV?invFiltro():[];invVis=invTodos.filter(t=>!faixaOff.has(faixaAlim(t)));
+  if(INV&&abaAtual==="I"){legendaAlim(invTodos);
+    if($("invMapa").checked)invVis.forEach(t=>{const s=invSel===t;
       const m=L.circleMarker([t.lat,t.lon],{radius:s?11:7,color:s?cssVar("--ink"):"#ffffff",weight:s?3:1.5,fillColor:corAlim(t),fillOpacity:1});
       m.bindTooltip(()=>dicaInv(t),{direction:"top",offset:[0,-6]});m.on("click",e=>{L.DomEvent.stopPropagation(e);abrirInv(t)});invLayer.addLayer(m)})}
   if(ALIM)desenharAlim();
@@ -1075,7 +1076,8 @@ function legendaAlim(lista){
 function cliqueLegenda(e){
   const c=e.target.closest("input[data-faixa],input[data-cls],input[data-gdc],input[data-gdf]");if(!c)return;
   if(c.dataset.gdf!=null){const i=+c.dataset.gdf;c.checked?gdOff.delete(i):gdOff.add(i);desenharGd();return}
-  if(c.dataset.faixa!=null){const i=+c.dataset.faixa;c.checked?faixaOff.delete(i):faixaOff.add(i);desenharAlim();render()}
+  if(c.dataset.faixa!=null){const i=+c.dataset.faixa;c.checked?faixaOff.delete(i):faixaOff.add(i);
+    if(abaAtual==="I"){invN=30;desenhar()}else desenharAlim();render()}
   else if(c.dataset.cls!=null){const k=c.dataset.cls;c.checked?classeOff.delete(k):classeOff.add(k);desenhar();render()}
   else{const k=+c.dataset.gdc;c.checked?empOff.delete(k):empOff.add(k);desenharEmp()}
 }
@@ -1180,7 +1182,7 @@ function listaInv(){
   ${tr?"":"O trafo de um só consumidor costuma ser pequeno: a usina em geral exige trocar ou ampliar o trafo. "}No mapa, a cor de cada local é a folga do alimentador (legenda no canto, que também filtra). Clique num local para ver o trafo e o alimentador.</p>
   ${invVis.length?"":`<p class="hint">Nenhum local com esses critérios.</p>`}
   <div class="near">${invVis.slice(0,invN).map(t=>`<button data-inv="${esc(t.id)}" data-m="${esc(t.m)}" data-d="${esc(t.d||"")}"><span class="dot" style="background:${corAlim(t)}"></span><span><b class="id">${esc(t.id)}</b><br><span class="d">${esc(nomeMun(t))+(META.dists?" ("+esc(nomeDist(t.d))+")":"")+" · "}${esc(t.alim||"–")} · ${fmtK(t.kva)} kVA${t.f?" · "+(t.f===3?"trif.":t.f===2?"bif.":"monof."):""}</span></span><span><b>${fmt(t.capa,0)}</b> <span class="d">kW alim.</span><br><span class="d">trafo ${fmt(t.cap,0)} kW</span></span></button>`).join("")}</div>
-  <section class="legenda soCel">${htmlLegAlim(invVis)}</section>
+  <section class="legenda soCel">${htmlLegAlim(INV?invFiltro():[])}</section>
   ${invVis.length>invN?`<button type="button" class="ghost" data-mais="1">Mostrar mais (${(invVis.length-invN).toLocaleString("pt-BR")} restantes)</button>`:""}</section>`;
 }
 infoInv.addEventListener("click",e=>{
