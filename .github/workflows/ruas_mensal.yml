@@ -1,0 +1,46 @@
+name: Atualizar ruas (OSM)
+
+# Regera dados/ruas/<código IBGE>.json (RGE, CEEE Equatorial e cooperativas do RS) a partir do
+# extrato OSM do Sul do Brasil (Geofabrik), todo início de mês. É o que a planta de localização
+# do CRM Solar usa em vez de consultar o Overpass ao vivo (scripts/ruas_osm.py).
+on:
+  schedule:
+    - cron: "0 6 3 * *"  # dia 3 de cada mês, 06:00 UTC (03:00 em Brasília)
+  workflow_dispatch: {}   # permite rodar manualmente em Actions → Atualizar ruas (OSM) → Run workflow
+
+permissions:
+  contents: write
+
+jobs:
+  atualizar-ruas:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Instala o osmium
+        run: pip install osmium
+
+      - name: Baixa o extrato OSM do Sul do Brasil (Geofabrik)
+        run: curl -L -o sul-latest.osm.pbf https://download.geofabrik.de/south-america/brazil/sul-latest.osm.pbf
+
+      - name: Gera dados/ruas/<ibge>.json
+        run: python3 scripts/ruas_osm.py sul-latest.osm.pbf
+
+      - name: Remove o extrato (não entra no repositório)
+        run: rm -f sul-latest.osm.pbf
+
+      - name: Publica se houve mudança
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add dados/ruas ceee/dados/ruas rs/*/dados/ruas
+          if git diff --cached --quiet; then
+            echo "Ruas sem mudança este mês."
+          else
+            git commit -m "Atualiza ruas (OSM) - $(date -u +%Y-%m)"
+            git push
+          fi

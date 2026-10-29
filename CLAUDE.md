@@ -17,6 +17,13 @@ nem sempre programadores: explique resultados em linguagem simples.
 - `dados/bt/<alimentador>.json` — rede BT de cada trafo e postes com GD (ao abrir um trafo).
 - `dados/mt/<alimentador>.json` — traçado da rede MT de cada alimentador (ao clicar numa empresa de MT).
 - `dados/emp/<código IBGE>.json` — empresas da prospecção (ao ligar a camada de prospecção).
+- `dados/ruas/<código IBGE>.json` — ruas (nome, tipo, geometria) de cada município, usadas pela
+  planta de localização do CRM Solar (repositório `GERADOR_PROJETOS`) em vez de consultar o
+  Overpass ao vivo (instável, sujeito a bloqueio de IP compartilhado). Geradas por
+  `scripts/ruas_osm.py` a partir do extrato OSM do Sul do Brasil (Geofabrik); o workflow
+  `.github/workflows/ruas_mensal.yml` reroda isso todo início de mês e publica sozinho se houver
+  mudança (ruas mudam pouco; o cache do CRM dura 7 dias). Mesma lista de pastas (RGE, CEEE
+  Equatorial, cooperativas) de `dados/<código IBGE>.json`.
 - `dados/invest.json` — "Usinas de investimento": trafos com 1 UC em alimentador com folga, de toda a
   área (ao abrir a aba Usinas). Gerado por `trafos_bdgd.py` junto com `dados/<código IBGE>.json`.
   Cada local tem `f` = nº de fases do primário do trafo (FAS_CON_P: 3 = trifásico), usado no filtro
