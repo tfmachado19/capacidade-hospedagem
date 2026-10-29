@@ -639,6 +639,9 @@ def main():
     ap.add_argument("--fp", type=float, default=0.92, help="fator de potência (padrão 0,92)")
     ap.add_argument("--janela", type=float, nargs=2, default=[9, 15], metavar=("INI", "FIM"))
     ap.add_argument("--fator-seg", type=float, default=1.0, help="fator de segurança sobre a carga mínima")
+    ap.add_argument("--fator-gd", type=float, default=1.0,
+                    help="fração da GD instalada descontada da carga mínima de dia no trafo (calibrada com os "
+                         "orçamentos de conexão da distribuidora; RGE: 0.35)")
     ap.add_argument("--atencao", type=float, default=60.0, help="limiar de 'atenção' da ocupação (%%)")
     ap.add_argument("--saida", default=None, help="pasta de saída")
     ap.add_argument("--gd-aneel", default=None,
@@ -836,11 +839,11 @@ def main():
     cmin = df["Carga mín. diurna estimada (kW)"] * a.fator_seg
     df["Ocupação GD / carga mín. (%)"] = (df["GD instalada (kW)"] / cmin.where(cmin > 0) * 100) \
         .where(df["GD instalada (kW)"] > 0)
-    df["Margem p/ nova GD sem inversão (kW)"] = cmin - df["GD instalada (kW)"]
+    df["Margem p/ nova GD sem inversão (kW)"] = cmin - a.fator_gd * df["GD instalada (kW)"]
     df["Situação inversão de fluxo"] = [classe_inv(g, c, a.atencao)
                                        for g, c in zip(df["GD instalada (kW)"], cmin)]
-    # mesma regra da plataforma: menor entre (carga mín. × fs − GD) e (kVA − GD), nunca negativa
-    df["Capacidade disponível estimada (kW)"] = np.fmin(cmin - df["GD instalada (kW)"],
+    # mesma regra da plataforma: menor entre (carga mín. × fs − fgd × GD) e (kVA − GD), nunca negativa
+    df["Capacidade disponível estimada (kW)"] = np.fmin(cmin - a.fator_gd * df["GD instalada (kW)"],
                                                         kva - df["GD instalada (kW)"]).clip(lower=0)
     df["Google Maps"] = [f"https://www.google.com/maps?q={la:.6f},{lo:.6f}" if pd.notna(la) else ""
                          for la, lo in zip(df["lat"], df["lon"])]
@@ -921,7 +924,7 @@ def main():
         ("Trafos — carregamento alto (80–100%)", int(cont_car.get("alto", 0))),
         ("Fator de potência usado", a.fp),
         ("Janela solar (h)", f"{a.janela[0]:g}–{a.janela[1]:g}"),
-        ("Fator de segurança", a.fator_seg),
+        ("Fator de segurança", a.fator_seg), ("Fração da GD descontada da carga mínima", a.fator_gd),
         ("Limiar de atenção (%)", a.atencao),
         ("POT_NOM em valores comerciais de kVA (%)", round(pct_padrao, 1)),
         ("Valores de POT_INST corrigidos de W → kW", corrigidas),
@@ -977,7 +980,7 @@ def main():
 
     m = re.search(r"(\d{4})-(\d{2})-(\d{2})", nome_gdb)
     base = f"{m.group(3)}/{m.group(2)}/{m.group(1)}" if m else nome_gdb
-    meta = {"base": base, "fs": a.fator_seg, "fp": a.fp}
+    meta = {"base": base, "fs": a.fator_seg, "fp": a.fp, "fgd": a.fator_gd}
     if todos:
         site = saida / "site_todos"
         meta.update(munNome="Rio Grande do Sul", titulo=a.mun_nome or "Área de concessão")
@@ -1371,6 +1374,7 @@ body.medindo .leaflet-control.legenda,body.medindo .leaflet-control.legAlimC{dis
       <dt>GD já ligada</dt><dd>Base de GD da ANEEL</dd></dl>
       <h2>Capacidade do trafo</h2>
       <p>Menor valor entre a carga mínima de dia (o consumo dos vizinhos ao meio-dia, × fator de segurança) e a potência do trafo, descontada a GD que já existe. Acima da carga mínima, a energia volta para a rede (inversão de fluxo).</p>
+      <p>Na RGE, a conta foi calibrada com os orçamentos de conexão da própria distribuidora (48 trafos de Santa Maria, Alegrete, São Gabriel, Caçapava do Sul e Cachoeira do Sul): da carga mínima desconta-se 35% da GD já instalada, e não toda ela. Com isso, nenhum trafo que a RGE deu como fluxo inverso aparece com folga, e a folga fica em média um pouco abaixo da calculada pela RGE. Nas outras distribuidoras, sem estudos para calibrar, desconta-se toda a GD.</p>
       <h2>Estudos da distribuidora</h2>
       <p>Trafos com contorno tracejado no mapa já apareceram num orçamento de conexão da distribuidora (o do cliente ou um vizinho analisado no estudo). A ficha mostra o sentido do fluxo e quanto ainda cabe segundo a distribuidora, na data do estudo. O número do trafo no orçamento não existe na BDGD: o trafo é achado pela posição, pelo alimentador, pela potência e pelo número de UCs e de GD. Busque pelo número do orçamento no campo de busca.</p>
       <h2>Capacidade do alimentador</h2>
@@ -1401,11 +1405,14 @@ function hex(k){return cssVar(COR[k].slice(4,-1))}
 const fmt=(v,d=1)=>v==null||isNaN(v)?"–":Number(v).toLocaleString("pt-BR",{minimumFractionDigits:d,maximumFractionDigits:d});
 const esc=s=>String(s??"").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
 
-// capacidade disponível estimada = menor entre (carga mín. diurna × fs − GD) e (kVA − GD)
+// capacidade disponível estimada = menor entre (carga mín. diurna × fs − fgd × GD) e (kVA − GD)
+// fgd = fração da GD já instalada que reduz o fluxo na hora da carga mínima, calibrada com os estudos
+// da distribuidora (orçamentos de conexão; RGE 0,35). Sem calibração, 1 (desconta toda a GD).
+const fgdDe=k=>{const d=(META.dists||[]).find(x=>x.k===k);return d&&d.g!=null?d.g:(META.dists?1:(META.fgd??1))};
 const kvaMinEl=document.getElementById("kvaMin"),kvaMaxEl=document.getElementById("kvaMax");
 const fmtK=v=>fmt(v,v%1?1:0);
-function preparar(){D.forEach(t=>{
-  const inv=t.cmin==null?null:t.cmin*META.fs-t.gd;
+function preparar(){const fg=fgdDe(META.dist);D.forEach(t=>{
+  const inv=t.cmin==null?null:t.cmin*META.fs-fg*t.gd;
   const lim=t.kva==null?null:t.kva-t.gd;
   t.capt=(inv==null&&lim==null)?null:Math.max(0,Math.min(inv??Infinity,lim??Infinity));
   t.limt=inv==null?"sem dado":(lim!=null&&lim<inv?"potência do trafo":"inversão de fluxo");
@@ -2061,7 +2068,7 @@ async function ligarInv(){
       // faixas de potência (kVA) presentes nos locais, para o filtro "Trafo de … até …"
       const vs=[...new Set(INV.map(t=>t.kva).filter(v=>v!=null))].sort((a,b)=>a-b);
       for(const el of [$("invKvaMin"),$("invKvaMax")])vs.forEach(v=>{const o=document.createElement("option");o.value=v;o.textContent=fmtK(v);el.append(o)});
-      INV.forEach(t=>{const inv=t.cmin==null?null:t.cmin*META.fs-t.gd,lim=t.kva==null?null:t.kva-t.gd;
+      INV.forEach(t=>{const inv=t.cmin==null?null:t.cmin*META.fs-fgdDe(t.d)*t.gd,lim=t.kva==null?null:t.kva-t.gd;
         t.cap=(inv==null&&lim==null)?null:Math.max(0,Math.min(inv??Infinity,lim??Infinity))})}
     catch(e){invErro=true}}
   desenhar();render();

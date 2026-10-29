@@ -133,7 +133,7 @@ O ambiente de nuvem precisa liberar `www.arcgis.com`, `*.arcgis.com` e
 ## Como regenerar tudo
 
 ```bash
-python3 -I scripts/trafos_bdgd.py RGE.zip --mun todos --mun-nome RGE --gd-aneel gd.parquet --saida /tmp/saida
+python3 -I scripts/trafos_bdgd.py RGE.zip --mun todos --mun-nome RGE --gd-aneel gd.parquet --saida /tmp/saida --fator-gd 0.35
 # copie /tmp/saida/site_todos/index.html e /tmp/saida/site_todos/dados/* para a raiz do repositório
 python3 -I scripts/prospeccao.py --bdgd RGE.zip --ucbt-pj ucbt_pj.zip --ucmt-pj ucmt_pj.csv \
     --trafos /tmp/saida/BDGD_trafos_todos.xlsx --nomes gd.parquet --saida /tmp/prosp --site .
@@ -165,7 +165,13 @@ O Overture precisa cobrir também o sul do estado (até lat −33,9: Pelotas, Ri
 - **Tensão (TTEN):** código 49 = 13,8 kV, 62 = 22 kV (CEEE), 63 = 23 kV (RGE). Outros códigos ficam
   sem carregamento. Cabo de saída com corrente nominal < 50 A é tratado como erro de cadastro (sem dado).
 - BT da CEEE é 220/127 V (TTEN 10 e 6); da RGE, 380/220 V (15 e 10).
-- **Capacidade do trafo** = menor entre (carga mínima diurna × fator de segurança − GD) e (kVA − GD).
+- **Capacidade do trafo** = menor entre (carga mínima diurna × fator de segurança − fgd × GD) e (kVA − GD).
+  `fgd` (fração da GD descontada da carga mínima; `--fator-gd`, gravado como `fgd` no `meta.json` e como `g`
+  na lista de distribuidoras do `unificar.py`) foi **calibrado com os orçamentos de conexão da RGE**
+  (`dados/orc.json`, 48 trafos, out/2026): com 1 o site dava inversão em 35 de 36 trafos em que a RGE dá 8;
+  com **0,35** nenhum trafo que a RGE dá como inverso aparece com folga e a folga fica ~5 kW abaixo da RGE
+  (lado seguro). Só a RGE usa 0,35; as outras ficam em 1 (sem estudos para calibrar). Ao ter mais
+  orçamentos, recalibre (ver o histórico do git deste ajuste).
 - **Alimentador:** capacidade = √3 × kV × corrente nominal (SEGCON.CNOM) do trecho de saída;
   carga mínima = energia medida na saída (CTMT, já líquida da GD) + geração estimada da GD
   (perfil FV do RS, ~1.150 kWh/kWp·ano) × forma das curvas típicas na janela solar.

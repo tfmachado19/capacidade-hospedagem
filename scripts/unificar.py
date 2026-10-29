@@ -43,6 +43,8 @@ def main():
         metas.append(m)
         muns += [dict(x, d=k, k=f"{k}:{x['c']}") for x in m["muns"]]
         d = {"k": k, "n": nome, "p": pasta, "padrao": f"{k}:{padrao}"}
+        if m.get("fgd") is not None and m["fgd"] != 1:
+            d["g"] = m["fgd"]   # fração da GD descontada da carga mínima (calibrada com os orçamentos)
         if (raiz / pasta / "dados" / "orc.json").exists():
             d["o"] = 1      # tem estudos da distribuidora (scripts/orcamentos.py)
         dists.append(d)
