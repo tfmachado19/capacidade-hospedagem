@@ -28,6 +28,15 @@ nem sempre programadores: explique resultados em linguagem simples.
   área (ao abrir a aba Usinas). Gerado por `trafos_bdgd.py` junto com `dados/<código IBGE>.json`.
   Cada local tem `f` = nº de fases do primário do trafo (FAS_CON_P: 3 = trifásico), usado no filtro
   "Só trafo trifásico".
+- `dados/orc.json` — **estudos da RGE** tirados dos orçamentos de conexão (PDF) por `scripts/orcamentos.py`
+  (`python3 -I scripts/orcamentos.py <PDFs ou pasta> --site .`; precisa do `pdftotext`). Por trafo da BDGD:
+  nº do trafo na RGE, data, fluxo direto/inverso, quanto cabe (kW), UCs e GD na data; também os trafos
+  vizinhos citados no estudo e estudos de alimentador. O nº do trafo no orçamento (número operativo da
+  CPFL) **não existe na BDGD**: o casamento é pela coordenada da UC + alimentador + kVA + nº de UCs + GD
+  (casamento duvidoso fica de fora). Só grava dados do trafo: nome, CPF, endereço, UC, coordenada e nº do
+  pedido do cliente **nunca** vão para o repositório, nem os PDFs (`*.pdf` no `.gitignore`). O site mostra
+  o estudo na ficha do trafo, contorno tracejado no mapa e busca pelo nº da RGE. `unificar.py` marca com
+  `o: 1` as distribuidoras que têm `orc.json`.
 - `dados/alim.json` — visão do estado na aba Usinas: um resumo por alimentador (centro e retângulo dos
   trafos, folga `capa`, GD, carregamento, nº de trafos `n`, locais com 1 UC `i` e trifásicos `i3`).
   Folga > 0 = alimentador sem inversão de fluxo. De longe o mapa mostra um círculo por alimentador; de

@@ -1158,6 +1158,8 @@ header{padding-bottom:0}
 .pill{display:inline-flex;align-items:center;gap:5px}.pill .ico{stroke:#fff!important}
 .near button{grid-template-columns:16px 1fr auto}
 .acoes{display:flex;gap:8px;flex-wrap:wrap}.acoes button{min-height:40px}
+.orc{border-left:3px solid var(--accent);background:var(--chip);border-radius:6px;padding:7px 9px;font-size:13px}
+.orc b.t{display:block;margin-bottom:2px}.orc ul{margin:2px 0 4px;padding-left:16px}.orc li{margin:1px 0}.orc .inv{color:#c62828;font-weight:600}
 details.mais summary{cursor:pointer;color:var(--accent);font-weight:600;font-size:13px}
 details.mais[open] summary{margin-bottom:6px}
 /* Ficha do trafo flutuando sobre o mapa (computador) */
@@ -1369,6 +1371,8 @@ body.medindo .leaflet-control.legenda,body.medindo .leaflet-control.legAlimC{dis
       <dt>GD já ligada</dt><dd>Base de GD da ANEEL</dd></dl>
       <h2>Capacidade do trafo</h2>
       <p>Menor valor entre a carga mínima de dia (o consumo dos vizinhos ao meio-dia, × fator de segurança) e a potência do trafo, descontada a GD que já existe. Acima da carga mínima, a energia volta para a rede (inversão de fluxo).</p>
+      <h2>Estudos da distribuidora</h2>
+      <p>Trafos com contorno tracejado no mapa já apareceram num orçamento de conexão da distribuidora (o do cliente ou um vizinho analisado no estudo). A ficha mostra o sentido do fluxo e quanto ainda cabe segundo a distribuidora, na data do estudo. O número do trafo no orçamento não existe na BDGD: o trafo é achado pela posição, pelo alimentador, pela potência e pelo número de UCs e de GD. Busque pelo número do orçamento no campo de busca.</p>
       <h2>Capacidade do alimentador</h2>
       <p>Menor valor entre a carga mínima de dia do alimentador e a capacidade do cabo de saída, descontada a GD em BT e MT. O carregamento do alimentador é a demanda de pico ÷ capacidade do cabo de saída; valores muito acima de 100% indicam dado atípico na BDGD.</p>
       <h2>Prospecção</h2>
@@ -1626,6 +1630,7 @@ function desenhar(){
     const m=new Forma([t.lat,t.lon],{forma:FORMA[k],radius:t===sel?10:6,color:t===sel?cssVar("--ink"):c,weight:t===sel?3:1,fillColor:c,fillOpacity:.85});
     m.bindTooltip(()=>dicaTrafo(t),{direction:"top",offset:[0,-6]});
     m.on("click",e=>{L.DomEvent.stopPropagation(e);abrir(t)});capa.addLayer(m);marcas.set(t.id,m);
+    if(orcDe(t))capa.addLayer(L.circleMarker([t.lat,t.lon],{radius:t===sel?15:10,color:cssVar("--ink"),weight:1.5,dashArray:"3 3",fill:false,interactive:false}));
   });
   // aba Usinas: locais de todo o estado, pintados pela folga do alimentador (camada própria)
   // legenda conta todos os locais do filtro; mapa, lista e CSV ficam só com as cores marcadas
@@ -1677,11 +1682,32 @@ function veredito(){
 }
 function rodape(){return `<p class="note">Estimativa para triagem a partir de dados públicos da ANEEL (BDGD de ${esc(META.base)}). Não substitui a análise da distribuidora. Veja como é calculado na aba “Sobre os dados”.</p>`}
 const LIM={"inversão de fluxo":"Limitada pela carga mínima de dia (risco de inversão de fluxo)","potência do trafo":"Limitada pela potência do trafo","sem dado":"Sem dado de carga na BDGD"};
+// ---- Estudos da distribuidora (orçamentos de conexão): <pasta>dados/orc.json, gerado por scripts/orcamentos.py
+// {t:{<id do trafo>:{m:<município>,e:[{tr,d,f:"D"|"I",lim,ucs,ugd,gd,v,kva,cmin,pk,lib}]}}, a:{<alimentador>:[{d,f,min,ucs,gd,pk,lib}]}}
+const ORC={};
+async function carregarOrc(){
+  await Promise.all((META.dists?META.dists.filter(d=>d.o):[{k:"",p:""}]).map(async d=>{try{const r=await fetch(`${BASE}${d.p}dados/orc.json`);if(r.ok)ORC[d.k]=await r.json()}catch(e){}}));
+  if(D&&D.length){desenhar();render()}
+}
+const orcDist=()=>ORC[META.dist||""]||ORC[""],orcDe=t=>{const o=orcDist();return o&&o.t[t.id]};
+const dataBr=s=>s.split("-").reverse().join("/");
+function htmlOrc(t){
+  const r=orcDe(t),al=t.alim&&orcDist()&&orcDist().a[t.alim],nd=esc(META.titulo||"distribuidora");if(!r&&!al)return "";
+  const lin=x=>`<li>${dataBr(x.d)}: fluxo ${x.f==="I"?'<span class="inv">inverso</span> (sem folga)':"direto, cabem <b>"+fmt(x.lim,2)+" kW</b>"}`+
+    (x.v?" · trafo vizinho de um pedido":x.pk?` · pedido de ${fmt(x.pk)} kW${x.lib!=null?", liberados "+fmt(x.lib,2)+" kW sem obra":""}`:"")+"</li>";
+  const la=x=>`<li>Alimentador ${esc(t.alim)} (${dataBr(x.d)}): fluxo ${x.f==="I"?'<span class="inv">inverso</span>':"direto"}${x.pk?` · pedido de ${fmt(x.pk)} kW${x.lib!=null?", liberados "+fmt(x.lib)+" kW":""}`:""}</li>`;
+  const u=r&&r.e[0];
+  return `<div class="orc"><b class="t">Estudo da ${nd}${u?" · trafo nº "+esc(u.tr):""}</b><ul>${r?r.e.slice(0,4).map(lin).join(""):""}${al?al.slice(0,2).map(la).join(""):""}</ul>`+
+    `<div class="base">Dos orçamentos de conexão enviados pela distribuidora${u?` (na data: ${u.ucs} UCs, GD ${fmt(u.gd,1)} kW)`:""}. Vale mais que a estimativa acima.</div></div>`;
+}
+// abre um trafo de qualquer município (busca pelo nº do trafo na distribuidora)
+async function abrirTrafoMun(k,id){if(k!==META.munK)await carregarMun(k,false);const t=D.find(x=>String(x.id)===String(id));if(t)abrir(t)}
 let detAberto=false;
 function ficha(t){
   const pot=+potEl.value||0,k=classe(t,pot),r=pot>0?ROTP:ROT;
   return `<div class="card"><div class="top"><span class="id">Trafo ${esc(t.id)}</span><span class="pill" style="background:${COR[k]}">${icone(k,12)}${r[k]}</span></div>
   <div><div class="base">Capacidade estimada para nova GD</div><div class="big">${fmt(t.cap)} <small>kW</small></div><div class="base">${esc(LIM[t.lim]||t.lim)}</div></div>
+  ${htmlOrc(t)}
   <dl><dt>Potência do trafo</dt><dd>${fmt(t.kva,1)} kVA</dd><dt>GD já ligada</dt><dd>${fmt(t.gd,1)} kW</dd>
   <dt>Alimentador ${esc(t.alim||"–")}</dt><dd>${fmt(t.capa,0)} kW livres</dd></dl>
   <details class="mais"${detAberto?" open":""}><summary>Mais detalhes</summary>
@@ -1722,7 +1748,8 @@ function relatorio(t){
   <table>${lin("Potência do trafo",fmt(t.kva,1)+" kVA")+lin("GD já ligada",fmt(t.gd,1)+" kW")+lin("Unidades consumidoras · geradoras",t.ucs+" · "+t.ugs)+
     lin("Carga mínima diurna",fmt(t.cmin,2)+" kW")+lin("Demanda de pico",fmt(t.pico,2)+" kW")+lin("Carregamento do trafo",fmt(t.car)+" %")+
     lin("Alimentador · subestação",esc(t.alim||"–")+" · "+esc(t.sub||"–"))+lin("Capacidade p/ nova GD no alimentador",fmt(t.capa,0)+" kW")+
-    lin("Carregamento do alimentador",fmt(t.ca)+" %")+lin("GD no alimentador",fmt(t.gda,0)+" kW")+lin("Coordenadas",t.lat.toFixed(6)+", "+t.lon.toFixed(6))}</table>
+    lin("Carregamento do alimentador",fmt(t.ca)+" %")+lin("GD no alimentador",fmt(t.gda,0)+" kW")+lin("Coordenadas",t.lat.toFixed(6)+", "+t.lon.toFixed(6))+
+    (orcDe(t)?orcDe(t).e.slice(0,4).map(x=>lin(`Estudo da ${esc(META.titulo||"distribuidora")} (${dataBr(x.d)}), trafo nº ${esc(x.tr)}`,x.f==="I"?"fluxo inverso (sem folga)":"fluxo direto, cabem "+fmt(x.lim,2)+" kW")).join(""):"")}</table>
   <p class="s">Estimativa para triagem a partir de dados públicos da ANEEL (BDGD e base de GD). Não considera proteção nem manobras e não substitui a análise de inversão de fluxo da distribuidora.</p>
   <p class="s">Consulta on-line: ${esc(linkTrafo(t))}</p><button onclick="print()">Imprimir / salvar PDF</button></body></html>`);
   w.document.close();w.focus();setTimeout(()=>{try{w.print()}catch(e){}},300);
@@ -2209,7 +2236,8 @@ function dicaTrafo(t){
   const pot=+potEl.value||0,k=classe(t,pot);
   return `<b>Trafo ${esc(t.id)}</b> · ${fmt(t.kva,1)} kVA<br>Capacidade p/ GD: <b>${fmt(t.cap)} kW</b> (${esc(t.lim)})<br>
   GD instalada: ${fmt(t.gd,1)} kW · ${t.ugs} UG · ${t.ucs} UCs<br>Carregamento: ${fmt(t.car)} %<br>
-  Alimentador ${esc(t.alim||"–")}: cap. p/ GD ${fmt(t.capa,0)} kW · carreg. ${fmt(t.ca)} %`;
+  Alimentador ${esc(t.alim||"–")}: cap. p/ GD ${fmt(t.capa,0)} kW · carreg. ${fmt(t.ca)} %`+
+  (orcDe(t)?`<br><b>Estudo da ${esc(META.titulo||"distribuidora")}</b> (${dataBr(orcDe(t).e[0].d)}): fluxo ${orcDe(t).e[0].f==="I"?"inverso":"direto, cabem "+fmt(orcDe(t).e[0].lim,2)+" kW"}`:"");
 }
 function dicaEmp(x){
   const a=(empCache[META.mun]||{a:{}}).a;
@@ -2353,6 +2381,11 @@ function sugestoes(){
       tp:fmtK(t.kva)+" kVA · "+esc(META.munNome.split(",")[0]),f:()=>{qEl.value="";fecharSug();abrir(t)}}));
     [...new Set(D.map(t=>t.alim).filter(a=>a&&a.toUpperCase().includes(up)))].slice(0,3).forEach(a=>it.push({ic:"⚡",h:"Alimentador "+marca(a),
       tp:esc(META.titulo||""),f:()=>{qEl.value="";fecharSug();aba("C");alimEl.value=a;sel=null;ponto=null;resumoFiltros();desenhar();render();ajustar()}}))}
+  if(/^\d{4,8}$/.test(txt)){let n=0;
+    for(const [dk,o] of Object.entries(ORC))for(const [id,r] of Object.entries(o.t)){if(n>=4)break;const e=r.e.find(x=>String(x.tr).includes(txt));if(!e)continue;n++;
+      const m=META.muns?META.muns.find(x=>x.c===r.m&&(!META.dists||x.d===dk)):null;
+      it.push({ic:"▲",h:`Trafo nº ${marca(e.tr)} (${esc(dk?nomeDist(dk):META.titulo||"")})`,tp:(m?esc(m.n)+" · ":"")+"BDGD "+esc(id),
+        f:()=>{qEl.value="";fecharSug();aba("C");m?abrirTrafoMun(munK(m),id):(()=>{const t=D.find(x=>String(x.id)===id);if(t)abrir(t)})()}})}}
   if(EST&&q.length>=3){let n=0;for(const r of EST){if(n>=5)break;if(!distOff.P.has(r[11])&&semAc(r[9]||"").includes(q)){n++;
     it.push({ic:"◆",h:"Empresa · "+marca(r[9]||""),tp:esc(nomeMun({m:r[7],d:r[11]}))+" · "+fmt(r[2],0)+" kWh/mês",
       f:()=>{qEl.value="";fecharSug();aba("P");abrirPainel();abrirEmpEst(r)}})}}}
@@ -2701,8 +2734,8 @@ if(META.muns){
   const hm=META.muns.find(m=>munK(m)===hMun)||META.muns.find(m=>m.c===hMun&&(!META.dists||m.d===META.dists[0].k))||META.muns.find(m=>m.c===hMun);
   if(hm)carregarMun(munK(hm)).then(()=>{const t=hTr&&D.find(x=>String(x.id)===hTr);if(t)abrir(t)});
   else{if(META.dists){META.munNome="Rio Grande do Sul";document.getElementById("titulo").textContent="Rio Grande do Sul"}desenhar();render()}
-  ligarInv();
-}else{desenhar();render();ajustar();const t=hTr&&D.find(x=>String(x.id)===hTr);if(t)abrir(t)}
+  ligarInv();carregarOrc();
+}else{carregarOrc();desenhar();render();ajustar();const t=hTr&&D.find(x=>String(x.id)===hTr);if(t)abrir(t)}
 </script>
 </body>
 </html>

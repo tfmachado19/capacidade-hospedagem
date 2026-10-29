@@ -42,7 +42,10 @@ def main():
         padrao = padrao or m["default"]
         metas.append(m)
         muns += [dict(x, d=k, k=f"{k}:{x['c']}") for x in m["muns"]]
-        dists.append({"k": k, "n": nome, "p": pasta, "padrao": f"{k}:{padrao}"})
+        d = {"k": k, "n": nome, "p": pasta, "padrao": f"{k}:{padrao}"}
+        if (raiz / pasta / "dados" / "orc.json").exists():
+            d["o"] = 1      # tem estudos da distribuidora (scripts/orcamentos.py)
+        dists.append(d)
     chave = lambda x: (unicodedata.normalize("NFKD", x["n"]).encode("ascii", "ignore").decode().lower(), x["d"])
     muns.sort(key=chave)
     b = [m["bboxAll"] for m in metas]
