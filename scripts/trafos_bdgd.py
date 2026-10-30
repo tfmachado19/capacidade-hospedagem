@@ -1243,6 +1243,10 @@ h3.subt{font:700 13px var(--display);text-transform:uppercase;letter-spacing:.06
 .cabe{border:1px solid var(--line);border-left:4px solid #16a34a;border-radius:8px;padding:8px 10px;margin:8px 0}
 .cabe.nao{border-left-color:#dc2626}
 .pt{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:5px;vertical-align:middle}
+/* aba Medir: cruz fina para marcar os cantos com precisão (ponto vermelho no centro = ponto marcado) */
+body.medindo .leaflet-container,body.medindo .leaflet-grab,body.medindo .leaflet-interactive{cursor:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='33' height='33'%3E%3Cpath d='M16.5 1v13M16.5 19v13M1 16.5h13M19 16.5h13' stroke='%23fff' stroke-width='4'/%3E%3Cpath d='M16.5 1v13M16.5 19v13M1 16.5h13M19 16.5h13' stroke='%23000' stroke-width='1.5'/%3E%3Ccircle cx='16.5' cy='16.5' r='1.3' fill='%23e11d48'/%3E%3C/svg%3E") 16 16,crosshair!important}
+body.medindo.mapaLivre .leaflet-container{cursor:grab!important}body.medindo.mapaLivre .leaflet-dragging .leaflet-container,body.medindo.mapaLivre.leaflet-dragging{cursor:grabbing!important}
+body.medindo.sobreModulo .leaflet-container{cursor:move!important}body.medindo .leaflet-marker-icon.altv,body.medindo .leaflet-marker-icon.vert{cursor:pointer!important}
 body.plantaFundo #map{background:#fff}body.plantaFundo .leaflet-tile-pane{opacity:0}body.plantaFundo .selo{visibility:hidden}
 .medCalPt{background:#e11d48;border:2px solid #fff;border-radius:50%}
 body.medindo .leaflet-control.legenda,body.medindo .leaflet-control.legAlimC{display:none!important}
@@ -2839,7 +2843,11 @@ function medManual(on){
 med.camMao=L.layerGroup();med.mapaLivre=false;let arr=null;
 // no modo à mão o arraste desenha: o navegador não pode usar o gesto para rolar (touch-action), senão cancela o arraste
 function medArrasteMapa(){const on=abaAtual==="M"&&med.manual&&!med.mapaLivre;
-  if(on)map.dragging.disable();else map.dragging.enable();map.getContainer().style.touchAction=on?"none":""}
+  if(on)map.dragging.disable();else map.dragging.enable();map.getContainer().style.touchAction=on?"none":"";
+  document.body.classList.toggle("mapaLivre",abaAtual==="M"&&med.manual&&med.mapaLivre)}
+// em cima de um módulo (modo à mão), a seta de mover no lugar da cruz
+map.getContainer().addEventListener("mousemove",e=>{const on=abaAtual==="M"&&med.manual&&!med.mapaLivre&&!arr&&med.man.length>0&&
+  modEm((ll=>[ll.lat,ll.lng])(map.mouseEventToLatLng(e)))>=0;document.body.classList.toggle("sobreModulo",on)});
 function desenharMao(){
   med.camMao.clearLayers();if(!med.manual)return;
   med.man.forEach((m,i)=>{if(arr&&arr.tipo==="mover"&&arr.i===i&&!arr.moveu)return;
