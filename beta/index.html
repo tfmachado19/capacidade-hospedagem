@@ -245,6 +245,12 @@ h3.subt{font:700 13px var(--display);text-transform:uppercase;letter-spacing:.06
 body.medindo .leaflet-container,body.medindo .leaflet-grab,body.medindo .leaflet-interactive{cursor:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='33' height='33'%3E%3Cpath d='M16.5 1v13M16.5 19v13M1 16.5h13M19 16.5h13' stroke='%23fff' stroke-width='4'/%3E%3Cpath d='M16.5 1v13M16.5 19v13M1 16.5h13M19 16.5h13' stroke='%23000' stroke-width='1.5'/%3E%3Ccircle cx='16.5' cy='16.5' r='1.3' fill='%23e11d48'/%3E%3C/svg%3E") 16 16,crosshair!important}
 body.medindo.mapaLivre .leaflet-container{cursor:grab!important}body.medindo.mapaLivre .leaflet-dragging .leaflet-container,body.medindo.mapaLivre.leaflet-dragging{cursor:grabbing!important}
 body.medindo.sobreModulo .leaflet-container{cursor:move!important}body.medindo .leaflet-marker-icon.altv,body.medindo .leaflet-marker-icon.vert{cursor:pointer!important}
+#medBarra{position:fixed;left:50%;transform:translateX(-50%);bottom:36px;z-index:800;background:rgba(255,255,255,.97);color:#111;
+  border-radius:10px;box-shadow:0 2px 12px rgba(0,0,0,.28);padding:7px 14px;display:flex;gap:16px;font-size:13px;white-space:nowrap}
+#medBarra b{font-weight:600;color:#475569;margin-right:4px}#medBarra[hidden]{display:none}
+@media(max-width:760px){#medBarra{bottom:auto;top:116px;font-size:12px;gap:10px;padding:5px 10px}}
+.seRot{background:#0ea5e9;color:#fff;border:2px solid #fff;border-radius:50%;font:700 15px/22px sans-serif;text-align:center;
+  width:26px!important;height:26px!important;margin:-13px 0 0 -13px!important;cursor:grab!important;box-shadow:0 1px 4px rgba(0,0,0,.4)}
 body.plantaFundo #map{background:#fff}body.plantaFundo .leaflet-tile-pane{opacity:0}body.plantaFundo .selo{visibility:hidden}
 .medCalPt{background:#e11d48;border:2px solid #fff;border-radius:50%}
 body.medindo .leaflet-control.legenda,body.medindo .leaflet-control.legAlimC{display:none!important}
@@ -359,7 +365,7 @@ body.medindo .leaflet-control.legenda,body.medindo .leaflet-control.legAlimC{dis
         </div>
       </div>
       <div class="acoes" role="group" aria-label="Como pôr os módulos">
-        <button type="button" id="medAuto" aria-pressed="true">Módulos automáticos</button>
+        <button type="button" id="medAuto" aria-pressed="true">Módulos por água</button>
         <button type="button" class="ghost" id="medMao" aria-pressed="false">Posicionar à mão</button></div>
       <div id="medMaoCtl" hidden>
         <p class="hint">Arraste um módulo para mudar de lugar (perto de outro, ele encaixa a 5 cm). Arraste no espaço vazio para abrir uma caixa que vai criando módulos em fileiras; começando colado num módulo, continua a fileira dele. Um toque põe ou seleciona um módulo.</p>
@@ -373,6 +379,12 @@ body.medindo .leaflet-control.legenda,body.medindo .leaflet-control.legAlimC{dis
         <button type="button" class="ghost" id="medNovo">Novo contorno</button>
         <button type="button" class="ghost" id="medLimpa">Limpar</button>
       </div>
+      <div class="acoes">
+        <button type="button" class="ghost" id="medDesf" title="Desfazer (Ctrl+Z)" disabled>↶ Desfazer</button>
+        <button type="button" class="ghost" id="medRef" title="Refazer (Ctrl+Y)" disabled>↷ Refazer</button>
+        <button type="button" class="ghost" id="medExp">Exportar</button>
+        <button type="button" class="ghost" id="medImp">Importar</button>
+        <input type="file" id="medImpArq" accept="application/json,.json" hidden></div>
       <input type="hidden" id="medInc" value="17"><span id="medRowInc" hidden></span>
       <div id="medTelBox">
         <div class="acoes" role="group" aria-label="O que desenhar no telhado">
@@ -394,7 +406,7 @@ body.medindo .leaflet-control.legenda,body.medindo .leaflet-control.legAlimC{dis
       </div>
       <div class="row" id="medRowSolo" hidden><label for="medPasso">Entre mesas</label><input id="medPasso" type="number" min="2" max="20" step="0.1" value="6"><span class="base">m (centro a centro)</span>
         <label for="medIncS">Inclinação</label><input id="medIncS" type="number" min="0" max="40" step="1" value="20"><span class="base">°</span></div>
-      <div class="row"><label for="medMg">Afastamento</label><input id="medMg" type="number" min="0" max="20" step="0.1" value="0.3"><span class="base">m das bordas</span></div>
+      <div class="row" id="medRowMg" hidden><label for="medMg">Afastamento</label><input id="medMg" type="number" min="0" max="20" step="0.1" value="0.3"><span class="base">m das bordas</span></div>
       <div class="row"><label for="medW">Módulo</label><input id="medW" type="number" min="100" max="900" step="5" value="620"><span class="base">W</span>
         <input id="medC" type="number" min="0.5" max="3" step="0.001" value="2.465" aria-label="comprimento do módulo (m)"><span class="base">×</span>
         <input id="medL" type="number" min="0.5" max="2" step="0.001" value="1.134" aria-label="largura do módulo (m)"><span class="base">m</span></div>
@@ -1581,6 +1593,8 @@ async function medClique(ll){
   if(med.manual){if(med.mapaLivre)medMaoClique(ll);return}
   if(med.tipo==="telhado"&&med.ferr==="obst"){obsClique(ll);return}
   if(med.tipo==="telhado"&&med.ferr==="alt")return;   // nas alturas, só os cantos respondem
+  if(seAtivo()){if(med.mapaLivre)seClique(ll,false);return}   // água selecionada: quem trata é o arraste (pointer)
+  if(med.tipo==="telhado"&&med.modo!=="desenho"){const g=faceEm([ll.lat,ll.lng]);if(g){med.seSel=g;medDesenhar();medRender();medArrasteMapa();return}}
   if(med.modo==="desenho"){med.pts.push(medGruda(ll));med.fonte="desenho";medDesenhar();medRender();return}
   if(med.pts.length>=3){medMsgTopo(med.tipo==="telhado"?"Face pronta. Para a próxima água do telhado, toque em \"Adicionar face\".":"Contorno pronto. Para começar de novo, toque em \"Novo contorno\".");return}
   medModo("desenho",true);med.pts.push(medGruda(ll));medDesenhar();medRender();return;
@@ -1604,13 +1618,15 @@ function medDesenhar(){
       :L.polyline(pts,{color:"#f2b400",weight:3,dashArray:"6 4",interactive:false,renderer:rTopo})).addTo(med.camada);
     if(ativo)med.forma=forma;
     if(!fechado)return;
-    const fi=med.tipo==="telhado"?faceInfo(pts):null,ob=med.obst.map(o=>o.pts);
-    const lay=medLayout(pts,fi?{...cfg,inc:fi.th,ang:fi.ang,obst:ob}:{...cfg,obst:ob});med.lay.push({pts,lay,fi});
+    const ob=med.obst.map(o=>o.pts);let fi=null,lay;
+    if(med.tipo==="telhado"){const r=seFace(pts,ob);fi=r.fi;lay=r.lay}else lay=medLayout(pts,{...cfg,obst:ob});
+    med.lay.push({pts,lay,fi});
     if(fi){const q=proj(pts),cx=pts.reduce((s,p)=>[s[0]+p[0]/pts.length,s[1]+p[1]/pts.length],[0,0]);
       L.tooltip({permanent:true,direction:"center",className:"faceLbl"}).setLatLng(cx)
         .setContent(`F${k+1} · ${fmt(fi.th,0)}°${fi.est?"?":""}${fi.az!=null?" · "+fmt(fi.az,0)+"° "+card(fi.az):""}`).addTo(med.camada)}
     // desenho limitado (áreas enormes); a contagem usa todos
     if(med.manual){}
+    else if(med.tipo==="telhado")seDesenhar(pts,lay);
     else if(lay.n>MED_DESENHO)   // muitos módulos: desenha as mesas cheias (mesmo esboço, mais leve)
       lay.mesas.forEach(m=>L.polygon(m,{color:"#0f172a",weight:.8,fillColor:"#1e3a8a",fillOpacity:.85,interactive:false,renderer:rTopo}).addTo(med.camada));
     else{lay.mods.forEach(m=>L.polygon(m,{color:"#bfdbfe",weight:.6,fillColor:"#1e3a8a",fillOpacity:.8,interactive:false,renderer:rTopo}).addTo(med.camada));
@@ -1706,8 +1722,10 @@ function medModo(m,manter){
   med.modo=m;
   $("medDica").textContent=m==="desenho"?`Toque nos cantos ${med.tipo==="solo"?"do terreno":"do telhado"}, em sequência, na imagem de satélite. Para terminar, toque no primeiro canto. Arraste um canto para ajustar.`
     :med.tipo==="solo"?"Contorno pronto. Use \"Ajustar cantos\" para corrigir ou \"Novo contorno\" para começar de novo."
-    :"Face pronta. Use \"Adicionar face\" para a próxima água (toque nos cantos já marcados para ligar as faces) e depois \"Alturas\" para a inclinação.";
+    :"Água pronta e selecionada: ajuste beiral, inclinação e módulos no painel da água (abaixo). Toque em outra água para editá-la, ou em \"Adicionar face\" para desenhar a próxima (toque nos cantos já marcados para ligar as águas).";
   if(m==="desenho"&&!manter){med.pts=[];med.editando=false}
+  if(m==="desenho")med.seSel=null;else if(med.tipo==="telhado"&&!med.manual&&med.pts.length>=3&&!med.seSel)med.seSel=med.pts;
+  if(typeof medArrasteMapa==="function")medArrasteMapa();
   $("medNovo").textContent=med.tipo==="telhado"&&(med.pts.length>=3||med.areas.length)?"Adicionar face":"Novo contorno";
   medDesenhar();medRender();
 }
@@ -1715,13 +1733,13 @@ function medTipo(t){
   med.tipo=t;med.areas=[];med.pts=[];med.editando=false;
   $("medTel").setAttribute("aria-pressed",t==="telhado");$("medSolo").setAttribute("aria-pressed",t==="solo");
   $("medTel").className=t==="telhado"?"":"ghost";$("medSolo").className=t==="solo"?"":"ghost";
-  $("medRowInc").hidden=t!=="telhado";$("medRowSolo").hidden=t!=="solo";$("medTelBox").hidden=t!=="telhado";if(t!=="telhado"&&med.ferr!=="face")medFerr("face");$("medMg").value=t==="solo"?"3":"0.3";
+  $("medRowInc").hidden=t!=="telhado";$("medRowSolo").hidden=t!=="solo";$("medRowMg").hidden=t==="telhado";med.seSel=null;$("medTelBox").hidden=t!=="telhado";if(t!=="telhado"&&med.ferr!=="face")medFerr("face");$("medMg").value=t==="solo"?"3":"0.3";
   medModo("desenho",true);
 }
 function medRender(){
   if(med.manual)return medRenderMao();
   const el=$("infoMed"),areas=(med.lay||[]);
-  if(!areas.length){el.innerHTML=med.modo==="desenho"?`<p class="hint">${med.pts.length} de pelo menos 3 cantos marcados.</p>`:"";return}
+  if(!areas.length){el.innerHTML=med.modo==="desenho"?`<p class="hint">${med.pts.length} de pelo menos 3 cantos marcados.</p>`:"";medMudou();return}
   const c=medCfg(),w=+$("medW").value||0,solo=c.tipo==="solo",inc=solo?0:c.inc;
   let nTot=0,aTot=0,uTot=0;
   const linhas=areas.map(({pts,lay,fi},i)=>{const m=medidas(pts),th=fi?fi.th:inc,k=Math.cos(th*Math.PI/180),a=m.area/k;
@@ -1732,7 +1750,7 @@ function medRender(){
     return {i,a,u:a-ob,ob,plano:m.area,per:m.per,ret:m.ret,n:lay.n,mesas:lay.mesas.length,cheio:lay.cheio,fi}});
   const kwp=nTot*w/1000,um=linhas.length===1?linhas[0]:null,est=linhas.some(l=>l.fi&&l.fi.est),obs=linhas.some(l=>l.ob>0);
   const faceTxt=l=>l.fi?`${fmt(l.fi.th,0)}°${l.fi.est?" (estimada)":""} · ${l.fi.az!=null?fmt(l.fi.az,0)+"° "+card(l.fi.az):"sem azimute"}`:"";
-  el.innerHTML=`<section><h2>${solo?"Terreno":linhas.length>1?"Telhado · "+linhas.length+" faces":"Telhado"}</h2><div class="card">
+  el.innerHTML=`${sePainelHtml()}<section><h2>${solo?"Terreno":linhas.length>1?"Telhado · "+linhas.length+" faces":"Telhado"}</h2><div class="card">
    <div><div class="base">${solo?"Área do terreno":"Área real do telhado"+(linhas.length>1?" (somada)":"")}</div><div class="medGrande">${fmt(aTot,1)} <small>m²</small></div></div>
    <dl>${obs?`<dt>Área útil (sem obstáculos)</dt><dd>${fmt(uTot,1)} m²</dd>`:""}
    ${um?`${um.fi?`<dt>Inclinação · azimute</dt><dd>${faceTxt(um)}</dd><dt>Área vista de cima</dt><dd>${fmt(um.plano,1)} m²</dd>`:""}<dt>Perímetro</dt><dd>${fmt(um.per,1)} m</dd><dt>Medidas (retângulo envolvente)</dt><dd>${fmt(um.ret.c,1)} × ${fmt(um.ret.l,1)} m</dd>`
@@ -1748,7 +1766,7 @@ function medRender(){
    <button type="button" class="ghost" id="medEdita">${med.editando||med.modo==="desenho"?"Parar de editar":"Ajustar cantos"}</button>
    <button type="button" class="ghost" id="medCopia">Copiar medidas</button></div>
    <p class="hint">${solo?`Esboço de mesas com 2 linhas de módulos em pé, inclinadas ${fmt(c.incS,0)}°, a ${fmt(c.passo,1)} m entre centros, afastadas ${fmt(c.mg,1)} m da divisa.`
-     :`Esboço com módulos em pé ou deitados (o que couber mais), afastados ${fmt(c.mg,1)} m das bordas${obs?" e fora dos obstáculos":""}. `+
+     :`Toque numa água para editar beiral, inclinação, retrato/paisagem, recuo, espaçamentos e rotação, e para tirar ou pôr módulos${obs?" (obstáculos não recebem módulo)":""}. `+
       (est?`Inclinação não informada: considerada ${c.inc}°. Use “Alturas” (beiral e cumeeira) para a inclinação, o azimute e a área real de cada face. `
         :`Inclinação e azimute de cada face pelas alturas dos cantos (azimute: 0° = Norte, sentido horário, para onde a água escorre); fileiras ao longo do beiral. `)}
    É uma estimativa: sombras, orientação e obstáculos mudam o resultado. Geração pela média do RS (~1.150 kWh/kWp por ano).</p></div></section>`;
@@ -1757,11 +1775,14 @@ function medRender(){
     navigator.clipboard?.writeText(t).then(()=>{$("medCopia").textContent="Copiado!"},()=>{})};
   $("medConsulta").onclick=()=>{const todos=areas.flatMap(a=>a.pts),cc=todos.reduce((s,p)=>[s[0]+p[0]/todos.length,s[1]+p[1]/todos.length],[0,0]);
     potEl.value=Math.round(kwp*100)/100;aba("C");filtraRow.hidden=false;pontoGlobal(cc[0],cc[1],solo?"Terreno medido":"Telhado medido")};
+  seLigarPainel();medMudou();
+  if(med.seSel!==medUltSel){medUltSel=med.seSel;const sp=el.querySelector(".sePainel");if(sp)setTimeout(()=>sp.scrollIntoView({block:"start",behavior:"smooth"}),50)}
 }
+let medUltSel=null;
 ["medInc","medIncS","medPasso","medMg","medW","medC","medL"].forEach(i=>$(i).addEventListener("input",()=>{medDesenhar();medRender()}));
 $("medNovo").onclick=()=>{if(med.tipo==="telhado"&&med.pts.length>=3){med.areas.push(med.pts);med.pts=[]}
   else if(med.tipo==="solo"){med.areas=[];med.pts=[]}medModo("desenho",true)};
-$("medLimpa").onclick=()=>{med.areas=[];med.pts=[];med.man=[];med.selM=-1;med.editando=false;
+$("medLimpa").onclick=()=>{med.areas=[];med.pts=[];med.man=[];med.selM=-1;med.editando=false;med.seSel=null;
   med.alt.clear();med.altSel.clear();med.obst=[];med.obsPts=[];medFerr("face");medModo("desenho",true)};
 // ---- Telhado em faces (estilo SolarEdge): cada face é um contorno; cantos iguais de faces vizinhas são o mesmo
 // canto; cada canto tem uma altura (beiral por padrão). Inclinação, azimute e área real saem da normal do plano
@@ -1799,7 +1820,9 @@ function medFerr(k){
 $("medFerFace").onclick=()=>medFerr("face");$("medFerAlt").onclick=()=>medFerr("alt");$("medFerObs").onclick=()=>medFerr("obst");
 $("medBeiral").addEventListener("input",()=>{medDesenhar();medRender()});
 $("medAltOk").onclick=()=>{const v=+$("medAltSel").value;if(!med.altSel.size||!(v>=0))return;
-  med.altSel.forEach(k=>med.alt.set(k,v));med.altSel.clear();medDesenhar();medRender()};
+  med.altSel.forEach(k=>med.alt.set(k,v));med.altSel.clear();
+  [...med.areas,med.pts].forEach(f=>{if(f.p){const fi=faceInfo(f);if(!fi.est){f.p.inc=+fi.th.toFixed(1);f.p.b=bordaPadrao(f)}}});
+  medDesenhar();medRender()};
 $("medAltSel").addEventListener("keydown",e=>{if(e.key==="Enter")$("medAltOk").click()});
 $("medObApaga").onclick=()=>{if(med.obsPts.length)med.obsPts=[];else med.obst.pop();medDesenhar();medRender()};
 // ---- Módulos à mão: {c:[lat,lon] centro, a: ângulo (rad) da largura em relação ao leste, d: deitado}
@@ -1840,7 +1863,7 @@ function medManual(on){
 // ---- Arrastar: módulo (mover) ou caixa no espaço vazio (cria módulos em fileiras e colunas)
 med.camMao=L.layerGroup();med.mapaLivre=false;let arr=null;
 // no modo à mão o arraste desenha: o navegador não pode usar o gesto para rolar (touch-action), senão cancela o arraste
-function medArrasteMapa(){const on=abaAtual==="M"&&med.manual&&!med.mapaLivre;
+function medArrasteMapa(){const on=abaAtual==="M"&&(med.manual||seAtivo())&&!med.mapaLivre;
   if(on)map.dragging.disable();else map.dragging.enable();map.getContainer().style.touchAction=on?"none":"";
   document.body.classList.toggle("mapaLivre",abaAtual==="M"&&med.manual&&med.mapaLivre)}
 // em cima de um módulo (modo à mão), a seta de mover no lugar da cruz
@@ -1865,8 +1888,13 @@ function caixaModulos(){const m0={c:arr.c0,a:arr.a,d:arr.d},[w,h]=modTam(m0),[x,
   arr.lista=l}
 const mapEl=map.getContainer();
 mapEl.addEventListener("pointerdown",e=>{
-  if(abaAtual!=="M"||!med.manual||med.mapaLivre||e.button>0||e.target.closest(".leaflet-control,.leaflet-popup")||(planta&&planta.cal))return;
-  if(arr){arr=null;desenharMao();return}   // segundo dedo (pinça): cancela
+  const se=seAtivo();
+  if(abaAtual!=="M"||!(med.manual||se)||med.mapaLivre||e.button>0||e.target.closest(".leaflet-control,.leaflet-popup,.leaflet-marker-icon")||(planta&&planta.cal))return;
+  if(arr){arr=null;med.camSel.clearLayers();medDesenhar();return}   // segundo dedo (pinça): cancela
+  if(se){const ll=map.mouseEventToLatLng(e),p=[ll.lat,ll.lng],f=med.seSel,h=seHit(f,p);
+    arr={id:e.pointerId,x:e.clientX,y:e.clientY,moveu:false,shift:e.shiftKey||e.ctrlKey||e.metaKey,f,ll0:ll};
+    if(h&&h.ativo){arr.tipo="arranjo";arr.l0=f.p._h.fr.para(p);arr.off0=f.p.off.slice()}else arr.tipo="selbox";
+    try{mapEl.setPointerCapture(e.pointerId)}catch(_){}return}
   const ll=map.mouseEventToLatLng(e),p=[ll.lat,ll.lng],i=modEm(p);
   arr={id:e.pointerId,x:e.clientX,y:e.clientY,pf:p,i,moveu:false};
   if(i>=0){const m=med.man[i];arr.tipo="mover";arr.off=[m.c[0]-p[0],m.c[1]-p[1]];arr.orig=m.c.slice()}
@@ -1877,11 +1905,19 @@ mapEl.addEventListener("pointermove",e=>{
   if(!arr||e.pointerId!==arr.id)return;
   if(!arr.moveu&&Math.hypot(e.clientX-arr.x,e.clientY-arr.y)<6)return;
   arr.moveu=true;e.preventDefault();const ll=map.mouseEventToLatLng(e);arr.pf=[ll.lat,ll.lng];
+  if(arr.tipo==="arranjo"){const l=arr.f.p._h.fr.para(arr.pf);arr.f.p.off=[arr.off0[0]+l[0]-arr.l0[0],arr.off0[1]+l[1]-arr.l0[1]];medDesenhar();return}
+  if(arr.tipo==="selbox"){med.camSel.clearLayers();L.rectangle([arr.ll0,ll],{color:"#f97316",weight:1.5,dashArray:"4 3",fillOpacity:.08,interactive:false}).addTo(med.camSel);return}
   if(arr.tipo==="mover"){const m=med.man[arr.i];m.c=[arr.pf[0]+arr.off[0],arr.pf[1]+arr.off[1]]}else caixaModulos();
   desenharMao();
 });
 function fimArraste(e,cancela){
   if(!arr||(e&&e.pointerId!==arr.id))return;const a=arr;arr=null;
+  if(a.tipo==="arranjo"||a.tipo==="selbox"){med.camSel.clearLayers();
+    if(cancela){if(a.tipo==="arranjo")a.f.p.off=a.off0;medDesenhar();return}
+    if(!a.moveu){seClique(map.mouseEventToLatLng(e),a.shift);return}
+    if(a.tipo==="selbox"){const b=L.bounds(map.latLngToContainerPoint(a.ll0),map.latLngToContainerPoint(a.pf)),P=a.f.p;
+      if(!a.shift)P.sel=new Set();(P._h.cent||[]).forEach(([k,c])=>{if(b.contains(map.latLngToContainerPoint(c)))P.sel.add(k)})}
+    medDesenhar();medRender();return}
   if(cancela){if(a.tipo==="mover"&&a.moveu)med.man[a.i].c=a.orig}
   else if(!a.moveu){const ll=map.mouseEventToLatLng(e);medMaoClique(ll);return}
   else if(a.tipo==="mover"){const m=med.man[a.i],en=modEncaixa(m.c,a.i);if(en){m.c=en.c;m.a=en.a;m.d=en.dd}med.selM=-1}
@@ -1917,6 +1953,7 @@ function medRenderMao(){
   $("medCopia").onclick=()=>{navigator.clipboard?.writeText(`Cabem ${n} módulos de ${w} W = ${fmt(kwp,2)} kWp (~${fmt(kwp*1150/12,0)} kWh/mês).`).then(()=>{$("medCopia").textContent="Copiado!"},()=>{})};
   $("medConsulta").onclick=()=>{const cc=med.man.reduce((s,m)=>[s[0]+m.c[0]/n,s[1]+m.c[1]/n],[0,0]);
     potEl.value=Math.round(kwp*100)/100;aba("C");filtraRow.hidden=false;pontoGlobal(cc[0],cc[1],"Módulos posicionados")};
+  medMudou();
 }
 $("medTel").onclick=()=>medTipo("telhado");$("medSolo").onclick=()=>medTipo("solo");
 // ---- Planta em PDF ou imagem por baixo do desenho (pdf.js do cdnjs, carregado só quando usar)
@@ -2006,6 +2043,182 @@ $("medCalOk").onclick=()=>{const c=planta&&planta.cal,real=+$("medCalD").value;i
   planta.calLayer.clearLayers();planta.cal=null;$("medRowCal").hidden=true;plantaAtualizar();medModo(med.modo,true);
   medMsg(`Planta calibrada${planta.pdf?" (escala 1:"+$("medEsc").value+")":""}. Marque os cantos do telhado em cima da planta.`);if(!desk.matches)fecharPainel()};
 $("medCalD").addEventListener("keydown",e=>{if(e.key==="Enter")$("medCalOk").click()});
+// ---- Módulos por água (estilo SolarEdge Designer). Cada água guarda em pts.p: aresta do beiral (b), inclinação,
+// orientação, recuo, espaçamentos, rotação extra, deslocamento do arranjo (off) e o grid: células preenchidas
+// (cells "i,j") menos as tiradas pelo usuário (rem). Tudo em metros num referencial com X ao longo do beiral e Y
+// subindo a água; a dimensão no sentido da queda (e o espaçamento entre fileiras) vezes cos(inclinação).
+med.seSel=null;med.camSel=L.layerGroup().addTo(map);
+function seAtivo(){return abaAtual==="M"&&med.tipo==="telhado"&&!med.manual&&med.ferr==="face"&&med.modo!=="desenho"&&!med.editando&&!!med.seSel&&med.seSel.length>=3}
+function faceEm(p){return [...med.areas,med.pts].filter(f=>f.length>=3).reverse().find(f=>dentroPoly(p,f))||null}
+function bordaPadrao(f){   // com alturas: a aresta mais baixa (empate: a mais longa); sem alturas: a mais longa
+  const q=proj(f),n=f.length;let best=0,bs=null;
+  for(let i=0;i<n;i++){const l=Math.hypot(q[(i+1)%n][0]-q[i][0],q[(i+1)%n][1]-q[i][1]),h=med.alt.size?(altDe(f[i])+altDe(f[(i+1)%n]))/2:0,sc=[h,-l];
+    if(!bs||sc[0]<bs[0]-1e-6||(Math.abs(sc[0]-bs[0])<1e-6&&sc[1]<bs[1])){bs=sc;best=i}}return best}
+function seP(f){if(!f.p){const fi=faceInfo(f);f.p={b:bordaPadrao(f),inc:fi.est?15:+fi.th.toFixed(1),orient:"retrato",recuo:+$("medMg").value||0.3,
+  sx:.02,sy:.02,rot:0,off:[0,0],opt:[0,0],cells:null,rem:new Set(),sel:new Set(),gsig:"",lsig:""}}
+  if(f.p.b>=f.length)f.p.b=0;return f.p}
+function seFrame(f,p){
+  const la0=f.reduce((s,q)=>s+q[0],0)/f.length,lo0=f.reduce((s,q)=>s+q[1],0)/f.length,kx=111320*Math.cos(la0*Math.PI/180),ky=110540;
+  const E=f.map(q=>[(q[1]-lo0)*kx,(q[0]-la0)*ky]),n=E.length,b=p.b,A=E[b],B=E[(b+1)%n];
+  let ux=B[0]-A[0],uy=B[1]-A[1];const Lb=Math.hypot(ux,uy)||1;ux/=Lb;uy/=Lb;
+  let nx=-uy,ny=ux;const mx=(A[0]+B[0])/2+nx*.05,my=(A[1]+B[1])/2+ny*.05;
+  let dn=false;for(let i=0,j=n-1;i<n;j=i++){const [xi,yi]=E[i],[xj,yj]=E[j];if(((yi>my)!==(yj>my))&&(mx<(xj-xi)*(my-yi)/(yj-yi)+xi))dn=!dn}
+  if(!dn){nx=-nx;ny=-ny}   // n = normal para dentro (sobe a água)
+  const r=(p.rot||0)*Math.PI/180,c=Math.cos(r),s=Math.sin(r),X=[ux*c+nx*s,uy*c+ny*s],Y=[-ux*s+nx*c,-uy*s+ny*c];
+  const paraE=([e,m])=>[e*X[0]+m*X[1],e*Y[0]+m*Y[1]];
+  return {R:E.map(paraE),para:q=>paraE([(q[1]-lo0)*kx,(q[0]-la0)*ky]),
+    volta:([x,y])=>{const e=x*X[0]+y*Y[0],m=x*X[1]+y*Y[1];return [la0+m/ky,lo0+e/kx]},
+    enu:([e,m])=>[la0+m/ky,lo0+e/kx],la0,lo0,kx,ky,n:[nx,ny],u:[ux,uy],angX:Math.atan2(X[1],X[0]),
+    az:(Math.atan2(-nx,-ny)*180/Math.PI+360)%360,beiral:[f[b],f[(b+1)%n]]};
+}
+function seDims(p){const k=Math.cos(p.inc*Math.PI/180),c=medCfg();const [w,h]=p.orient==="paisagem"?[c.C,c.L*k]:[c.L,c.C*k];return {w,h,sx:p.sx,sy:p.sy*k}}
+// cabe: cantos, meios dos lados e centro dentro do polígono e a pelo menos "recuo" das bordas; nenhum canto do
+// polígono dentro do módulo (água em L); fora dos obstáculos (10 cm). Na borda exata conta como dentro.
+function seCabe(R,mg,OB){const n=R.length;
+  const dentro=(x,y,P)=>{let r=false;for(let i=0,j=P.length-1;i<P.length;j=i++){const [xi,yi]=P[i],[xj,yj]=P[j];
+    if(((yi>y)!==(yj>y))&&(x<(xj-xi)*(y-yi)/(yj-yi)+xi))r=!r}return r};
+  const borda=(x,y)=>{let d=1e9;for(let i=0;i<n;i++){const [ax,ay]=R[i],[bx,by]=R[(i+1)%n],dx=bx-ax,dy=by-ay,l=dx*dx+dy*dy;
+    const t=l?Math.max(0,Math.min(1,((x-ax)*dx+(y-ay)*dy)/l)):0;d=Math.min(d,Math.hypot(x-ax-t*dx,y-ay-t*dy))}return d};
+  return (x,y,w,h)=>{const A=[[x,y],[x+w,y],[x+w,y+h],[x,y+h],[x+w/2,y],[x+w,y+h/2],[x+w/2,y+h],[x,y+h/2],[x+w/2,y+h/2]];
+    return A.every(([a,b])=>{const d=borda(a,b);return (d<1e-6||dentro(a,b,R))&&d>=mg-1e-6})
+      &&!R.some(([px,py])=>px>x-mg+1e-6&&px<x+w+mg-1e-6&&py>y-mg+1e-6&&py<y+h+mg-1e-6)
+      &&!OB.some(o=>A.some(([a,b])=>dentro(a,b,o))||o.some(([px,py])=>px>x-.1&&px<x+w+.1&&py>y-.1&&py<y+h+.1))}}
+function seFace(f,ob){
+  const p=seP(f),fr=seFrame(f,p),d=seDims(p),c=medCfg(),OB=ob.map(o=>o.map(fr.para)),cabe=seCabe(fr.R,p.recuo,OB);
+  const xs=fr.R.map(q=>q[0]),ys=fr.R.map(q=>q[1]),X0=Math.min(...xs),X1=Math.max(...xs),Y0=Math.min(...ys),Y1=Math.max(...ys);
+  const px=d.w+d.sx,py=d.h+d.sy,ni=Math.ceil((X1-X0)/px)+1,nj=Math.ceil((Y1-Y0)/py)+1;
+  const lsig=[p.b,p.inc,p.orient,p.sx,p.sy,p.rot,c.C,c.L].join("|"),gsig=lsig+"|"+p.recuo+"|"+fr.R.map(q=>q[0].toFixed(3)+","+q[1].toFixed(3)).join(";")+"|"+JSON.stringify(ob);
+  if(p.gsig!==gsig||!p.cells){   // preencher: testa N×N deslocamentos do grid e fica com o que dá mais módulos
+    const N=(X1-X0)*(Y1-Y0)>1500?6:20;let best=null;
+    if(px>0&&py>0&&ni*nj<40000)for(let fy=0;fy<N;fy++)for(let fx=0;fx<N;fx++){const o=[fx/N*px,fy/N*py],cl=[];
+      for(let j=-1;j<nj;j++)for(let i=-1;i<ni;i++)if(cabe(X0+o[0]+i*px,Y0+o[1]+j*py,d.w,d.h))cl.push(i+","+j);
+      if(!best||cl.length>best.cl.length)best={o,cl}}
+    best=best||{o:[0,0],cl:[]};
+    const mesma=p.lsig===lsig&&p.opt&&Math.abs(best.o[0]-p.opt[0])<1e-9&&Math.abs(best.o[1]-p.opt[1])<1e-9;
+    p.opt=best.o;p.cells=best.cl;p.off=[0,0];if(!mesma)p.rem=new Set();p.sel=new Set();p.gsig=gsig;p.lsig=lsig;
+  }
+  const o=[p.opt[0]+p.off[0],p.opt[1]+p.off[1]],ret=(x,y)=>[[x,y],[x+d.w,y],[x+d.w,y+d.h],[x,y+d.h]].map(fr.volta);
+  const mods=[],keys=[],inval=[],cs=[],cent=[],act=new Set(),vazias=[],vaz=new Set();
+  p.cells.forEach(k=>{if(p.rem.has(k))return;act.add(k);const [i,j]=k.split(",").map(Number),x=X0+o[0]+i*px,y=Y0+o[1]+j*py;
+    const cc=fr.volta([x+d.w/2,y+d.h/2]);cent.push([k,cc]);
+    if(cabe(x,y,d.w,d.h)){mods.push(ret(x,y));keys.push(k);cs.push({c:cc,d:p.orient==="paisagem"})}else inval.push(ret(x,y))});
+  if(med.seSel===f)for(let j=-2;j<nj+1;j++)for(let i=-2;i<ni+1;i++){const k=i+","+j;if(act.has(k))continue;
+    const x=X0+o[0]+i*px,y=Y0+o[1]+j*py;if(cabe(x,y,d.w,d.h)){vazias.push(ret(x,y));vaz.add(k)}}
+  p._h={fr,X0,Y0,px,py,o,w:d.w,h:d.h,act,vaz,cent,Y1,cx:(X0+X1)/2};
+  return {fi:{th:p.inc,az:fr.az,ang:fr.angX,est:false},lay:{n:mods.length,mods,keys,inval,vazias,cs,ang:fr.angX,mesas:[],cheio:false}};
+}
+function seHit(f,p){const H=f&&f.p&&f.p._h;if(!H)return null;const [x,y]=H.fr.para(p);
+  const i=Math.floor((x-H.X0-H.o[0])/H.px),j=Math.floor((y-H.Y0-H.o[1])/H.py),k=i+","+j;
+  if(x-(H.X0+H.o[0]+i*H.px)>H.w||y-(H.Y0+H.o[1]+j*H.py)>H.h)return null;   // no espaço entre módulos
+  return H.act.has(k)?{k,ativo:true}:H.vaz.has(k)?{k,vazia:true}:null}
+function seAresta(f,ll){const q=map.latLngToContainerPoint(ll);let best=-1,bd=10;
+  f.forEach((a,i)=>{const b=f[(i+1)%f.length],A=map.latLngToContainerPoint(a),B=map.latLngToContainerPoint(b),dx=B.x-A.x,dy=B.y-A.y,l=dx*dx+dy*dy;
+    const t=l?Math.max(0,Math.min(1,((q.x-A.x)*dx+(q.y-A.y)*dy)/l)):0,d=Math.hypot(q.x-A.x-t*dx,q.y-A.y-t*dy);if(d<bd){bd=d;best=i}});return best}
+function seClique(ll,shift){
+  const f=med.seSel,p=[ll.lat,ll.lng],h=seHit(f,p),P=f.p;
+  if(h&&h.ativo){if(shift){P.sel.has(h.k)?P.sel.delete(h.k):P.sel.add(h.k)}else{P.rem.add(h.k);P.sel.delete(h.k)}}
+  else if(h&&h.vazia){if(!P.cells.includes(h.k))P.cells.push(h.k);P.rem.delete(h.k)}
+  else{const e=seAresta(f,ll);if(e>=0&&e!==P.b){P.b=e;P.off=[0,0]}else if(e<0){med.seSel=faceEm(p);medArrasteMapa()}}
+  medDesenhar();medRender();
+}
+function seApagaSel(){const P=med.seSel&&med.seSel.p;if(!P||!P.sel.size)return;P.sel.forEach(k=>P.rem.add(k));P.sel=new Set();medDesenhar();medRender()}
+function seDesenhar(f,lay){
+  const P=f.p,sel=med.seSel===f,H=P._h,st={interactive:false,renderer:rTopo};
+  lay.mods.forEach((m,i)=>{const s=P.sel.has(lay.keys[i]);L.polygon(m,{...st,color:s?"#7c2d12":"#bfdbfe",weight:s?2:.6,fillColor:s?"#f97316":"#1e3a8a",fillOpacity:.85}).addTo(med.camada)});
+  lay.inval.forEach(m=>L.polygon(m,{...st,color:"#7f1d1d",weight:1,fillColor:"#dc2626",fillOpacity:.75}).addTo(med.camada));
+  if(!sel)return;
+  lay.vazias.forEach(m=>L.polygon(m,{...st,color:"#1e3a8a",weight:1,dashArray:"3 3",fill:false}).addTo(med.camada));
+  L.polygon(f,{...st,color:"#0ea5e9",weight:4,fill:false}).addTo(med.camada);
+  L.polyline(H.fr.beiral,{...st,color:"#16a34a",weight:7,opacity:.95}).addTo(med.camada);
+  // seta da caída (para onde a água escorre), do centro para o beiral
+  const fr=H.fr,c0=[0,0],tam=Math.min(3,Math.max(1,(H.Y1-Math.min(...fr.R.map(q=>q[1])))/3)),[nx,ny]=fr.n,ponta=[-nx*tam,-ny*tam];
+  const gira=(v,a)=>[v[0]*Math.cos(a)-v[1]*Math.sin(a),v[0]*Math.sin(a)+v[1]*Math.cos(a)],asa=v=>[ponta[0]+v[0]*.35*tam,ponta[1]+v[1]*.35*tam];
+  L.polyline([fr.enu(c0),fr.enu(ponta)],{...st,color:"#0ea5e9",weight:3}).addTo(med.camada);
+  L.polyline([fr.enu(asa(gira([nx,ny],.45))),fr.enu(ponta),fr.enu(asa(gira([nx,ny],-.45)))],{...st,color:"#0ea5e9",weight:3}).addTo(med.camada);
+  L.tooltip({permanent:true,direction:"bottom",className:"faceLbl",offset:[0,6]}).setLatLng(fr.enu(ponta)).setContent(`caída ${fmt(fr.az,0)}° ${card(fr.az)}`).addTo(med.camada);
+  // alça de rotação do arranjo (arraste)
+  const hl=fr.volta([H.cx,H.Y1+1.2]),mk=L.marker(hl,{draggable:true,icon:L.divIcon({className:"seRot",html:"⟳",iconSize:null}),title:"Arraste para girar o arranjo"}).addTo(med.camada);
+  const hand=fr.u[0]*fr.n[1]-fr.u[1]*fr.n[0],angN=Math.atan2(fr.n[1],fr.n[0]),cen=fr.volta([H.cx,(H.Y1+Math.min(...fr.R.map(q=>q[1])))/2]);
+  mk.on("drag",ev=>{const g=ev.target.getLatLng(),e=(g.lng-cen[1])*fr.kx,m=(g.lat-cen[0])*fr.ky;
+    let r=hand*(Math.atan2(m,e)-angN)*180/Math.PI;r=((r+540)%360)-180;P.rot=Math.round(r);const el=$("seRot");if(el)el.value=P.rot});
+  mk.on("dragend",()=>{medDesenhar();medRender()});
+}
+function sePainelHtml(){
+  const f=med.seSel;if(!f||!f.p||med.manual||med.tipo!=="telhado"||f.length<3)return "";
+  const P=f.p,l=(med.lay||[]).find(x=>x.pts===f);if(!l)return "";
+  const k=[...med.areas,med.pts].indexOf(f)+1,w=+$("medW").value||0,n=l.lay.n,inv=l.lay.inval.length,a=medidas(f).area/Math.cos(P.inc*Math.PI/180);
+  const bt=(id,t,on)=>`<button type="button" data-se="${id}" class="${on?"":"ghost"}">${t}</button>`;
+  return `<section class="sePainel"><h2>Água ${k}</h2><div class="card">
+   <dl><dt>Módulos · potência</dt><dd>${n} · ${fmt(n*w/1000,2)} kWp</dd>${inv?`<dt>Fora da área útil</dt><dd>${inv} (vermelhos, não contam)</dd>`:""}
+   <dt>Azimute (caída)</dt><dd>${fmt(l.fi.az,0)}° ${card(l.fi.az)}</dd><dt>Área real</dt><dd>${fmt(a,1)} m²</dd></dl>
+   <div class="row"><label>Beiral</label>${bt("b-","◀")}<span class="base">aresta ${P.b+1} de ${f.length} (verde)</span>${bt("b+","▶")}</div>
+   <div class="row"><label for="seInc">Inclinação</label><input id="seInc" type="number" min="0" max="80" step="0.5" value="${P.inc}"><span class="base">°</span></div>
+   <div class="acoes" role="group" aria-label="Orientação">${bt("retrato","Retrato",P.orient==="retrato")}${bt("paisagem","Paisagem",P.orient==="paisagem")}</div>
+   <div class="row"><label for="seRec">Recuo</label><input id="seRec" type="number" min="0" max="10" step="0.05" value="${P.recuo}"><span class="base">m das bordas</span></div>
+   <div class="row"><label for="seSx">Entre módulos</label><input id="seSx" type="number" min="0" max="2" step="0.01" value="${P.sx}"><span class="base">m</span>
+     <label for="seSy">Entre fileiras</label><input id="seSy" type="number" min="0" max="5" step="0.01" value="${P.sy}"><span class="base">m</span></div>
+   <div class="row"><label for="seRot">Rotação</label><input id="seRot" type="number" min="-180" max="180" step="1" value="${P.rot}"><span class="base">° (ou arraste a alça ⟳)</span></div>
+   <div class="acoes">${bt("encher","Preencher novamente",true)}${bt("limpa","Limpar água")}<button type="button" class="ghost" data-se="apaga"${P.sel.size?"":" disabled"}>Apagar selecionados (${P.sel.size})</button></div>
+   <p class="hint">Toque num módulo para tirar e numa célula tracejada para pôr. Arraste um módulo para mover o arranjo; arraste no vazio para selecionar vários (ou Shift + clique) e apague com Delete. Toque numa aresta para fazê-la o beiral.</p>
+   </div></section>`;
+}
+function seLigarPainel(){
+  const f=med.seSel;if(!f||!f.p)return;const P=f.p,muda=()=>{medDesenhar();medRender()};
+  document.querySelectorAll("#infoMed [data-se]").forEach(b=>b.onclick=()=>{const a=b.dataset.se;
+    if(a==="b-"||a==="b+"){P.b=(P.b+(a==="b+"?1:-1)+f.length)%f.length;P.off=[0,0]}
+    else if(a==="retrato"||a==="paisagem")P.orient=a;
+    else if(a==="encher"){P.gsig="";P.rem=new Set();P.lsig=""}
+    else if(a==="limpa"){P.cells=[];P.rem=new Set();P.sel=new Set()}
+    else if(a==="apaga"){seApagaSel();return}
+    muda()});
+  [["seInc","inc"],["seRec","recuo"],["seSx","sx"],["seSy","sy"],["seRot","rot"]].forEach(([id,c])=>{const el=$(id);if(el)el.onchange=()=>{const v=+el.value;if(isFinite(v)){P[c]=v;muda()}}});
+}
+// ---- Desfazer/refazer (pilha de 60), salvar no navegador, exportar/importar
+const HIST={l:[],i:-1,rest:false};let medSalvarT=null;
+function medSer(){const sp=f=>f&&f.p?{b:f.p.b,inc:f.p.inc,orient:f.p.orient,recuo:f.p.recuo,sx:f.p.sx,sy:f.p.sy,rot:f.p.rot,off:f.p.off,opt:f.p.opt,
+    cells:f.p.cells,rem:[...f.p.rem],gsig:f.p.gsig,lsig:f.p.lsig}:null;
+  return JSON.stringify({v:1,tipo:med.tipo,modo:med.modo,areas:med.areas.map(f=>({pts:f,p:sp(f)})),pts:{pts:med.pts,p:sp(med.pts)},
+    alt:[...med.alt],obst:med.obst,man:med.man,manual:med.manual,
+    cfg:{W:$("medW").value,C:$("medC").value,L:$("medL").value,beiral:$("medBeiral").value,mg:$("medMg").value}})}
+function medRestaura(txt){let d;try{d=JSON.parse(txt)}catch(e){return false}if(!d||d.v!==1)return false;
+  HIST.rest=true;
+  try{const c=d.cfg||{};[["medW","W"],["medC","C"],["medL","L"],["medBeiral","beiral"],["medMg","mg"]].forEach(([id,k])=>{if(c[k]!=null)$(id).value=c[k]});
+    medTipo(d.tipo==="solo"?"solo":"telhado");
+    const fp=x=>{const f=(x&&x.pts||[]).map(q=>q.slice());if(x&&x.p)f.p={...x.p,rem:new Set(x.p.rem||[]),sel:new Set()};return f};
+    med.areas=(d.areas||[]).map(fp);med.pts=fp(d.pts);med.alt=new Map(d.alt||[]);med.obst=d.obst||[];med.man=d.man||[];med.seSel=null;
+    if(!!d.manual!==med.manual)medManual(!!d.manual);
+    medModo(d.modo||"desenho",true);med.seSel=null;medDesenhar();medRender();
+  }finally{HIST.rest=false}
+  return true}
+function medBotoesHist(){$("medDesf").disabled=HIST.i<=0;$("medRef").disabled=HIST.i>=HIST.l.length-1}
+function medGuardar(s){clearTimeout(medSalvarT);medSalvarT=setTimeout(()=>{try{localStorage.setItem("medir.v1",s)}catch(e){}},250)}
+function medMudou(){
+  if(typeof atualizarBarra==="function")atualizarBarra();
+  if(HIST.rest)return;const s=medSer();if(HIST.l[HIST.i]===s)return;
+  HIST.l=HIST.l.slice(0,HIST.i+1);HIST.l.push(s);if(HIST.l.length>60)HIST.l.shift();HIST.i=HIST.l.length-1;medGuardar(s);medBotoesHist()}
+function medDesfaz(){if(HIST.i<=0)return;HIST.i--;medRestaura(HIST.l[HIST.i]);medGuardar(HIST.l[HIST.i]);medBotoesHist()}
+function medRefaz(){if(HIST.i>=HIST.l.length-1)return;HIST.i++;medRestaura(HIST.l[HIST.i]);medGuardar(HIST.l[HIST.i]);medBotoesHist()}
+$("medDesf").onclick=medDesfaz;$("medRef").onclick=medRefaz;
+$("medExp").onclick=()=>{const a=document.createElement("a");a.href=URL.createObjectURL(new Blob([medSer()],{type:"application/json"}));
+  a.download="medicao-telhado.json";document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(a.href),2000)};
+$("medImp").onclick=()=>$("medImpArq").click();
+$("medImpArq").addEventListener("change",async e=>{const f=e.target.files[0];if(!f)return;
+  if(!medRestaura(await f.text()))medMsg("Arquivo não reconhecido (use um JSON exportado pela aba Medir).");else medMudou();e.target.value=""});
+document.addEventListener("keydown",e=>{
+  if(abaAtual!=="M"||e.target.closest("input,textarea,select,[contenteditable]"))return;const k=e.key.toLowerCase(),ctl=e.ctrlKey||e.metaKey;
+  if(ctl&&k==="z"&&!e.shiftKey){e.preventDefault();medDesfaz()}
+  else if(ctl&&(k==="y"||(k==="z"&&e.shiftKey))){e.preventDefault();medRefaz()}
+  else if((k==="delete"||k==="backspace")&&med.seSel&&med.seSel.p&&med.seSel.p.sel.size){e.preventDefault();seApagaSel()}
+  else if(k==="escape"&&med.seSel){med.seSel=null;medDesenhar();medRender();medArrasteMapa()}});
+// barra de resumo (embaixo, como no SolarEdge): total / água selecionada
+const medBarra=document.createElement("div");medBarra.id="medBarra";medBarra.hidden=true;document.body.append(medBarra);
+function atualizarBarra(){const on=abaAtual==="M";medBarra.hidden=!on;if(!on)return;
+  const w=+$("medW").value||0,nT=med.manual?med.man.length:(med.lay||[]).reduce((s,l)=>s+l.lay.n,0);
+  const l=!med.manual&&med.seSel&&(med.lay||[]).find(x=>x.pts===med.seSel),nS=l?l.lay.n:null,aS=l?medidas(l.pts).area/Math.cos(l.fi.th*Math.PI/180):null;
+  medBarra.innerHTML=`<span><b>Módulos FV</b>${nT}${nS!=null?" / "+nS:""}</span><span><b>Potência CC</b>${fmt(nT*w/1000,2)}${nS!=null?" / "+fmt(nS*w/1000,2):""} kWp</span>`+
+    (aS!=null?`<span><b>Área da água</b>${fmt(aS,1)} m²</span>`:"")}
+// recupera a última medição salva neste navegador
+(()=>{let s=null;try{s=localStorage.getItem("medir.v1")}catch(e){}if(s)medRestaura(s);medMudou()})();
 // abas do painel
 let empMexeu=false;
 // cada aba mostra só o que é dela: trocar de aba limpa o mapa e a seleção da anterior
@@ -2014,6 +2227,7 @@ function aba(k){
   ["C","P","I","G","M","S"].forEach(x=>{$("aba"+x).hidden=x!==k;$("tab"+x).setAttribute("aria-selected",x===k)});
   if(k==="M"&&antes!=="M")medEntrar();else if(antes==="M"&&k!=="M")medSair();
   if(typeof medArrasteMapa==="function")medArrasteMapa();
+  if(typeof atualizarBarra==="function")atualizarBarra();
   if(k!==antes&&typeof invLayer!=="undefined"){limparAba();
     if((k==="P"||k==="I"||k==="G")&&META.bboxAll){const b=META.bboxAll;map.fitBounds([[b[0],b[1]],[b[2],b[3]]])}   // estado todo
     camadasDaAba()}

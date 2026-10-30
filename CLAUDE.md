@@ -76,7 +76,18 @@ nem sempre programadores: explique resultados em linguagem simples.
   abre uma caixa que cria módulos em fileiras/colunas (`caixaModulos`, prévia laranja; começando colado num
   módulo continua a fileira); eventos de ponteiro no container do mapa, com `map.dragging` desligado e
   `touch-action: none` (`medArrasteMapa`); "✋ Mover o mapa" (`med.mapaLivre`) devolve o arraste ao mapa;
-  pinça de 2 dedos continua dando zoom. Girar 90°/5°, apagar, "Começar pelo automático". **Telhado em faces**
+  pinça de 2 dedos continua dando zoom. Girar 90°/5°, apagar, "Começar pelo automático".
+  **Módulos por água** (padrão no telhado; estilo SolarEdge Designer): cada água guarda em `pts.p` beiral `b`
+  (aresta; padrão = mais baixa com alturas, senão a mais longa), `inc`, `orient` retrato/paisagem, `recuo`,
+  `sx`/`sy` (0,02 m), `rot`, `off` (arrastar o arranjo), `opt` (deslocamento ótimo) e o grid `cells` ("i,j")
+  menos `rem` (tirados). `seFace()` trabalha em metros com X ao longo do beiral e Y subindo a água (dimensão na
+  queda e espaçamento entre fileiras × cos inc) e testa 20×20 deslocamentos; refaz o grid quando muda `gsig` e
+  mantém `rem` se a rede de células (`lsig` + `opt`) não mudou. Fechar uma água seleciona ela; com água
+  selecionada (`seAtivo()`), ponteiro: toque tira/põe módulo, aresta vira beiral, arrastar módulo move o arranjo
+  (fora da área útil fica vermelho e não conta), arrastar no vazio seleciona (Shift+clique também) e Delete
+  apaga; alça ⟳ gira. Desfazer/refazer (`HIST`, 60 passos, Ctrl+Z/Ctrl+Y), estado salvo em
+  `localStorage["medir.v1"]` (a planta em PDF não), Exportar/Importar JSON, barra de resumo `#medBarra`.
+  Testes de aceite (10×6 m: 16 a 0°, 24 a 30°; L e triângulo dentro do recuo; 37° → azimute 143°). **Telhado em faces**
   (estilo SolarEdge, doc "Aba Medir — modelagem de telhado"): cada contorno é uma face; toque a até 14 px de
   um canto existente reusa o canto (`medGruda`), então faces vizinhas compartilham cantos; altura por canto em
   `med.alt` (chave `vk(p)`, padrão = beiral `#medBeiral`); `faceInfo()` tira inclinação, azimute (0° = N,
