@@ -335,11 +335,11 @@ body.medindo .leaflet-control.legenda,body.medindo .leaflet-control.legAlimC{dis
         <button type="button" id="medTel" aria-pressed="true">Telhado</button>
         <button type="button" class="ghost" id="medSolo" aria-pressed="false">Solo</button>
       </div>
-      <details class="menu" id="medPlantaBox"><summary>Planta em PDF</summary>
-        <p class="hint">Abra a planta (PDF ou imagem) para desenhar o telhado ou o terreno em cima dela. O arquivo fica só no seu aparelho.</p>
+      <div id="medPlantaBox">
         <input type="file" id="medArq" accept="application/pdf,image/*" hidden>
-        <div class="acoes"><button type="button" class="ghost" id="medAbrir">Abrir planta</button>
+        <div class="acoes"><button type="button" id="medAbrir">📄 Abrir planta (PDF)</button>
           <button type="button" class="ghost" id="medTira" hidden>Tirar a planta</button></div>
+        <p class="hint" id="medPlantaDica">Desenhe o telhado ou o terreno em cima da planta da obra (PDF ou imagem). O arquivo fica só no seu aparelho.</p>
         <div id="medPlantaCtl" hidden>
           <div class="row" id="medRowPag" hidden><label for="medPag">Página</label><select id="medPag"></select></div>
           <div class="row" id="medRowEsc"><label for="medEsc">Escala</label><span class="base">1 :</span><input id="medEsc" type="number" min="1" max="100000" step="1" value="100"></div>
@@ -350,7 +350,7 @@ body.medindo .leaflet-control.legenda,body.medindo .leaflet-control.legAlimC{dis
           <label class="chk"><input type="checkbox" id="medFundo" checked> Esconder o mapa atrás da planta</label>
           <div class="acoes"><button type="button" class="ghost" id="medCentro">Trazer a planta para o centro</button></div>
         </div>
-      </details>
+      </div>
       <p class="hint" id="medDica">Toque nos cantos do telhado, em sequência, na imagem de satélite. Para terminar, toque no primeiro canto. Arraste um canto para ajustar.</p>
       <div class="acoes">
         <button type="button" class="ghost" id="medNovo">Novo contorno</button>
@@ -1724,7 +1724,7 @@ async function plantaAbrir(arq){
       $("medRowPag").hidden=planta.doc.numPages<2;await plantaPagina(1)}
     else{planta.url=URL.createObjectURL(arq);const im=new Image();await new Promise((ok,erro)=>{im.onload=ok;im.onerror=erro;im.src=planta.url});
       planta.w=im.naturalWidth;planta.h=im.naturalHeight;planta.mpu=20/planta.w;$("medRowPag").hidden=true}   // imagem: 20 m de largura até calibrar
-    $("medRowEsc").hidden=!pdf;$("medPlantaCtl").hidden=false;$("medTira").hidden=false;$("medAbrir").textContent="Trocar planta";
+    $("medRowEsc").hidden=!pdf;$("medPlantaCtl").hidden=false;$("medTira").hidden=false;$("medPlantaDica").hidden=true;$("medAbrir").textContent="📄 Trocar planta";
     plantaAtualizar();map.fitBounds(plantaLimites(),{padding:[30,30]});
     medMsg(pdf?"Planta aberta na escala 1:"+$("medEsc").value+". Confira com uma cota: toque em \"Calibrar por uma cota\". Depois marque os cantos do telhado em cima da planta."
       :"Imagem aberta sem escala. Toque em \"Calibrar por uma cota\" e marque as duas pontas de uma medida conhecida.");
@@ -1733,7 +1733,7 @@ async function plantaAbrir(arq){
 function plantaTirar(){
   if(!planta)return;plantaMostrar(false);if(planta.ov)map.removeLayer(planta.ov);map.removeLayer(planta.calLayer);
   if(planta.url&&planta.url.startsWith("blob:"))URL.revokeObjectURL(planta.url);planta=null;
-  $("medPlantaCtl").hidden=true;$("medTira").hidden=true;$("medAbrir").textContent="Abrir planta";$("medArq").value="";medRender();
+  $("medPlantaCtl").hidden=true;$("medTira").hidden=true;$("medPlantaDica").hidden=false;$("medAbrir").textContent="📄 Abrir planta (PDF)";$("medArq").value="";medRender();
 }
 function plantaCalPonto(ll){
   const c=planta.cal;c.pts.push([ll.lat,ll.lng]);
