@@ -72,7 +72,11 @@ nem sempre programadores: explique resultados em linguagem simples.
   O resultado é a contagem do esboço (`medLayout`): no telhado testa módulos em pé e deitados, 6 deslocamentos
   de fileira e completa as sobras com a outra orientação (fica o arranjo com mais módulos). **Posicionar à
   mão** (`med.manual`, `med.man` = [{c, a, d}]): toque põe módulo (encaixa a 5 cm de um vizinho), toque no
-  módulo seleciona e o próximo toque move; girar 90°/5°, apagar, "Começar pelo automático". **Telhado em faces**
+  módulo seleciona e o próximo toque move; **arrastar** um módulo move (encaixa ao soltar); arrastar no vazio
+  abre uma caixa que cria módulos em fileiras/colunas (`caixaModulos`, prévia laranja; começando colado num
+  módulo continua a fileira); eventos de ponteiro no container do mapa, com `map.dragging` desligado e
+  `touch-action: none` (`medArrasteMapa`); "✋ Mover o mapa" (`med.mapaLivre`) devolve o arraste ao mapa;
+  pinça de 2 dedos continua dando zoom. Girar 90°/5°, apagar, "Começar pelo automático". **Telhado em faces**
   (estilo SolarEdge, doc "Aba Medir — modelagem de telhado"): cada contorno é uma face; toque a até 14 px de
   um canto existente reusa o canto (`medGruda`), então faces vizinhas compartilham cantos; altura por canto em
   `med.alt` (chave `vk(p)`, padrão = beiral `#medBeiral`); `faceInfo()` tira inclinação, azimute (0° = N,
