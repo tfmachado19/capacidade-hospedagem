@@ -351,6 +351,15 @@ body.medindo .leaflet-control.legenda,body.medindo .leaflet-control.legAlimC{dis
           <div class="acoes"><button type="button" class="ghost" id="medCentro">Trazer a planta para o centro</button></div>
         </div>
       </div>
+      <div class="acoes" role="group" aria-label="Como pôr os módulos">
+        <button type="button" id="medAuto" aria-pressed="true">Módulos automáticos</button>
+        <button type="button" class="ghost" id="medMao" aria-pressed="false">Posicionar à mão</button></div>
+      <div id="medMaoCtl" hidden>
+        <p class="hint">Toque para pôr um módulo; perto de outro, ele encaixa ao lado (5 cm). Toque num módulo para selecionar e depois toque onde ele deve ficar.</p>
+        <div class="acoes"><button type="button" class="ghost" id="medGira">Girar 90°</button><button type="button" class="ghost" id="medGiraM">↺ 5°</button>
+          <button type="button" class="ghost" id="medGiraP">↻ 5°</button><button type="button" class="ghost" id="medApaga">Apagar módulo</button></div>
+        <div class="acoes"><button type="button" class="ghost" id="medDoAuto">Começar pelo automático</button><button type="button" class="ghost" id="medApagaTodos">Apagar todos</button></div>
+      </div>
       <p class="hint" id="medDica">Toque nos cantos do telhado, em sequência, na imagem de satélite. Para terminar, toque no primeiro canto. Arraste um canto para ajustar.</p>
       <div class="acoes">
         <button type="button" class="ghost" id="medNovo">Novo contorno</button>
@@ -1541,6 +1550,7 @@ function medidas(pts){
 // só desenho à mão: cada toque marca um canto; tocar no primeiro canto fecha o contorno
 async function medClique(ll){
   if(planta&&planta.cal){plantaCalPonto(ll);return}
+  if(med.manual){medMaoClique(ll);return}
   if(med.modo==="desenho"){med.pts.push([ll.lat,ll.lng]);med.fonte="desenho";medDesenhar();medRender();return}
   if(med.pts.length>=3){medMsgTopo(med.tipo==="telhado"?"Telhado pronto. Para somar outro, toque em \"Adicionar telhado\".":"Contorno pronto. Para começar de novo, toque em \"Novo contorno\".");return}
   medModo("desenho",true);med.pts.push([ll.lat,ll.lng]);medDesenhar();medRender();return;
@@ -1566,7 +1576,8 @@ function medDesenhar(){
     if(!fechado)return;
     const lay=medLayout(pts,cfg);med.lay.push({pts,lay});
     // desenho limitado (áreas enormes); a contagem usa todos
-    if(lay.n>MED_DESENHO)   // muitos módulos: desenha as mesas cheias (mesmo esboço, mais leve)
+    if(med.manual){}
+    else if(lay.n>MED_DESENHO)   // muitos módulos: desenha as mesas cheias (mesmo esboço, mais leve)
       lay.mesas.forEach(m=>L.polygon(m,{color:"#0f172a",weight:.8,fillColor:"#1e3a8a",fillOpacity:.85,interactive:false,renderer:rTopo}).addTo(med.camada));
     else{lay.mods.forEach(m=>L.polygon(m,{color:"#bfdbfe",weight:.6,fillColor:"#1e3a8a",fillOpacity:.8,interactive:false,renderer:rTopo}).addTo(med.camada));
       lay.mesas.forEach(m=>L.polygon(m,{color:"#0f172a",weight:1.5,fill:false,interactive:false,renderer:rTopo}).addTo(med.camada))}
@@ -1575,7 +1586,9 @@ function medDesenhar(){
       L.tooltip({permanent:true,direction:"center",className:"lado"}).setLatLng([(p[0]+q[0])/2,(p[1]+q[1])/2])
         .setContent(fmt(m.lados[i],1)+" m").addTo(med.camada)});
   });
-  if(med.modo==="desenho"||med.editando)med.pts.forEach((p,i)=>{
+  if(med.manual)med.man.forEach((m,i)=>L.polygon(modCantos(m),{color:i===med.selM?"#7c2d12":"#bfdbfe",weight:i===med.selM?2:.6,
+    fillColor:i===med.selM?"#f97316":"#1e3a8a",fillOpacity:.85,interactive:false,renderer:rTopo}).addTo(med.camada));
+  if(!med.manual&&(med.modo==="desenho"||med.editando))med.pts.forEach((p,i)=>{
     const mk=L.marker(p,{draggable:true,icon:L.divIcon({className:"vert",iconSize:[14,14]})}).addTo(med.camada);
     mk.on("drag",ev=>{const g=ev.target.getLatLng();med.pts[i]=[g.lat,g.lng];if(med.forma)med.forma.setLatLngs(med.pts)});
     mk.on("dragend",()=>{medDesenhar();medRender()});
@@ -1600,26 +1613,38 @@ function medLayout(pts,c){
     if(((yi>y)!==(yj>y))&&(x<(xj-xi)*(y-yi)/(yj-yi)+xi))r=!r}return r};
   const borda=(x,y)=>{let d=1e9;for(let i=0;i<n;i++){const [ax,ay]=R[i],[bx,by]=R[(i+1)%n],dx=bx-ax,dy=by-ay,l=dx*dx+dy*dy;
     const t=l?Math.max(0,Math.min(1,((x-ax)*dx+(y-ay)*dy)/l)):0;d=Math.min(d,Math.hypot(x-ax-t*dx,y-ay-t*dy))}return d};
-  const cabe=(x,y,w,h)=>[[x,y],[x+w,y],[x+w,y+h],[x,y+h],[x+w/2,y+h/2]].every(([a,b])=>dentro(a,b)&&borda(a,b)>=c.mg-1e-6);
+  // cabe: cantos, meios dos lados e centro dentro (com o afastamento) e nenhum canto do contorno dentro do módulo
+  const cabe=(x,y,w,h)=>[[x,y],[x+w,y],[x+w,y+h],[x,y+h],[x+w/2,y],[x+w,y+h/2],[x+w/2,y+h],[x,y+h/2],[x+w/2,y+h/2]]
+    .every(([a,b])=>dentro(a,b)&&borda(a,b)>=c.mg-1e-6)&&!R.some(([px,py])=>px>x-c.mg+1e-6&&px<x+w+c.mg-1e-6&&py>y-c.mg+1e-6&&py<y+h+c.mg-1e-6);
   const ci=Math.cos(ang),sn=Math.sin(ang),volta=([x,y])=>{const X=x*ci-y*sn,Y=x*sn+y*ci;return [la0+Y/ky,lo0+X/kx]};
   const ret=(x,y,w,h)=>[[x,y],[x+w,y],[x+w,y+h],[x,y+h]].map(volta);
-  const mods=[],mesas=[],LIM=150000,gap=0.05,w=c.L;   // 5 cm entre módulos
-  if(!(c.C>0&&w>0))return {mods,mesas,n:0};
+  const mods=[],mesas=[],cs=[],LIM=150000,gap=0.05,w=c.L;   // 5 cm entre módulos; cs = centro e orientação de cada módulo
+  if(!(c.C>0&&w>0))return {mods,mesas,cs,n:0,ang};
   if(c.tipo==="solo"){
     const h=c.C*Math.cos(c.incS*Math.PI/180),prof=2*h+gap,passo=Math.max(c.passo,prof);
     for(let y=y0+c.mg;y+prof<=y1-c.mg+1e-9&&mods.length<LIM;y+=passo){
       let ini=null,cols=0;
       const fecha=x=>{if(cols>0)mesas.push(ret(ini,y,x-ini-gap,prof));ini=null;cols=0};
       for(let x=x0+c.mg;x+w<=x1-c.mg+1e-9;x+=w+gap){
-        if(cabe(x,y,w,prof)){if(ini==null)ini=x;cols++;mods.push(ret(x,y,w,h),ret(x,y+h+gap,w,h))}else fecha(x)}
+        if(cabe(x,y,w,prof)){if(ini==null)ini=x;cols++;mods.push(ret(x,y,w,h),ret(x,y+h+gap,w,h));
+          cs.push({c:volta([x+w/2,y+h/2]),d:false},{c:volta([x+w/2,y+h+gap+h/2]),d:false})}else fecha(x)}
       fecha(ini==null?0:ini+cols*(w+gap));
     }
   }else{
-    const h=c.C*Math.cos(c.inc*Math.PI/180);
-    for(let y=y0+c.mg;y+h<=y1-c.mg+1e-9&&mods.length<LIM;y+=h+gap)
-      for(let x=x0+c.mg;x+w<=x1-c.mg+1e-9;x+=w+gap)if(cabe(x,y,w,h))mods.push(ret(x,y,w,h));
+    // telhado: testa módulos em pé e deitados, desloca as fileiras e completa as sobras com a outra orientação;
+    // em cada fileira o módulo encosta no primeiro ponto onde cabe (não numa grade fixa). Fica o que tiver mais módulos.
+    const h=c.C*Math.cos(c.inc*Math.PI/180),grande=(x1-x0)*(y1-y0)>1500,passoX=grande?0.25:0.05,nOff=grande?1:6;
+    const livre=(bx,x,y,ww,hh)=>bx.every(b=>x>=b[0]+b[2]+gap-1e-9||x+ww<=b[0]-gap+1e-9||y>=b[1]+b[3]+gap-1e-9||y+hh<=b[1]-gap+1e-9);
+    const encher=(bx,ww,hh,ya,d)=>{for(let y=ya;y+hh<=y1-c.mg+1e-9&&bx.length<LIM;y+=hh+gap){let x=x0+c.mg;
+      while(x+ww<=x1-c.mg+1e-9){if(cabe(x,y,ww,hh)&&livre(bx,x,y,ww,hh)){bx.push([x,y,ww,hh,d]);x+=ww+gap}else x+=passoX}}};
+    let melhor=[];
+    for(const [ww,hh,d] of [[w,h,0],[h,w,1]])for(let k=0;k<nOff;k++){
+      const base=[];encher(base,ww,hh,y0+c.mg+k*(hh+gap)/nOff,d);
+      for(let j=0;j<(grande?1:3);j++){const bx=base.slice();encher(bx,hh,ww,y0+c.mg+j*(ww+gap)/3,1-d);
+        if(bx.length>melhor.length||(bx.length===melhor.length&&bx.filter(b=>b[4]).length<melhor.filter(b=>b[4]).length))melhor=bx}}
+    melhor.forEach(([x,y,ww,hh,d])=>{mods.push(ret(x,y,ww,hh));cs.push({c:volta([x+ww/2,y+hh/2]),d:!!d})});
   }
-  return {mods,mesas,n:mods.length,cheio:mods.length>=LIM};
+  return {mods,mesas,cs,ang,n:mods.length,cheio:mods.length>=LIM};
 }
 function medModo(m,manter){
   med.modo=m;
@@ -1638,6 +1663,7 @@ function medTipo(t){
   medModo("desenho",true);
 }
 function medRender(){
+  if(med.manual)return medRenderMao();
   const el=$("infoMed"),areas=(med.lay||[]);
   if(!areas.length){el.innerHTML=med.modo==="desenho"?`<p class="hint">${med.pts.length} de pelo menos 3 cantos marcados.</p>`:"";return}
   const c=medCfg(),w=+$("medW").value||0,solo=c.tipo==="solo",inc=solo?0:c.inc;
@@ -1671,7 +1697,66 @@ function medRender(){
 ["medInc","medIncS","medPasso","medMg","medW","medC","medL"].forEach(i=>$(i).addEventListener("input",()=>{medDesenhar();medRender()}));
 $("medNovo").onclick=()=>{if(med.tipo==="telhado"&&med.pts.length>=3){med.areas.push(med.pts);med.pts=[]}
   else if(med.tipo==="solo"){med.areas=[];med.pts=[]}medModo("desenho",true)};
-$("medLimpa").onclick=()=>{med.areas=[];med.pts=[];med.editando=false;medModo("desenho",true)};
+$("medLimpa").onclick=()=>{med.areas=[];med.pts=[];med.man=[];med.selM=-1;med.editando=false;medModo("desenho",true)};
+// ---- Módulos à mão: {c:[lat,lon] centro, a: ângulo (rad) da largura em relação ao leste, d: deitado}
+med.man=[];med.manual=false;med.selM=-1;
+const kxy=la=>[111320*Math.cos(la*Math.PI/180),110540];
+function modTam(m){const c=medCfg(),inc=(c.tipo==="solo"?c.incS:c.inc)*Math.PI/180,w=c.L,h=c.C*Math.cos(inc);return m.d?[h,w]:[w,h]}
+function modPonto(m,x,y){const [kx,ky]=kxy(m.c[0]),co=Math.cos(m.a),si=Math.sin(m.a);return [m.c[0]+(x*si+y*co)/ky,m.c[1]+(x*co-y*si)/kx]}
+function modLocal(m,p){const [kx,ky]=kxy(m.c[0]),dx=(p[1]-m.c[1])*kx,dy=(p[0]-m.c[0])*ky,co=Math.cos(m.a),si=Math.sin(m.a);return [dx*co+dy*si,-dx*si+dy*co]}
+function modCantos(m){const [w,h]=modTam(m);return [[-w/2,-h/2],[w/2,-h/2],[w/2,h/2],[-w/2,h/2]].map(([x,y])=>modPonto(m,x,y))}
+function modEm(p){for(let i=med.man.length-1;i>=0;i--){const m=med.man[i],[w,h]=modTam(m),[x,y]=modLocal(m,p);if(Math.abs(x)<=w/2+.05&&Math.abs(y)<=h/2+.05)return i}return -1}
+// perto de outro módulo: encaixa ao lado dele (5 cm), na mesma direção, numa vaga livre
+function modEncaixa(p,ign){let best=null;
+  med.man.forEach((m,i)=>{if(i===ign)return;const [w,h]=modTam(m),[x,y]=modLocal(m,p);if(Math.hypot(x,y)>1.6*Math.max(w,h))return;
+    for(const [sx,sy] of [[w+.05,0],[-w-.05,0],[0,h+.05],[0,-h-.05]]){const d=Math.hypot(x-sx,y-sy);if(d>.6*Math.max(w,h)||(best&&d>=best.d))continue;
+      const c=modPonto(m,sx,sy);if(med.man.some((o,j)=>j!==ign&&Math.hypot(...modLocal(o,c))<.1))continue;best={d,c,a:m.a,dd:m.d}}});
+  return best}
+function angPadrao(){const u=med.selM>=0?med.man[med.selM]:med.man[med.man.length-1];if(u)return {a:u.a,d:u.d};
+  const pts=med.pts.length>=3?med.pts:med.areas[med.areas.length-1];
+  if(pts){const q=proj(pts);let mx=0,a=0;q.forEach((p,i)=>{const r=q[(i+1)%q.length],d=Math.hypot(r[0]-p[0],r[1]-p[1]);if(d>mx){mx=d;a=Math.atan2(r[1]-p[1],r[0]-p[0])}});return {a,d:false}}
+  return {a:0,d:false}}
+function medMaoClique(ll){
+  const p=[ll.lat,ll.lng],i=modEm(p);
+  if(i>=0)med.selM=med.selM===i?-1:i;
+  else if(med.selM>=0){const m=med.man[med.selM],e=modEncaixa(p,med.selM);if(e){m.c=e.c;m.a=e.a;m.d=e.dd}else m.c=p;med.selM=-1}
+  else{if(med.man.length>=3000){medMsgTopo("Limite de 3.000 módulos posicionados à mão.");return}
+    const e=modEncaixa(p,-1),b=angPadrao();med.man.push(e?{c:e.c,a:e.a,d:e.dd}:{c:p,a:b.a,d:b.d})}
+  medDesenhar();medRender();
+}
+function medManual(on){
+  med.manual=on;med.selM=-1;med.editando=false;
+  $("medAuto").setAttribute("aria-pressed",!on);$("medMao").setAttribute("aria-pressed",on);
+  $("medAuto").className=on?"ghost":"";$("medMao").className=on?"":"ghost";$("medMaoCtl").hidden=!on;$("medDica").hidden=on;
+  if(on&&!med.man.length&&med.lay&&med.lay.length)modDoAuto();
+  medDesenhar();medRender();
+}
+function modDoAuto(){med.man=(med.lay||[]).flatMap(({lay})=>(lay.cs||[]).map(x=>({c:x.c,a:lay.ang,d:x.d}))).slice(0,3000);med.selM=-1}
+function modAlvo(){return med.selM>=0?med.man[med.selM]:med.man[med.man.length-1]}
+function modGira(da,vira){const m=modAlvo();if(!m)return;if(vira)m.d=!m.d;else m.a+=da;medDesenhar();medRender()}
+$("medAuto").onclick=()=>medManual(false);$("medMao").onclick=()=>medManual(true);
+$("medGira").onclick=()=>modGira(0,true);$("medGiraM").onclick=()=>modGira(5*Math.PI/180);$("medGiraP").onclick=()=>modGira(-5*Math.PI/180);
+$("medApaga").onclick=()=>{const i=med.selM>=0?med.selM:med.man.length-1;if(i<0)return;med.man.splice(i,1);med.selM=-1;medDesenhar();medRender()};
+$("medApagaTodos").onclick=()=>{med.man=[];med.selM=-1;medDesenhar();medRender()};
+$("medDoAuto").onclick=()=>{if(!(med.lay&&med.lay.length)){medMsgTopo("Primeiro desenhe o contorno em \"Módulos automáticos\".");return}modDoAuto();medDesenhar();medRender()};
+function medRenderMao(){
+  const el=$("infoMed"),w=+$("medW").value||0,n=med.man.length,kwp=n*w/1000,c=medCfg();
+  const area=(med.lay||[]).reduce((s,{pts})=>s+medidas(pts).area,0);
+  el.innerHTML=`<section><h2>Módulos posicionados à mão</h2><div class="card">
+   <div class="medGrande">${fmt(kwp,2)} <small>kWp</small></div>
+   <dl><dt>Módulos de ${fmt(w,0)} W</dt><dd>${n.toLocaleString("pt-BR")}</dd>
+   ${area?`<dt>Área do contorno (vista de cima)</dt><dd>${fmt(area,1)} m²</dd>`:""}
+   <dt>Geração estimada</dt><dd>~${fmt(kwp*1150/12,0)} kWh/mês</dd></dl>
+   ${kwp>75?`<p class="hint">Acima de 75 kW é minigeração: a conexão exige estudo da distribuidora e a potência fica limitada pela demanda contratada.</p>`:""}
+   <div class="acoes"><button type="button" id="medConsulta"${kwp>0?"":" disabled"}>Consultar a rede com ${fmt(kwp,2)} kW</button>
+   <button type="button" class="ghost" id="medCopia">Copiar</button></div>
+   <p class="hint">${med.selM>=0?"Módulo selecionado (laranja): toque onde ele deve ficar, ou use Girar / Apagar. Toque nele de novo para soltar.":
+     n?"Toque para pôr mais um módulo. Girar e Apagar valem para o selecionado ou, sem seleção, para o último posto.":"Toque na planta ou na imagem para pôr o primeiro módulo."}
+   Medida do módulo: ${fmt(c.C,3)} × ${fmt(c.L,3)} m.</p></div></section>`;
+  $("medCopia").onclick=()=>{navigator.clipboard?.writeText(`Cabem ${n} módulos de ${w} W = ${fmt(kwp,2)} kWp (~${fmt(kwp*1150/12,0)} kWh/mês).`).then(()=>{$("medCopia").textContent="Copiado!"},()=>{})};
+  $("medConsulta").onclick=()=>{const cc=med.man.reduce((s,m)=>[s[0]+m.c[0]/n,s[1]+m.c[1]/n],[0,0]);
+    potEl.value=Math.round(kwp*100)/100;aba("C");filtraRow.hidden=false;pontoGlobal(cc[0],cc[1],"Módulos posicionados")};
+}
 $("medTel").onclick=()=>medTipo("telhado");$("medSolo").onclick=()=>medTipo("solo");
 // ---- Planta em PDF ou imagem por baixo do desenho (pdf.js do cdnjs, carregado só quando usar)
 // A planta vira uma imagem no mapa com o tamanho real (metros), então o desenho e os módulos usam a mesma conta.

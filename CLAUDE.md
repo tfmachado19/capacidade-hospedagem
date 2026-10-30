@@ -69,7 +69,10 @@ nem sempre programadores: explique resultados em linguagem simples.
   da área visível. Não há medição horária pública de alimentador ou trafo (só energia mensal).
 - **Aba Medir:** só desenho à mão. Telhado (vários telhados somados, módulos em pé alinhados ao maior
   lado) ou Solo (mesas de 2 linhas de módulos, passo centro a centro editável, padrão 6 m).
-  O resultado é a contagem do esboço (`medLayout`). Módulo padrão: DAH 620 W (DHN-78X16/DG, 2,465 × 1,134 m).
+  O resultado é a contagem do esboço (`medLayout`): no telhado testa módulos em pé e deitados, 6 deslocamentos
+  de fileira e completa as sobras com a outra orientação (fica o arranjo com mais módulos). **Posicionar à
+  mão** (`med.manual`, `med.man` = [{c, a, d}]): toque põe módulo (encaixa a 5 cm de um vizinho), toque no
+  módulo seleciona e o próximo toque move; girar 90°/5°, apagar, "Começar pelo automático". Módulo padrão: DAH 620 W (DHN-78X16/DG, 2,465 × 1,134 m).
   **Planta em PDF** (`planta`, `plantaAbrir()`): o usuário abre um PDF ou imagem e ele vira um
   `L.imageOverlay` com o tamanho real em metros (PDF: 1 pt = 1/72 pol × escala 1:E; imagem: só por
   calibração), então o desenho e os módulos usam a mesma conta do satélite. "Calibrar por uma cota" =
