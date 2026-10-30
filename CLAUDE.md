@@ -77,6 +77,12 @@ nem sempre programadores: explique resultados em linguagem simples.
   módulo continua a fileira); eventos de ponteiro no container do mapa, com `map.dragging` desligado e
   `touch-action: none` (`medArrasteMapa`); "✋ Mover o mapa" (`med.mapaLivre`) devolve o arraste ao mapa;
   pinça de 2 dedos continua dando zoom. Girar 90°/5°, apagar, "Começar pelo automático".
+  **Conjuntos** (como o "array" do SolarEdge): cada módulo à mão tem `g`; caixa nova = conjunto novo, módulo
+  encaixado/caixa colada entra no conjunto do vizinho (`modEncaixa` devolve `gi`). 1º toque seleciona o
+  conjunto (`med.selG`, contorno laranja `grupoCaixa`, alça ⟳ `desenharGiroGrupo`): arrastar move o conjunto
+  inteiro (solto perto de outro conjunto alinhado, encosta a 5 cm), girar (alça ou botões) gira em volta do
+  centro, Apagar/Delete remove o conjunto; 2º toque no mesmo módulo = só ele (`med.selM`); toque fora solta.
+  Medições antigas sem `g` são agrupadas por vizinhança (`garanteGrupos`).
   **Módulos por água** (padrão no telhado; estilo SolarEdge Designer): cada água guarda em `pts.p` beiral `b`
   (aresta; padrão = mais baixa com alturas, senão a mais longa), `inc`, `orient` retrato/paisagem, `recuo`,
   `sx`/`sy` (0,02 m), `rot`, `off` (arrastar o arranjo), `opt` (deslocamento ótimo) e o grid `cells` ("i,j")
