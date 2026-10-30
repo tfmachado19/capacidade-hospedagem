@@ -69,7 +69,11 @@ nem sempre programadores: explique resultados em linguagem simples.
   da área visível. Não há medição horária pública de alimentador ou trafo (só energia mensal).
 - **Aba Medir:** só desenho à mão. Telhado (vários telhados somados, módulos em pé alinhados ao maior
   lado) ou Solo (mesas de 2 linhas de módulos, passo centro a centro editável, padrão 6 m).
-  O resultado é a contagem do esboço (`medLayout`). Os contornos de prédios (`dados/edif/`) não são
+  O resultado é a contagem do esboço (`medLayout`). Módulo padrão: DAH 620 W (DHN-78X16/DG, 2,465 × 1,134 m).
+  **Planta em PDF** (`planta`, `plantaAbrir()`): o usuário abre um PDF ou imagem e ele vira um
+  `L.imageOverlay` com o tamanho real em metros (PDF: 1 pt = 1/72 pol × escala 1:E; imagem: só por
+  calibração), então o desenho e os módulos usam a mesma conta do satélite. "Calibrar por uma cota" =
+  2 toques + medida real. pdf.js 3.11.174 vem do cdnjs só quando usar. O arquivo não sai do navegador. Os contornos de prédios (`dados/edif/`) não são
   mais usados pela página.
 - `dados/edif/14/<x>/<y>.json` — contornos de prédios (aba Medir), gerados por `scripts/edificios.py`
   a partir do Overture Maps (s3://overturemaps-us-west-2/release/<versão>/theme=buildings/,

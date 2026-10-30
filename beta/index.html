@@ -238,6 +238,8 @@ h3.subt{font:700 13px var(--display);text-transform:uppercase;letter-spacing:.06
 .cabe{border:1px solid var(--line);border-left:4px solid #16a34a;border-radius:8px;padding:8px 10px;margin:8px 0}
 .cabe.nao{border-left-color:#dc2626}
 .pt{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:5px;vertical-align:middle}
+body.plantaFundo #map{background:#fff}body.plantaFundo .leaflet-tile-pane{opacity:0}body.plantaFundo .selo{visibility:hidden}
+.medCalPt{background:#e11d48;border:2px solid #fff;border-radius:50%}
 body.medindo .leaflet-control.legenda,body.medindo .leaflet-control.legAlimC{display:none!important}
 @media (max-width:760px){
   aside#side{left:0;right:0;bottom:0;top:auto;width:auto;max-height:62vh;border-radius:14px 14px 0 0;border-bottom:0;grid-row:auto}
@@ -333,6 +335,22 @@ body.medindo .leaflet-control.legenda,body.medindo .leaflet-control.legAlimC{dis
         <button type="button" id="medTel" aria-pressed="true">Telhado</button>
         <button type="button" class="ghost" id="medSolo" aria-pressed="false">Solo</button>
       </div>
+      <details class="menu" id="medPlantaBox"><summary>Planta em PDF</summary>
+        <p class="hint">Abra a planta (PDF ou imagem) para desenhar o telhado ou o terreno em cima dela. O arquivo fica só no seu aparelho.</p>
+        <input type="file" id="medArq" accept="application/pdf,image/*" hidden>
+        <div class="acoes"><button type="button" class="ghost" id="medAbrir">Abrir planta</button>
+          <button type="button" class="ghost" id="medTira" hidden>Tirar a planta</button></div>
+        <div id="medPlantaCtl" hidden>
+          <div class="row" id="medRowPag" hidden><label for="medPag">Página</label><select id="medPag"></select></div>
+          <div class="row" id="medRowEsc"><label for="medEsc">Escala</label><span class="base">1 :</span><input id="medEsc" type="number" min="1" max="100000" step="1" value="100"></div>
+          <div class="acoes"><button type="button" class="ghost" id="medCal">Calibrar por uma cota</button></div>
+          <div class="row" id="medRowCal" hidden><label for="medCalD">Medida real</label><input id="medCalD" type="number" min="0.01" step="0.01"><span class="base">m</span>
+            <button type="button" id="medCalOk">Aplicar</button></div>
+          <div class="row"><label for="medOp">Opacidade</label><input id="medOp" type="range" min="0.2" max="1" step="0.05" value="1"></div>
+          <label class="chk"><input type="checkbox" id="medFundo" checked> Esconder o mapa atrás da planta</label>
+          <div class="acoes"><button type="button" class="ghost" id="medCentro">Trazer a planta para o centro</button></div>
+        </div>
+      </details>
       <p class="hint" id="medDica">Toque nos cantos do telhado, em sequência, na imagem de satélite. Para terminar, toque no primeiro canto. Arraste um canto para ajustar.</p>
       <div class="acoes">
         <button type="button" class="ghost" id="medNovo">Novo contorno</button>
@@ -342,9 +360,9 @@ body.medindo .leaflet-control.legenda,body.medindo .leaflet-control.legAlimC{dis
       <div class="row" id="medRowSolo" hidden><label for="medPasso">Entre mesas</label><input id="medPasso" type="number" min="2" max="20" step="0.1" value="6"><span class="base">m (centro a centro)</span>
         <label for="medIncS">Inclinação</label><input id="medIncS" type="number" min="0" max="40" step="1" value="20"><span class="base">°</span></div>
       <div class="row"><label for="medMg">Afastamento</label><input id="medMg" type="number" min="0" max="20" step="0.1" value="0.3"><span class="base">m das bordas</span></div>
-      <div class="row"><label for="medW">Módulo</label><input id="medW" type="number" min="100" max="900" step="5" value="585"><span class="base">W</span>
-        <input id="medC" type="number" min="0.5" max="3" step="0.01" value="2.28" aria-label="comprimento do módulo (m)"><span class="base">×</span>
-        <input id="medL" type="number" min="0.5" max="2" step="0.01" value="1.13" aria-label="largura do módulo (m)"><span class="base">m</span></div>
+      <div class="row"><label for="medW">Módulo</label><input id="medW" type="number" min="100" max="900" step="5" value="620"><span class="base">W</span>
+        <input id="medC" type="number" min="0.5" max="3" step="0.001" value="2.465" aria-label="comprimento do módulo (m)"><span class="base">×</span>
+        <input id="medL" type="number" min="0.5" max="2" step="0.001" value="1.134" aria-label="largura do módulo (m)"><span class="base">m</span></div>
     </div>
     <div class="scroll" id="infoMed"></div>
   </section>
@@ -381,6 +399,8 @@ body.medindo .leaflet-control.legenda,body.medindo .leaflet-control.legAlimC{dis
       <p>Pg = consumo médio de 12 meses ÷ (16% × 24 × 30) × fator da classe, arredondado para cima (REN 1.000, art. 73-A, II; Manual de Inversão de Fluxo, item 8.12). Vale para microgeração até 75 kW. Na abordagem comercial, respeite a LGPD e o cadastro “Não Perturbe”.</p>
       <h2>Medição de telhados</h2>
       <p>Contornos dos prédios do Overture Maps, que junta OpenStreetMap (desenhado por voluntários), Google Open Buildings e Microsoft (detectados por inteligência artificial em imagens de satélite). A área é a projeção vista de cima; a inclinação escolhida converte para a área real do telhado. O contorno pode estar deslocado ou desatualizado em relação à imagem: confira e, se preciso, arraste os cantos ou desenhe à mão. Licença ODbL: © OpenStreetMap contributors, Overture Maps Foundation.</p>
+      <h2>Planta em PDF (aba Medir)</h2>
+      <p>Abra a planta da obra (PDF ou imagem) e desenhe o telhado ou o terreno em cima dela. No PDF, informe a escala do desenho (1:100, 1:50…); confira sempre com uma cota em “Calibrar por uma cota” (toque nas duas pontas de uma medida conhecida e digite o valor real), porque o PDF pode ter sido impresso fora de escala. Imagem não tem escala: a calibração é obrigatória. O arquivo é aberto só no seu aparelho e não é enviado a lugar nenhum. Módulo padrão: DAH 620 W (DHN-78X16/DG, 2,465 × 1,134 m), troque à vontade.</p>
       <h2>Usinas de investimento</h2>
       <p>Trafos com uma única unidade consumidora cujo alimentador ainda tem folga para nova GD, ordenados pela maior folga do alimentador. A folga é do alimentador inteiro: locais do mesmo alimentador disputam a mesma folga. Como o trafo de um só consumidor costuma ser pequeno, a usina em geral exige trocar ou ampliar o trafo; marque “exigir folga também no trafo” para ver só os que já comportam.</p>
       <h2>Limitações</h2>
@@ -1485,9 +1505,9 @@ function medEntrar(){
   if(!med.pts.length)med.modo="desenho";
   document.body.classList.add("medindo");
   if(map.getZoom()<18&&map.getZoom()>=14)map.setZoom(18);
-  medRender();
+  plantaMostrar(true);medRender();
 }
-function medSair(){document.body.classList.remove("medindo")}
+function medSair(){document.body.classList.remove("medindo");plantaMostrar(false)}
 function tileZ14(lat,lon){const n=16384,la=lat*Math.PI/180;
   return [Math.floor((lon+180)/360*n),Math.floor((1-Math.log(Math.tan(la)+1/Math.cos(la))/Math.PI)/2*n)]}
 async function edificios(lat,lon){
@@ -1520,6 +1540,7 @@ function medidas(pts){
 }
 // só desenho à mão: cada toque marca um canto; tocar no primeiro canto fecha o contorno
 async function medClique(ll){
+  if(planta&&planta.cal){plantaCalPonto(ll);return}
   if(med.modo==="desenho"){med.pts.push([ll.lat,ll.lng]);med.fonte="desenho";medDesenhar();medRender();return}
   if(med.pts.length>=3){medMsgTopo(med.tipo==="telhado"?"Telhado pronto. Para somar outro, toque em \"Adicionar telhado\".":"Contorno pronto. Para começar de novo, toque em \"Novo contorno\".");return}
   medModo("desenho",true);med.pts.push([ll.lat,ll.lng]);medDesenhar();medRender();return;
@@ -1652,6 +1673,93 @@ $("medNovo").onclick=()=>{if(med.tipo==="telhado"&&med.pts.length>=3){med.areas.
   else if(med.tipo==="solo"){med.areas=[];med.pts=[]}medModo("desenho",true)};
 $("medLimpa").onclick=()=>{med.areas=[];med.pts=[];med.editando=false;medModo("desenho",true)};
 $("medTel").onclick=()=>medTipo("telhado");$("medSolo").onclick=()=>medTipo("solo");
+// ---- Planta em PDF ou imagem por baixo do desenho (pdf.js do cdnjs, carregado só quando usar)
+// A planta vira uma imagem no mapa com o tamanho real (metros), então o desenho e os módulos usam a mesma conta.
+// PDF: 1 ponto = 1/72 pol; na escala 1:E, cada ponto vale E × 0,0254/72 m. Imagem: só por calibração (cota).
+const PT_M=0.0254/72;
+let planta=null,pdfLib=null;
+function carregarPdfJs(){
+  if(pdfLib)return Promise.resolve(pdfLib);
+  return new Promise((ok,erro)=>{const sc=document.createElement("script");
+    sc.src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js";
+    sc.onload=()=>{pdfLib=window.pdfjsLib;pdfLib.GlobalWorkerOptions.workerSrc="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";ok(pdfLib)};
+    sc.onerror=()=>erro(new Error("pdf.js"));document.head.append(sc)});
+}
+function plantaLimites(){   // retângulo da planta no mapa (mesma projeção local da medição)
+  const p=planta,w=p.w*p.mpu,h=p.h*p.mpu,[la,lo]=p.c,kx=111320*Math.cos(la*Math.PI/180),ky=110540;
+  return [[la-h/2/ky,lo-w/2/kx],[la+h/2/ky,lo+w/2/kx]];
+}
+function plantaAtualizar(){
+  if(!planta)return;
+  if(!planta.ov)planta.ov=L.imageOverlay(planta.url,plantaLimites(),{opacity:+$("medOp").value,interactive:false});
+  else planta.ov.setBounds(L.latLngBounds(plantaLimites()));
+  planta.ov.setOpacity(+$("medOp").value);
+  if(planta.pdf)$("medEsc").value=Math.round(planta.mpu/PT_M);
+  plantaMostrar(abaAtual==="M");
+}
+function plantaMostrar(on){
+  if(!planta){document.body.classList.remove("plantaFundo");return}
+  if(on){if(!map.hasLayer(planta.ov))planta.ov.addTo(map);map.setMaxZoom(23);document.body.classList.toggle("plantaFundo",$("medFundo").checked)}
+  else{if(map.hasLayer(planta.ov))map.removeLayer(planta.ov);planta.calLayer.clearLayers();planta.cal=null;$("medRowCal").hidden=true;
+    document.body.classList.remove("plantaFundo");map.setMaxZoom(undefined)}
+}
+async function plantaPagina(n){
+  const pg=await planta.doc.getPage(n),v1=pg.getViewport({scale:1}),esc=Math.min(4096/Math.max(v1.width,v1.height),6);
+  const v=pg.getViewport({scale:esc}),cv=document.createElement("canvas");cv.width=Math.round(v.width);cv.height=Math.round(v.height);
+  const cx=cv.getContext("2d");cx.fillStyle="#fff";cx.fillRect(0,0,cv.width,cv.height);
+  await pg.render({canvasContext:cx,viewport:v}).promise;
+  if(planta.url&&planta.url.startsWith("blob:"))URL.revokeObjectURL(planta.url);
+  planta.url=await new Promise(r=>cv.toBlob(b=>r(URL.createObjectURL(b)),"image/png"));
+  planta.w=v1.width;planta.h=v1.height;planta.mpu=(+$("medEsc").value||100)*PT_M;
+  if(planta.ov){map.removeLayer(planta.ov);planta.ov=null}
+}
+async function plantaAbrir(arq){
+  if(!arq)return;medMsg("Abrindo a planta…");
+  try{
+    if(planta)plantaTirar();
+    planta={c:[map.getCenter().lat,map.getCenter().lng],calLayer:L.layerGroup().addTo(map),cal:null};
+    const pdf=arq.type==="application/pdf"||/\.pdf$/i.test(arq.name);planta.pdf=pdf;
+    if(pdf){const lib=await carregarPdfJs();planta.doc=await lib.getDocument({data:await arq.arrayBuffer()}).promise;
+      $("medPag").innerHTML=Array.from({length:planta.doc.numPages},(_,i)=>`<option value="${i+1}">${i+1}</option>`).join("");
+      $("medRowPag").hidden=planta.doc.numPages<2;await plantaPagina(1)}
+    else{planta.url=URL.createObjectURL(arq);const im=new Image();await new Promise((ok,erro)=>{im.onload=ok;im.onerror=erro;im.src=planta.url});
+      planta.w=im.naturalWidth;planta.h=im.naturalHeight;planta.mpu=20/planta.w;$("medRowPag").hidden=true}   // imagem: 20 m de largura até calibrar
+    $("medRowEsc").hidden=!pdf;$("medPlantaCtl").hidden=false;$("medTira").hidden=false;$("medAbrir").textContent="Trocar planta";
+    plantaAtualizar();map.fitBounds(plantaLimites(),{padding:[30,30]});
+    medMsg(pdf?"Planta aberta na escala 1:"+$("medEsc").value+". Confira com uma cota: toque em \"Calibrar por uma cota\". Depois marque os cantos do telhado em cima da planta."
+      :"Imagem aberta sem escala. Toque em \"Calibrar por uma cota\" e marque as duas pontas de uma medida conhecida.");
+  }catch(e){medMsg("Não consegui abrir este arquivo. Use um PDF ou uma imagem (JPG, PNG).");if(planta&&!planta.url)plantaTirar()}
+}
+function plantaTirar(){
+  if(!planta)return;plantaMostrar(false);if(planta.ov)map.removeLayer(planta.ov);map.removeLayer(planta.calLayer);
+  if(planta.url&&planta.url.startsWith("blob:"))URL.revokeObjectURL(planta.url);planta=null;
+  $("medPlantaCtl").hidden=true;$("medTira").hidden=true;$("medAbrir").textContent="Abrir planta";$("medArq").value="";medRender();
+}
+function plantaCalPonto(ll){
+  const c=planta.cal;c.pts.push([ll.lat,ll.lng]);
+  L.marker(ll,{icon:L.divIcon({className:"medCalPt",iconSize:[12,12]}),interactive:false}).addTo(planta.calLayer);
+  if(c.pts.length===2){L.polyline(c.pts,{color:"#e11d48",weight:2,dashArray:"4 4",interactive:false}).addTo(planta.calLayer);
+    const q=proj(c.pts);c.d=Math.hypot(q[1][0]-q[0][0],q[1][1]-q[0][1]);
+    $("medDica").textContent=`Na planta, essa linha mede ${fmt(c.d,2)} m na escala atual. Digite a medida real (a cota) e toque em Aplicar.`;
+    $("medRowCal").hidden=false;$("medCalD").value="";if(!desk.matches)abrirPainel();$("medCalD").focus()}
+  else $("medDica").textContent="Agora toque na outra ponta da medida.";
+}
+$("medAbrir").onclick=()=>$("medArq").click();
+$("medArq").addEventListener("change",e=>plantaAbrir(e.target.files[0]));
+$("medTira").onclick=plantaTirar;
+$("medPag").addEventListener("change",async e=>{if(!planta||!planta.doc)return;await plantaPagina(+e.target.value);plantaAtualizar()});
+$("medEsc").addEventListener("change",()=>{if(!planta||!planta.pdf)return;planta.mpu=(+$("medEsc").value||100)*PT_M;plantaAtualizar();medDesenhar();medRender()});
+$("medOp").addEventListener("input",()=>{if(planta&&planta.ov)planta.ov.setOpacity(+$("medOp").value)});
+$("medFundo").addEventListener("change",()=>{if(planta)document.body.classList.toggle("plantaFundo",$("medFundo").checked)});
+$("medCentro").onclick=()=>{if(!planta)return;const c=map.getCenter();planta.c=[c.lat,c.lng];plantaAtualizar()};
+$("medCal").onclick=()=>{if(!planta)return;planta.calLayer.clearLayers();planta.cal={pts:[]};$("medRowCal").hidden=true;
+  $("medDica").textContent="Toque nas duas pontas de uma medida conhecida da planta (uma cota).";if(!desk.matches)fecharPainel()};
+$("medCalOk").onclick=()=>{const c=planta&&planta.cal,real=+$("medCalD").value;if(!c||c.pts.length<2||!(real>0)||!(c.d>0))return;
+  const f=real/c.d,[a]=c.pts;   // amplia em torno da primeira ponta: ela fica no lugar
+  planta.c=[a[0]+(planta.c[0]-a[0])*f,a[1]+(planta.c[1]-a[1])*f];planta.mpu*=f;
+  planta.calLayer.clearLayers();planta.cal=null;$("medRowCal").hidden=true;plantaAtualizar();medModo(med.modo,true);
+  medMsg(`Planta calibrada${planta.pdf?" (escala 1:"+$("medEsc").value+")":""}. Marque os cantos do telhado em cima da planta.`);if(!desk.matches)fecharPainel()};
+$("medCalD").addEventListener("keydown",e=>{if(e.key==="Enter")$("medCalOk").click()});
 // abas do painel
 let empMexeu=false;
 // cada aba mostra só o que é dela: trocar de aba limpa o mapa e a seleção da anterior
