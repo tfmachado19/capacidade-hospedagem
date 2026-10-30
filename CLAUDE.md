@@ -93,7 +93,12 @@ nem sempre programadores: explique resultados em linguagem simples.
   (fora da área útil fica vermelho e não conta), arrastar no vazio seleciona (Shift+clique também) e Delete
   apaga; alça ⟳ gira. Desfazer/refazer (`HIST`, 60 passos, Ctrl+Z/Ctrl+Y), estado salvo em
   `localStorage["medir.v1"]` (a planta em PDF não), Exportar/Importar JSON, barra de resumo `#medBarra`.
-  Testes de aceite (10×6 m: 16 a 0°, 24 a 30°; L e triângulo dentro do recuo; 37° → azimute 143°). **Telhado em faces**
+  Testes de aceite (10×6 m: 16 a 0°, 24 a 30°; L e triângulo dentro do recuo; 37° → azimute 143°).
+  **Só 2D** (pedido do usuário): Alturas e Obstáculo saíram da tela (`#medTelBox` fica escondido; `med.alt` e
+  `med.obst` ficam vazios, inclusive ao restaurar); a inclinação de cada água começa em 0° e é só um campo do
+  painel da água. **Barra de ferramentas** `#medTools` (em cima do mapa, só na aba Medir): os mesmos botões do
+  painel, movidos por JS para grupos (tipo, planta, módulos, desenhar, à mão `#medTbMao`, desfazer, arquivo).
+  (Histórico, já fora da tela:) **Telhado em faces**
   (estilo SolarEdge, doc "Aba Medir — modelagem de telhado"): cada contorno é uma face; toque a até 14 px de
   um canto existente reusa o canto (`medGruda`), então faces vizinhas compartilham cantos; altura por canto em
   `med.alt` (chave `vk(p)`, padrão = beiral `#medBeiral`); `faceInfo()` tira inclinação, azimute (0° = N,
