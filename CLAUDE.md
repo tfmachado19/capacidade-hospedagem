@@ -72,7 +72,13 @@ nem sempre programadores: explique resultados em linguagem simples.
   O resultado é a contagem do esboço (`medLayout`): no telhado testa módulos em pé e deitados, 6 deslocamentos
   de fileira e completa as sobras com a outra orientação (fica o arranjo com mais módulos). **Posicionar à
   mão** (`med.manual`, `med.man` = [{c, a, d}]): toque põe módulo (encaixa a 5 cm de um vizinho), toque no
-  módulo seleciona e o próximo toque move; girar 90°/5°, apagar, "Começar pelo automático". Módulo padrão: DAH 620 W (DHN-78X16/DG, 2,465 × 1,134 m).
+  módulo seleciona e o próximo toque move; girar 90°/5°, apagar, "Começar pelo automático". **Telhado em faces**
+  (estilo SolarEdge, doc "Aba Medir — modelagem de telhado"): cada contorno é uma face; toque a até 14 px de
+  um canto existente reusa o canto (`medGruda`), então faces vizinhas compartilham cantos; altura por canto em
+  `med.alt` (chave `vk(p)`, padrão = beiral `#medBeiral`); `faceInfo()` tira inclinação, azimute (0° = N,
+  horário) e direção do beiral pela normal de Newell; área real = planta / cos θ; fileiras ao longo do beiral;
+  sem nenhuma altura informada usa 17° (estimada). Obstáculos `med.obst` = [{pts, h, niv}] saem da área útil e
+  bloqueiam módulos (sem sombreamento ainda). Módulo deitado encurta a largura (L·cos θ). Módulo padrão: DAH 620 W (DHN-78X16/DG, 2,465 × 1,134 m).
   **Planta em PDF** (`planta`, `plantaAbrir()`): o usuário abre um PDF ou imagem e ele vira um
   `L.imageOverlay` com o tamanho real em metros (PDF: 1 pt = 1/72 pol × escala 1:E; imagem: só por
   calibração), então o desenho e os módulos usam a mesma conta do satélite. "Calibrar por uma cota" =
