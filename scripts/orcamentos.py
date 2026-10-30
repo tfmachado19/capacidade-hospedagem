@@ -20,7 +20,8 @@ dados/orc.json:
   estudo de trafo: {tr: nº do trafo na distribuidora, d: data (AAAA-MM-DD), f: "D" direto | "I" inverso,
      lim: kW que ainda cabem sem inverter o fluxo, ucs, ugd: UCs com GD, gd: kW de GD, v: 1 = trafo vizinho
      do pedido, kva, cmin: carga mínima de dia estimada pela distribuidora (kW, sem descontar a GD),
-     pk: kW pedidos, lib: kW liberados sem obra}
+     pk: kW pedidos, lib: kW liberados sem obra, por: de onde veio o lib ("pg" = cálculo de Pg pelo consumo
+     do cliente, "fluxo" = folga do fluxo do trafo, "gd" = limitado à GD que o cliente já tem, trafo invertido)}
   estudo de alimentador: {d, f, min: menor fluxo de dia (kW, negativo = inversão), ucs, gd, pk, lib}
 """
 import argparse, glob, json, math, os, re, subprocess, sys
@@ -84,6 +85,12 @@ def ler_texto(t):
         for a, b, c, d, e, f in re.findall(r"^\s*(\d{5,8})\s+(\d+)\s+(\d+)\s+([\d.,]+)\s+(Direto|Inverso)\s+([\d.,]+)",
                                            t[i:i + 3000], re.M):
             o["viz"].append({"tr": a, "ucs": int(b), "ugd": int(c), "gd": num(d), "f": e[0], "lim": num(f)})
+    # Pg (Tabela 4.1); sem 12 meses de histórico não há Pg
+    o["pg"] = None
+    i = t.find("Tabela 4.1")
+    if i >= 0 and "não possui histórico" not in u:
+        m = re.search(r"^\s*𝑃𝑔\s.*?([\d.,]+)\s*$", t[i:i + 1500], re.M)
+        o["pg"] = m and num(m.group(1))
     # potência liberada sem obra: alternativa IV (redução permanente da potência injetável)
     o["lib"] = None
     i = t.find("Tabela 5.1")
@@ -93,6 +100,15 @@ def ler_texto(t):
             p = re.split(r"\s{2,}", m.group(1).strip())
             v = re.findall(r"[\d.,]+", p[2]) if len(p) > 2 else []
             o["lib"] = num(v[-1]) if v else None
+    # de onde veio a potência liberada
+    o["por"] = None
+    if o["lib"] is not None:
+        if re.search(r"potência de geração distribuída já existente em sua instalação", u):
+            o["por"] = "gd"
+        elif o["pg"] is not None and abs(o["lib"] - o["pg"]) < 0.01:
+            o["por"] = "pg"
+        else:
+            o["por"] = "fluxo"
     return o
 
 
@@ -173,15 +189,15 @@ def main():
             if o["alim"]:
                 alims.setdefault(o["alim"], []).append({"d": o["data"], "f": "I" if (fluxo_dia(o["sem"]) or 0) < 0 else "D",
                     "min": round(fluxo_dia(o["sem"]), 1) if o["sem"] else None, "ucs": o["ucs"], "gd": o["gd"],
-                    "pk": o["pk"], "lib": o["lib"]})
+                    "pk": o["pk"], "lib": o["lib"], "por": o["por"]})
                 print(f"  {nome}: estudo do alimentador {o['alim']}")
             continue
         fl = min(min(r) for r in o["sem"]) if o["sem"] else None
         inv = fl is not None and fl < 0
-        # folga: com fluxo direto, o limite da alternativa IV (é o que a distribuidora libera sem obra)
-        lim = 0 if inv else (o["lib"] if o["lib"] is not None else (round(fl, 2) if fl is not None else None))
+        # folga do trafo: o menor fluxo; se a liberação veio do fluxo, o valor oficial da alternativa IV
+        lim = 0 if inv else (o["lib"] if o["por"] == "fluxo" else (round(fl, 2) if fl is not None else None))
         e = {"tr": o["tr"], "d": o["data"], "f": "I" if inv else "D", "lim": lim, "ucs": o["ucs"], "ugd": o["ugd"],
-             "gd": o["gd"], "v": 0, "kva": o["kva"], "pk": o["pk"], "lib": o["lib"]}
+             "gd": o["gd"], "v": 0, "kva": o["kva"], "pk": o["pk"], "lib": o["lib"], "por": o["por"]}
         cb = carga_bruta(o)
         if cb is not None:
             e["cmin"] = round(cb, 2)
@@ -200,8 +216,9 @@ def main():
     # um trafo da distribuidora -> um trafo da BDGD (o de menor nota; empate ou nota ruim fica de fora)
     escolha = []
     for n, l in cand.items():
-        l.sort(key=lambda x: x[0])
-        s, mg, t, _ = l[0]
+        # o estudo do próprio pedido (com kVA) manda no casamento; vizinho só quando não há
+        prop = [x for x in l if not x[3]["v"]]
+        s, mg, t, _ = min(prop or l, key=lambda x: x[0])
         if s <= a.max_score and mg >= 0.3:
             escolha.append((s, n, t))
         else:

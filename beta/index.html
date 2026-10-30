@@ -696,11 +696,14 @@ async function carregarOrc(){
 }
 const orcDist=()=>ORC[META.dist||""]||ORC[""],orcDe=t=>{const o=orcDist();return o&&o.t[t.id]};
 const dataBr=s=>s.split("-").reverse().join("/");
+// de onde veio a potência liberada no orçamento
+const POR={pg:"pelo cálculo de Pg (consumo do cliente)",fluxo:"pelo fluxo do trafo",gd:"limitado à GD que o cliente já tinha (trafo com inversão)"};
+const liberado=x=>x.lib!=null?`, liberados <b>${fmt(x.lib,2)} kW</b> ${POR[x.por]||"sem obra"}`:"";
 function htmlOrc(t){
   const r=orcDe(t),al=t.alim&&orcDist()&&orcDist().a[t.alim],nd=esc(META.titulo||"distribuidora");if(!r&&!al)return "";
   const lin=x=>`<li>${dataBr(x.d)}: fluxo ${x.f==="I"?'<span class="inv">inverso</span> (sem folga)':"direto, cabem <b>"+fmt(x.lim,2)+" kW</b>"}`+
-    (x.v?" · trafo vizinho de um pedido":x.pk?` · pedido de ${fmt(x.pk)} kW${x.lib!=null?", liberados "+fmt(x.lib,2)+" kW sem obra":""}`:"")+"</li>";
-  const la=x=>`<li>Alimentador ${esc(t.alim)} (${dataBr(x.d)}): fluxo ${x.f==="I"?'<span class="inv">inverso</span>':"direto"}${x.pk?` · pedido de ${fmt(x.pk)} kW${x.lib!=null?", liberados "+fmt(x.lib)+" kW":""}`:""}</li>`;
+    (x.v?" · trafo vizinho de um pedido":x.pk?` · pedido de ${fmt(x.pk)} kW${liberado(x)}`:"")+"</li>";
+  const la=x=>`<li>Alimentador ${esc(t.alim)} (${dataBr(x.d)}): fluxo ${x.f==="I"?'<span class="inv">inverso</span>':"direto"}${x.pk?` · pedido de ${fmt(x.pk)} kW${liberado(x)}`:""}</li>`;
   const u=r&&r.e[0];
   return `<div class="orc"><b class="t">Estudo da ${nd}${u?" · trafo nº "+esc(u.tr):""}</b><ul>${r?r.e.slice(0,4).map(lin).join(""):""}${al?al.slice(0,2).map(la).join(""):""}</ul>`+
     `<div class="base">Dos orçamentos de conexão enviados pela distribuidora${u?` (na data: ${u.ucs} UCs, GD ${fmt(u.gd,1)} kW)`:""}. Vale mais que a estimativa acima.</div></div>`;
@@ -754,7 +757,7 @@ function relatorio(t){
     lin("Carga mínima diurna",fmt(t.cmin,2)+" kW")+lin("Demanda de pico",fmt(t.pico,2)+" kW")+lin("Carregamento do trafo",fmt(t.car)+" %")+
     lin("Alimentador · subestação",esc(t.alim||"–")+" · "+esc(t.sub||"–"))+lin("Capacidade p/ nova GD no alimentador",fmt(t.capa,0)+" kW")+
     lin("Carregamento do alimentador",fmt(t.ca)+" %")+lin("GD no alimentador",fmt(t.gda,0)+" kW")+lin("Coordenadas",t.lat.toFixed(6)+", "+t.lon.toFixed(6))+
-    (orcDe(t)?orcDe(t).e.slice(0,4).map(x=>lin(`Estudo da ${esc(META.titulo||"distribuidora")} (${dataBr(x.d)}), trafo nº ${esc(x.tr)}`,x.f==="I"?"fluxo inverso (sem folga)":"fluxo direto, cabem "+fmt(x.lim,2)+" kW")).join(""):"")}</table>
+    (orcDe(t)?orcDe(t).e.slice(0,4).map(x=>lin(`Estudo da ${esc(META.titulo||"distribuidora")} (${dataBr(x.d)}), trafo nº ${esc(x.tr)}`,(x.f==="I"?"fluxo inverso (sem folga)":"fluxo direto, cabem "+fmt(x.lim,2)+" kW")+(x.lib!=null&&!x.v?`; pedido de ${fmt(x.pk)} kW, liberados ${fmt(x.lib,2)} kW ${POR[x.por]||""}`:""))).join(""):"")}</table>
   <p class="s">Estimativa para triagem a partir de dados públicos da ANEEL (BDGD e base de GD). Não considera proteção nem manobras e não substitui a análise de inversão de fluxo da distribuidora.</p>
   <p class="s">Consulta on-line: ${esc(linkTrafo(t))}</p><button onclick="print()">Imprimir / salvar PDF</button></body></html>`);
   w.document.close();w.focus();setTimeout(()=>{try{w.print()}catch(e){}},300);
