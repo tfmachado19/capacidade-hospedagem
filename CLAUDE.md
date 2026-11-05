@@ -96,8 +96,11 @@ nem sempre programadores: explique resultados em linguagem simples.
   Testes de aceite (10×6 m: 16 a 0°, 24 a 30°; L e triângulo dentro do recuo; 37° → azimute 143°).
   **Só 2D** (pedido do usuário): Alturas e Obstáculo saíram da tela (`#medTelBox` fica escondido; `med.alt` e
   `med.obst` ficam vazios, inclusive ao restaurar); a inclinação de cada água começa em 0° e é só um campo do
-  painel da água. **Barra de ferramentas** `#medTools` (em cima do mapa, só na aba Medir): os mesmos botões do
-  painel, movidos por JS para grupos (tipo, planta, módulos, desenhar, à mão `#medTbMao`, desfazer, arquivo).
+  painel da água. **Dock embaixo** `#medTools` (opção C escolhida pelo usuário entre 4 layouts; só na aba Medir): os
+  mesmos botões do painel, movidos por JS, com ícone SVG (`ICO`/`svgI`) e nome (`tbRot` troca só o nome); linha
+  principal `#medDock` (Telhado, Solo | Planta, Desenhar, Por água, À mão | Desfazer, Refazer, ⋯ Mais) + resultado
+  `#medResumo` (kWp, módulos, água); acima, linhas de contexto `#medTbPlanta` (Ajustar, Cota, Tirar — some sem planta)
+  e `#medTbMao` (só no modo à mão), e a faixa `#medAviso`; "⋯ Mais" (`#medMaisMenu`) = Limpar, Exportar, Importar.
   (Histórico, já fora da tela:) **Telhado em faces**
   (estilo SolarEdge, doc "Aba Medir — modelagem de telhado"): cada contorno é uma face; toque a até 14 px de
   um canto existente reusa o canto (`medGruda`), então faces vizinhas compartilham cantos; altura por canto em

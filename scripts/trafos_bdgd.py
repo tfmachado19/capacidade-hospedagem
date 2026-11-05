@@ -1248,24 +1248,35 @@ h3.subt{font:700 13px var(--display);text-transform:uppercase;letter-spacing:.06
 body.medindo .leaflet-container,body.medindo .leaflet-grab,body.medindo .leaflet-interactive{cursor:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='33' height='33'%3E%3Cpath d='M16.5 1v13M16.5 19v13M1 16.5h13M19 16.5h13' stroke='%23fff' stroke-width='4'/%3E%3Cpath d='M16.5 1v13M16.5 19v13M1 16.5h13M19 16.5h13' stroke='%23000' stroke-width='1.5'/%3E%3Ccircle cx='16.5' cy='16.5' r='1.3' fill='%23e11d48'/%3E%3C/svg%3E") 16 16,crosshair!important}
 body.medindo.mapaLivre .leaflet-container{cursor:grab!important}body.medindo.mapaLivre .leaflet-dragging .leaflet-container,body.medindo.mapaLivre.leaflet-dragging{cursor:grabbing!important}
 body.medindo.sobreModulo .leaflet-container{cursor:move!important}body.medindo .leaflet-marker-icon.altv,body.medindo .leaflet-marker-icon.vert{cursor:pointer!important}
-#medTools{position:fixed;top:112px;left:10px;right:64px;justify-content:flex-start;z-index:850;display:none;gap:6px;flex-wrap:wrap;align-items:center;pointer-events:none}
+/* aba Medir: dock embaixo (opção C): ferramentas + resultado; linhas de contexto (planta, à mão) e aviso logo acima */
+#medTools{position:fixed;left:50%;transform:translateX(-50%);bottom:16px;z-index:850;display:none;flex-direction:column;align-items:center;gap:6px;
+  max-width:calc(100vw - 24px);pointer-events:none}
 body.medindo #medTools{display:flex}
-#medTools .tbGrupo{display:flex;gap:2px;background:rgba(255,255,255,.97);border-radius:10px;box-shadow:0 2px 10px rgba(0,0,0,.25);padding:3px;pointer-events:auto}
-#medTools .tbGrupo[hidden]{display:none}
-@media(min-width:761px){body:has(#side:not(.fechado)) #medTools{left:418px}}
-#medAviso{flex-basis:100%;max-width:560px;background:#0f172a;color:#fff;border-radius:8px;padding:6px 10px;font-size:12.5px;pointer-events:auto;box-shadow:0 2px 10px rgba(0,0,0,.25)}
+#medTools .tbGrupo,#medDock{display:flex;align-items:center;gap:2px;background:rgba(255,255,255,.98);border-radius:14px;
+  box-shadow:0 4px 18px rgba(0,0,0,.32);padding:5px 6px;pointer-events:auto;max-width:100%;color:#15211d}
+#medTools .tbGrupo[hidden],#medTools .tbGrupo:not(:has(button:not([hidden]))){display:none}
+#medDock{overflow-x:auto;scrollbar-width:none}#medDock::-webkit-scrollbar{display:none}
+#medTools button{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;min-width:58px;height:54px;padding:4px 6px;
+  border:0;border-radius:10px;background:transparent;color:#15211d;font:600 11px var(--body);white-space:nowrap;margin:0;flex:none}
+#medTools button svg{width:20px;height:20px;flex:none}
+#medTools button:hover{background:#e8eeec}
+#medTools button[aria-pressed="true"],#medTools button.on{background:#0f6b5c;color:#fff}
+#medTools button.ghost{background:transparent}
+#medTools button:disabled{opacity:.35}
+#medTools .tbGrupo button{min-width:52px;height:46px}
+#medTools .sep{width:1px;height:34px;background:#d9e0dd;margin:0 4px;flex:none}
+#medResumo{display:flex;flex-direction:column;justify-content:center;padding:0 10px 0 6px;flex:none;white-space:nowrap}
+#medResumo b{font:700 20px var(--display);color:#0f6b5c;line-height:1.05}#medResumo span{font-size:12px;color:#5d6b66}
+#medMaisMenu{position:absolute;bottom:calc(100% + 6px);right:0;background:#fff;border-radius:12px;box-shadow:0 6px 22px rgba(0,0,0,.3);padding:6px;
+  display:flex;flex-direction:column;gap:2px;pointer-events:auto;min-width:170px}
+#medMaisMenu[hidden]{display:none}
+#medTools #medMaisMenu button{flex-direction:row;justify-content:flex-start;gap:8px;height:38px;min-width:0;font-size:13px;padding:0 10px}
+#medAviso{max-width:560px;background:#0f172a;color:#fff;border-radius:8px;padding:6px 10px;font-size:12.5px;pointer-events:auto;box-shadow:0 2px 10px rgba(0,0,0,.25)}
 #medAviso[hidden]{display:none}
-.plH{background:#fff;border:2px solid #0ea5e9;border-radius:3px;width:16px!important;height:16px!important;margin:-8px 0 0 -8px!important;cursor:nwse-resize!important;box-shadow:0 1px 4px rgba(0,0,0,.4)}
-.plM{background:#0ea5e9;color:#fff;border:2px solid #fff;border-radius:50%;font:700 16px/26px sans-serif;text-align:center;width:30px!important;height:30px!important;margin:-15px 0 0 -15px!important;cursor:move!important;box-shadow:0 1px 4px rgba(0,0,0,.4)}
-#medTools button{padding:6px 9px;font-size:12.5px;min-height:0;border-radius:7px;white-space:nowrap;margin:0}
-#medTools button:disabled{opacity:.4}
-@media(max-width:760px){#medTools{left:8px;right:56px;top:108px;flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;padding-bottom:4px;align-items:flex-start}
-  #medAviso{position:fixed;top:156px;left:8px;right:8px;max-width:none;flex-basis:auto}
-  #medTools::-webkit-scrollbar{display:none}}
-#medBarra{position:fixed;left:50%;transform:translateX(-50%);bottom:36px;z-index:800;background:rgba(255,255,255,.97);color:#111;
-  border-radius:10px;box-shadow:0 2px 12px rgba(0,0,0,.28);padding:7px 14px;display:flex;gap:16px;font-size:13px;white-space:nowrap}
-#medBarra b{font-weight:600;color:#475569;margin-right:4px}#medBarra[hidden]{display:none}
-@media(max-width:760px){#medBarra{bottom:96px;top:auto;font-size:12px;gap:10px;padding:5px 10px}}
+#medBarra{display:none!important}
+@media(min-width:761px){body:has(#side:not(.fechado)) #medTools{left:calc(50% + 205px);max-width:calc(100vw - 440px)}}
+@media(max-width:760px){#medTools{left:8px;right:8px;transform:none;bottom:8px;max-width:none;align-items:stretch}
+  #medDock,#medTools .tbGrupo{overflow-x:auto;scrollbar-width:none}#medAviso{max-width:none}}
 .seRot{background:#0ea5e9;color:#fff;border:2px solid #fff;border-radius:50%;font:700 15px/22px sans-serif;text-align:center;
   width:26px!important;height:26px!important;margin:-13px 0 0 -13px!important;cursor:grab!important;box-shadow:0 1px 4px rgba(0,0,0,.4)}
 body.plantaFundo #map{background:#fff}body.plantaFundo .leaflet-tile-pane{opacity:0}body.plantaFundo .selo{visibility:hidden}
@@ -2752,7 +2763,7 @@ function medModo(m,manter){
   if(m==="desenho"&&!manter){med.pts=[];med.editando=false}
   if(m==="desenho")med.seSel=null;else if(med.tipo==="telhado"&&!med.manual&&med.pts.length>=3&&!med.seSel)med.seSel=med.pts;
   if(typeof medArrasteMapa==="function")medArrasteMapa();
-  $("medNovo").textContent=med.tipo==="telhado"&&(med.pts.length>=3||med.areas.length)?"✏ Nova água":"✏ Desenhar";
+  tbRot("medNovo",med.tipo==="telhado"&&(med.pts.length>=3||med.areas.length)?"Nova água":"Desenhar");
   medDesenhar();medRender();
 }
 function medTipo(t){
@@ -3129,7 +3140,7 @@ async function plantaAbrir(arq){
       $("medRowPag").hidden=planta.doc.numPages<2;await plantaPagina(1)}
     else{planta.url=URL.createObjectURL(arq);const im=new Image();await new Promise((ok,erro)=>{im.onload=ok;im.onerror=erro;im.src=planta.url});
       planta.w=im.naturalWidth;planta.h=im.naturalHeight;planta.mpu=20/planta.w;planta.src0=im;planta.w0=planta.w;planta.h0=planta.h;planta.url0=planta.url;planta.rot=0;$("medRowPag").hidden=true}   // imagem: 20 m de largura até calibrar
-    $("medRowEsc").hidden=!pdf;$("medPlantaCtl").hidden=false;$("medTira").hidden=false;$("medPlantaDica").hidden=true;$("medAbrir").textContent="📄 Trocar";
+    $("medRowEsc").hidden=!pdf;$("medPlantaCtl").hidden=false;$("medTira").hidden=false;$("medPlantaDica").hidden=true;tbRot("medAbrir","Trocar");
     $("medCal").hidden=false;$("medAjusta").hidden=false;
     plantaAtualizar();map.fitBounds(plantaLimites(),{paddingTopLeft:[30,230],paddingBottomRight:[30,90]});plantaAjuste(!pdf);   // imagem não tem escala: já abre no ajuste
     medMsg(pdf?"Planta aberta na escala 1:"+$("medEsc").value+". Confira com uma cota: toque em \"Calibrar por uma cota\". Depois marque os cantos do telhado em cima da planta."
@@ -3140,7 +3151,7 @@ function plantaTirar(){
   if(!planta)return;plantaMostrar(false);if(planta.ov)map.removeLayer(planta.ov);map.removeLayer(planta.calLayer);if(planta.hLayer)map.removeLayer(planta.hLayer);
   $("medCal").hidden=true;$("medAjusta").hidden=true;medAviso(null);
   [planta.url,planta.url0].forEach(u=>{if(u&&u.startsWith("blob:"))URL.revokeObjectURL(u)});planta=null;
-  $("medPlantaCtl").hidden=true;$("medTira").hidden=true;$("medPlantaDica").hidden=false;$("medAbrir").textContent="📄 Planta";$("medArq").value="";medRender();
+  $("medPlantaCtl").hidden=true;$("medTira").hidden=true;$("medPlantaDica").hidden=false;tbRot("medAbrir","Planta");$("medArq").value="";medRender();
 }
 function plantaCalPonto(ll){
   const c=planta.cal;c.pts.push([ll.lat,ll.lng]);
@@ -3340,30 +3351,54 @@ document.addEventListener("keydown",e=>{
   else if(k==="escape"&&med.manual&&(med.selM>=0||med.selG!=null)){med.selM=-1;med.selG=null;medDesenhar();medRender()}
   else if((k==="delete"||k==="backspace")&&med.seSel&&med.seSel.p&&med.seSel.p.sel.size){e.preventDefault();seApagaSel()}
   else if(k==="escape"&&med.seSel){med.seSel=null;medDesenhar();medRender();medArrasteMapa()}});
-// barra de ferramentas da aba Medir (em cima do mapa): os mesmos botões do painel, agrupados, com ícone e dica
+// dock da aba Medir (embaixo, opção C): os mesmos botões do painel, com ícone e nome; resultado junto; linhas de
+// contexto acima (planta aberta; posicionar à mão) e "⋯ Mais" com limpar/exportar/importar
+const ICO={casa:'<path d="M3 11l9-7 9 7M5 10v10h14V10"/>',solo:'<rect x="3" y="6" width="18" height="12" rx="1"/>',
+  planta:'<path d="M6 2h9l5 5v15H6z"/><path d="M15 2v5h5"/>',lapis:'<path d="M4 20l4-1 11-11-3-3L5 16z"/>',
+  grade:'<rect x="3" y="3" width="18" height="18"/><path d="M3 9h18M3 15h18M9 3v18M15 3v18"/>',
+  mao:'<path d="M9 11V5a1.5 1.5 0 013 0v6M12 10V4a1.5 1.5 0 013 0v7M15 11V6a1.5 1.5 0 013 0v8a6 6 0 01-6 6h-1a6 6 0 01-5-3l-2-4a1.5 1.5 0 012.5-1.5L9 13"/>',
+  desf:'<path d="M9 14L4 9l5-5M4 9h10a6 6 0 010 12h-3"/>',ref:'<path d="M15 14l5-5-5-5M20 9H10a6 6 0 000 12h3"/>',
+  mais:'<circle cx="5" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="19" cy="12" r="1.6"/>',
+  ajusta:'<path d="M4 9V4h5M20 15v5h-5M4 4l7 7M20 20l-7-7"/>',regua:'<path d="M3 17L17 3l4 4L7 21z"/><path d="M7 13l2 2M10 10l2 2M13 7l2 2"/>',
+  x:'<path d="M6 6l12 12M18 6L6 18"/>',mover:'<path d="M12 2v20M2 12h20M12 2l-3 3M12 2l3 3M12 22l-3-3M12 22l3-3M2 12l3-3M2 12l3 3M22 12l-3-3M22 12l-3 3"/>',
+  gira:'<path d="M20 12a8 8 0 11-3-6.2M20 4v5h-5"/>',giraM:'<path d="M4 12a8 8 0 103-6.2M4 4v5h5"/>',lixo:'<path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/>',
+  borracha:'<path d="M3 17l8-8 6 6-4 4H7z"/><path d="M14 6l4 4M13 19h8"/>',baixa:'<path d="M12 3v12M7 10l5 5 5-5M4 20h16"/>',sobe:'<path d="M12 21V9M7 14l5-5 5 5M4 4h16"/>'};
+const svgI=k=>`<svg viewBox="0 0 24 24" fill="${k==="mais"?"currentColor":"none"}" stroke="${k==="mais"?"none":"currentColor"}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICO[k]}</svg>`;
+function tbRot(id,t){const b=$(id),sp=b&&b.querySelector("span");if(sp)sp.textContent=t;else if(b)b.textContent=t}
 (()=>{const tb=document.createElement("div");tb.id="medTools";tb.setAttribute("role","toolbar");tb.setAttribute("aria-label","Ferramentas de medição");
-  const B={medTel:["⌂ Telhado","Medir telhado"],medSolo:["▭ Solo","Medir terreno (usina no solo)"],
-    medAbrir:["📄 Planta","Abrir a planta da obra (PDF ou imagem)"],medTira:["✕ Planta","Tirar a planta"],
-    medAjusta:["⤢ Ajustar","Mover e redimensionar a planta (arraste os cantos)"],medCal:["📏 Cota","Calibrar a escala por uma medida conhecida"],
-    medAuto:["▦ Por água","Módulos preenchidos em cada água do telhado"],medMao:["☝ À mão","Posicionar módulos à mão, em conjuntos"],
-    medNovo:[null,"Desenhar mais uma água / contorno"],medLimpa:["🧹 Limpar","Apagar todo o desenho"],
-    medPan:["✥ Mapa","Arrastar move o mapa (ligado) ou desenha (desligado)"],medGira:["⟳ 90°","Girar a seleção 90°"],medGiraM:["↺ 5°","Girar 5° anti-horário"],
-    medGiraP:["↻ 5°","Girar 5° horário"],medApaga:["🗑 Apagar","Apagar a seleção (Delete)"],medDoAuto:["▦→☝","Começar pelo arranjo automático"],
-    medApagaTodos:["Apagar todos","Apagar todos os módulos à mão"],medDesf:["↶","Desfazer (Ctrl+Z)"],medRef:["↷","Refazer (Ctrl+Y)"],
-    medExp:["⤓ Exportar","Salvar a medição num arquivo JSON"],medImp:["⤒ Importar","Abrir uma medição salva (JSON)"]};
-  const G=[["medTel","medSolo"],["medAbrir","medAjusta","medCal","medTira"],["medAuto","medMao"],["medNovo","medLimpa"],
-    ["medPan","medGira","medGiraM","medGiraP","medApaga","medDoAuto","medApagaTodos"],["medDesf","medRef"],["medExp","medImp"]];
-  G.forEach((ids,k)=>{const g=document.createElement("div");g.className="tbGrupo";if(k===4){g.id="medTbMao";g.hidden=true}
-    ids.forEach(id=>{const b=$(id);if(!b)return;const [t,d]=B[id]||[];if(t)b.textContent=t;if(d)b.title=d;g.append(b)});tb.append(g)});
+  const B={medTel:["casa","Telhado","Medir telhado"],medSolo:["solo","Solo","Medir terreno (usina no solo)"],
+    medAbrir:["planta","Planta","Abrir a planta da obra (PDF ou imagem)"],medNovo:["lapis","Desenhar","Desenhar uma água / contorno"],
+    medAuto:["grade","Por água","Módulos preenchidos em cada água do telhado"],medMao:["mao","À mão","Posicionar módulos à mão, em conjuntos"],
+    medDesf:["desf","Desfazer","Desfazer (Ctrl+Z)"],medRef:["ref","Refazer","Refazer (Ctrl+Y)"],
+    medAjusta:["ajusta","Ajustar","Tamanho, mover e girar a planta"],medCal:["regua","Cota","Calibrar a escala por uma medida conhecida"],medTira:["x","Tirar","Tirar a planta"],
+    medPan:["mover","Mapa","Arrastar move o mapa (ligado) ou desenha (desligado)"],medGira:["gira","90°","Girar a seleção 90°"],medGiraM:["giraM","5°","Girar 5° anti-horário"],
+    medGiraP:["gira","5°","Girar 5° horário"],medApaga:["lixo","Apagar","Apagar a seleção (Delete)"],medDoAuto:["grade","Do automático","Começar pelo arranjo automático"],
+    medApagaTodos:["borracha","Apagar todos","Apagar todos os módulos à mão"],
+    medLimpa:["borracha","Limpar desenho","Apagar todo o desenho"],medExp:["baixa","Exportar","Salvar a medição num arquivo JSON"],medImp:["sobe","Importar","Abrir uma medição salva (JSON)"]};
+  const pega=id=>{const b=$(id);if(!b)return null;const [i,t,d]=B[id]||[];if(i){b.innerHTML=svgI(i)+`<span>${t}</span>`}if(d){b.title=d;b.setAttribute("aria-label",d)}return b};
+  const linha=(id,ids)=>{const g=document.createElement("div");g.className="tbGrupo";g.id=id;ids.forEach(x=>{const b=pega(x);if(b)g.append(b)});return g};
   const av=document.createElement("div");av.id="medAviso";av.hidden=true;av.setAttribute("aria-live","polite");tb.append(av);
+  tb.append(linha("medTbPlanta",["medAjusta","medCal","medTira"]));
+  const gm=linha("medTbMao",["medPan","medGira","medGiraM","medGiraP","medApaga","medDoAuto","medApagaTodos"]);gm.hidden=true;tb.append(gm);
+  const dk=document.createElement("div");dk.id="medDock";const sep=()=>{const d=document.createElement("div");d.className="sep";return d};
+  ["medTel","medSolo"].forEach(x=>dk.append(pega(x)));dk.append(sep());
+  ["medAbrir","medNovo","medAuto","medMao"].forEach(x=>dk.append(pega(x)));dk.append(sep());
+  ["medDesf","medRef"].forEach(x=>dk.append(pega(x)));
+  const mb=document.createElement("button");mb.type="button";mb.id="medMais";mb.title="Mais: limpar, exportar, importar";mb.setAttribute("aria-label",mb.title);
+  mb.setAttribute("aria-expanded","false");mb.innerHTML=svgI("mais")+"<span>Mais</span>";dk.append(mb);
+  const mm=document.createElement("div");mm.id="medMaisMenu";mm.hidden=true;mm.setAttribute("role","menu");
+  ["medLimpa","medExp","medImp"].forEach(x=>{const b=pega(x);b.setAttribute("role","menuitem");b.addEventListener("click",()=>{mm.hidden=true;mb.setAttribute("aria-expanded","false")});mm.append(b)});
+  mb.onclick=e=>{e.stopPropagation();mm.hidden=!mm.hidden;mb.setAttribute("aria-expanded",!mm.hidden)};
+  document.addEventListener("click",e=>{if(!mm.hidden&&!mm.contains(e.target)&&e.target!==mb){mm.hidden=true;mb.setAttribute("aria-expanded","false")}});
+  dk.append(sep());const rs=document.createElement("div");rs.id="medResumo";rs.setAttribute("aria-live","polite");dk.append(rs);
+  const wrap=document.createElement("div");wrap.style.cssText="position:relative;display:flex;justify-content:center;max-width:100%";wrap.append(dk,mm);tb.append(wrap);
   document.body.append(tb)})();
 // barra de resumo (embaixo, como no SolarEdge): total / água selecionada
 const medBarra=document.createElement("div");medBarra.id="medBarra";medBarra.hidden=true;document.body.append(medBarra);
 function atualizarBarra(){const on=abaAtual==="M";medBarra.hidden=!on;if(!on)return;
   const w=+$("medW").value||0,nT=med.manual?med.man.length:(med.lay||[]).reduce((s,l)=>s+l.lay.n,0);
   const l=!med.manual&&med.seSel&&(med.lay||[]).find(x=>x.pts===med.seSel),nS=l?l.lay.n:null,aS=l?medidas(l.pts).area/Math.cos(l.fi.th*Math.PI/180):null;
-  medBarra.innerHTML=`<span><b>Módulos FV</b>${nT}${nS!=null?" / "+nS:""}</span><span><b>Potência CC</b>${fmt(nT*w/1000,2)}${nS!=null?" / "+fmt(nS*w/1000,2):""} kWp</span>`+
-    (aS!=null?`<span><b>Área da água</b>${fmt(aS,1)} m²</span>`:"")}
+  const rs=$("medResumo");if(rs)rs.innerHTML=`<b>${fmt(nT*w/1000,2)} kWp</b><span>${nT} módulos${nS!=null?` · água: ${nS} · ${fmt(aS,1)} m²`:""}</span>`}
 // recupera a última medição salva neste navegador
 (()=>{let s=null;try{s=localStorage.getItem("medir.v1")}catch(e){}if(s)medRestaura(s);medMudou()})();
 // abas do painel
