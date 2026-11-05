@@ -109,7 +109,8 @@ nem sempre programadores: explique resultados em linguagem simples.
   `L.imageOverlay` com o tamanho real em metros (PDF: 1 pt = 1/72 pol × escala 1:E; imagem: só por
   calibração), então o desenho e os módulos usam a mesma conta do satélite. "Calibrar por uma cota" =
   2 toques + medida real (botão "📏 Cota" na barra). "⤢ Ajustar" (`plantaAjuste`, `plantaAlcas`): alças nos 4 cantos
-  redimensionam sem distorcer (canto oposto parado) e ✥ no centro move; imagem já abre no ajuste; no ajuste os
+  redimensionam sem distorcer (canto oposto parado), ✥ no centro move e ⟳ acima gira (`plantaGira`: redesenha a
+  imagem original `src0` girada numa tela nova; `w0`/`h0` = tamanho sem giro, `w`/`h` = caixa da imagem girada); imagem já abre no ajuste; no ajuste os
   toques no mapa não desenham. Avisos curtos na faixa `#medAviso` da barra. pdf.js 3.11.174 vem do cdnjs só quando usar. O arquivo não sai do navegador. Os contornos de prédios (`dados/edif/`) não são
   mais usados pela página.
 - `dados/edif/14/<x>/<y>.json` — contornos de prédios (aba Medir), gerados por `scripts/edificios.py`

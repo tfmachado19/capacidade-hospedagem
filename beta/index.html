@@ -2053,7 +2053,7 @@ function plantaAtualizar(){
   plantaMostrar(abaAtual==="M");
 }
 function medAviso(t){const a=$("medAviso");if(!a)return;a.hidden=!t;a.textContent=t||""}
-function plantaTam(){if(!planta)return "";return `Planta com ${fmt(planta.w*planta.mpu,2)} × ${fmt(planta.h*planta.mpu,2)} m${planta.pdf?" (escala 1:"+Math.round(planta.mpu/PT_M)+")":""}`}
+function plantaTam(){if(!planta)return "";return `Planta com ${fmt((planta.w0||planta.w)*planta.mpu,2)} × ${fmt((planta.h0||planta.h)*planta.mpu,2)} m${planta.rot?", girada "+planta.rot+"°":""}${planta.pdf?" (escala 1:"+Math.round(planta.mpu/PT_M)+")":""}`}
 // ajuste: alças nos 4 cantos (arraste = muda o tamanho, sem distorcer; o canto oposto fica parado) e no centro (move)
 function plantaAlcas(){
   if(!planta||!planta.hLayer)return;planta.hLayer.clearLayers();
@@ -2066,14 +2066,38 @@ function plantaAlcas(){
       const d=[(g.lng-op.lng)*kx,(g.lat-op.lat)*ky],D=[(c.lng-op.lng)*kx,(c.lat-op.lat)*ky],f=Math.max(.02,(d[0]*D[0]+d[1]*D[1])/(D[0]*D[0]+D[1]*D[1]));
       planta.mpu=ini.mpu*f;planta.c=[op.lat+(ini.c[0]-op.lat)*f,op.lng+(ini.c[1]-op.lng)*f];
       planta.ov.setBounds(L.latLngBounds(plantaLimites()));medAviso(plantaTam()+" · solte para ajustar")});
-    mk.on("dragend",()=>{ini=null;plantaAtualizar();plantaAlcas();medAviso(plantaTam()+" · arraste os cantos para o tamanho real, ✥ para mover, ou use 📏 Cota");medDesenhar();medRender()})});
+    mk.on("dragend",()=>{ini=null;plantaAtualizar();plantaAlcas();medAviso(plantaTam()+" · cantos = tamanho, ✥ = mover, ⟳ = girar, ou use 📏 Cota");medDesenhar();medRender()})});
   const mc=L.marker(b.getCenter(),{draggable:true,icon:L.divIcon({className:"plM",html:"✥",iconSize:null}),title:"Arraste para mover a planta"}).addTo(planta.hLayer);
+  const ky=110540,kx=111320*Math.cos(planta.c[0]*Math.PI/180),topo=[planta.c[0]+(planta.h*planta.mpu/2+Math.max(1.5,planta.h*planta.mpu*.08))/ky,planta.c[1]];
+  const mr=L.marker(topo,{draggable:true,icon:L.divIcon({className:"seRot",html:"⟳",iconSize:null}),title:"Arraste para girar a planta"}).addTo(planta.hLayer);
+  let g0=null,contorno=null;
+  const cantos=r=>{const a=r*Math.PI/180,W=planta.w0*planta.mpu/2,H=planta.h0*planta.mpu/2;   // giro horário no mapa
+    return [[-W,-H],[W,-H],[W,H],[-W,H]].map(([x,y])=>{const e=x*Math.cos(a)+y*Math.sin(a),n=-x*Math.sin(a)+y*Math.cos(a);return [planta.c[0]+n/ky,planta.c[1]+e/kx]})};
+  mr.on("dragstart",ev=>{const cp=map.latLngToContainerPoint(planta.c),q=map.latLngToContainerPoint(ev.target.getLatLng());
+    g0={rot:planta.rot||0,r:planta.rot||0,a0:Math.atan2(q.y-cp.y,q.x-cp.x)};
+    contorno=L.polygon(cantos(g0.rot),{color:"#0ea5e9",weight:2,dashArray:"6 4",fill:false,interactive:false}).addTo(planta.hLayer)});
+  mr.on("drag",ev=>{if(!g0)return;const cp=map.latLngToContainerPoint(planta.c),q=map.latLngToContainerPoint(ev.target.getLatLng());
+    g0.r=Math.round(g0.rot+(Math.atan2(q.y-cp.y,q.x-cp.x)-g0.a0)*180/Math.PI);contorno.setLatLngs(cantos(g0.r));
+    medAviso(`Girando a planta: ${((g0.r%360)+360)%360}° · solte para aplicar`)});
+  mr.on("dragend",()=>{const r=g0?g0.r:planta.rot;g0=null;plantaGira(r).then(()=>medAviso(plantaTam()+" · cantos = tamanho, ✥ = mover, ⟳ = girar, ou use 📏 Cota"))});
   mc.on("drag",ev=>{const g=ev.target.getLatLng();planta.c=[g.lat,g.lng];planta.ov.setBounds(L.latLngBounds(plantaLimites()))});
   mc.on("dragend",()=>{plantaAtualizar();plantaAlcas()});
 }
+function plantaGira(graus,semAtualizar){
+  const p=planta;if(!p||!p.src0)return Promise.resolve();p.rot=((Math.round(graus)%360)+360)%360;
+  if(p.url&&p.url!==p.url0&&p.url.startsWith("blob:"))URL.revokeObjectURL(p.url);
+  if(!p.rot){p.url=p.url0;p.w=p.w0;p.h=p.h0}
+  else{const r=p.rot*Math.PI/180,c=Math.abs(Math.cos(r)),s=Math.abs(Math.sin(r));p.w=p.w0*c+p.h0*s;p.h=p.w0*s+p.h0*c}
+  const pronto=()=>{if(!semAtualizar){if(p.ov){map.removeLayer(p.ov);p.ov=null}plantaAtualizar();plantaAlcas();medDesenhar();medRender()}};
+  if(!p.rot){pronto();return Promise.resolve()}
+  const sw=p.src0.naturalWidth||p.src0.width,k=Math.min(sw/p.w0,4096/Math.max(p.w,p.h)),cv=document.createElement("canvas");
+  cv.width=Math.max(1,Math.round(p.w*k));cv.height=Math.max(1,Math.round(p.h*k));const x=cv.getContext("2d");
+  x.translate(cv.width/2,cv.height/2);x.rotate(p.rot*Math.PI/180);x.drawImage(p.src0,-p.w0*k/2,-p.h0*k/2,p.w0*k,p.h0*k);
+  return new Promise(ok=>cv.toBlob(bl=>{p.url=URL.createObjectURL(bl);if(semAtualizar&&p.ov){map.removeLayer(p.ov);p.ov=null}pronto();ok()},"image/png"));
+}
 function plantaAjuste(on){if(!planta)return;planta.ajuste=on;$("medAjusta").className=on?"":"ghost";$("medAjusta").setAttribute("aria-pressed",on);
   if(on&&planta.cal){planta.cal=null;planta.calLayer.clearLayers();$("medRowCal").hidden=true}
-  plantaAlcas();medAviso(on?plantaTam()+" · arraste os cantos para o tamanho real, ✥ para mover, ou use 📏 Cota":null)}
+  plantaAlcas();medAviso(on?plantaTam()+" · cantos = tamanho, ✥ = mover, ⟳ = girar, ou use 📏 Cota":null)}
 function plantaMostrar(on){
   if(!planta){document.body.classList.remove("plantaFundo");return}
   if(planta.hLayer){if(on)plantaAlcas();else planta.hLayer.clearLayers()}
@@ -2087,8 +2111,9 @@ async function plantaPagina(n){
   const cx=cv.getContext("2d");cx.fillStyle="#fff";cx.fillRect(0,0,cv.width,cv.height);
   await pg.render({canvasContext:cx,viewport:v}).promise;
   if(planta.url&&planta.url.startsWith("blob:"))URL.revokeObjectURL(planta.url);
-  planta.url=await new Promise(r=>cv.toBlob(b=>r(URL.createObjectURL(b)),"image/png"));
+  planta.url=await new Promise(r=>cv.toBlob(b=>r(URL.createObjectURL(b)),"image/png"));planta.url0=planta.url;
   planta.w=v1.width;planta.h=v1.height;planta.mpu=(+$("medEsc").value||100)*PT_M;
+  planta.src0=cv;planta.w0=planta.w;planta.h0=planta.h;if(planta.rot)await plantaGira(planta.rot,true);
   if(planta.ov){map.removeLayer(planta.ov);planta.ov=null}
 }
 async function plantaAbrir(arq){
@@ -2101,10 +2126,10 @@ async function plantaAbrir(arq){
       $("medPag").innerHTML=Array.from({length:planta.doc.numPages},(_,i)=>`<option value="${i+1}">${i+1}</option>`).join("");
       $("medRowPag").hidden=planta.doc.numPages<2;await plantaPagina(1)}
     else{planta.url=URL.createObjectURL(arq);const im=new Image();await new Promise((ok,erro)=>{im.onload=ok;im.onerror=erro;im.src=planta.url});
-      planta.w=im.naturalWidth;planta.h=im.naturalHeight;planta.mpu=20/planta.w;$("medRowPag").hidden=true}   // imagem: 20 m de largura até calibrar
+      planta.w=im.naturalWidth;planta.h=im.naturalHeight;planta.mpu=20/planta.w;planta.src0=im;planta.w0=planta.w;planta.h0=planta.h;planta.url0=planta.url;planta.rot=0;$("medRowPag").hidden=true}   // imagem: 20 m de largura até calibrar
     $("medRowEsc").hidden=!pdf;$("medPlantaCtl").hidden=false;$("medTira").hidden=false;$("medPlantaDica").hidden=true;$("medAbrir").textContent="📄 Trocar";
     $("medCal").hidden=false;$("medAjusta").hidden=false;
-    plantaAtualizar();map.fitBounds(plantaLimites(),{padding:[30,30]});plantaAjuste(!pdf);   // imagem não tem escala: já abre no ajuste
+    plantaAtualizar();map.fitBounds(plantaLimites(),{paddingTopLeft:[30,230],paddingBottomRight:[30,90]});plantaAjuste(!pdf);   // imagem não tem escala: já abre no ajuste
     medMsg(pdf?"Planta aberta na escala 1:"+$("medEsc").value+". Confira com uma cota: toque em \"Calibrar por uma cota\". Depois marque os cantos do telhado em cima da planta."
       :"Imagem aberta sem escala. Toque em \"Calibrar por uma cota\" e marque as duas pontas de uma medida conhecida.");
   }catch(e){medMsg("Não consegui abrir este arquivo. Use um PDF ou uma imagem (JPG, PNG).");if(planta&&!planta.url)plantaTirar()}
@@ -2112,7 +2137,7 @@ async function plantaAbrir(arq){
 function plantaTirar(){
   if(!planta)return;plantaMostrar(false);if(planta.ov)map.removeLayer(planta.ov);map.removeLayer(planta.calLayer);if(planta.hLayer)map.removeLayer(planta.hLayer);
   $("medCal").hidden=true;$("medAjusta").hidden=true;medAviso(null);
-  if(planta.url&&planta.url.startsWith("blob:"))URL.revokeObjectURL(planta.url);planta=null;
+  [planta.url,planta.url0].forEach(u=>{if(u&&u.startsWith("blob:"))URL.revokeObjectURL(u)});planta=null;
   $("medPlantaCtl").hidden=true;$("medTira").hidden=true;$("medPlantaDica").hidden=false;$("medAbrir").textContent="📄 Planta";$("medArq").value="";medRender();
 }
 function plantaCalPonto(ll){
