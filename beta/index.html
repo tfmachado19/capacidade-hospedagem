@@ -104,6 +104,7 @@ aside::-webkit-scrollbar{width:10px}aside::-webkit-scrollbar-thumb{background:va
 .lado{background:rgba(20,20,20,.75)!important;color:#fff!important;border:0!important;box-shadow:none!important;font:600 11px var(--mono)!important;padding:1px 4px!important}
 .lado::before{display:none}
 .vert{background:#fff;border:2px solid #f2b400;border-radius:50%;box-shadow:0 0 0 1px rgba(0,0,0,.5)}
+.vert:hover{background:#e11d48;border-color:#fff}.vert.fecha,.vert.fecha:hover{background:#16a34a;border-color:#fff}
 .medGrande{font:600 30px var(--mono);font-variant-numeric:tabular-nums}.medGrande small{font-size:15px;color:var(--muted)}
 .glogo img{display:block;height:18px;filter:drop-shadow(0 0 1px rgba(0,0,0,.6))}
 .links a.gsat{display:inline-block;background:var(--accent);color:var(--accent-ink);padding:4px 10px;border-radius:6px;text-decoration:none;font-weight:600}
@@ -390,7 +391,7 @@ body.medindo .leaflet-control.legenda,body.medindo .leaflet-control.legAlimC{dis
           <button type="button" class="ghost" id="medGiraP">↻ 5°</button><button type="button" class="ghost" id="medApaga">Apagar seleção</button></div>
         <div class="acoes"><button type="button" class="ghost" id="medDoAuto">Começar pelo automático</button><button type="button" class="ghost" id="medApagaTodos">Apagar todos</button></div>
       </div>
-      <p class="hint" id="medDica">Toque nos cantos do telhado, em sequência, na imagem de satélite. Para terminar, toque no primeiro canto. Arraste um canto para ajustar.</p>
+      <p class="hint" id="medDica">Toque nos cantos do telhado, em sequência, na imagem de satélite. Para terminar, toque no primeiro canto (verde). Clicou errado? Toque no ponto para apagar. Arraste um canto para ajustar.</p>
       <div class="acoes">
         <button type="button" class="ghost" id="medNovo">Novo contorno</button>
         <button type="button" class="ghost" id="medLimpa">Limpar</button>
@@ -1667,14 +1668,20 @@ function medDesenhar(){
         if(med.altSel.size===1)$("medAltSel").value=altDe(p);medDesenhar()})}))}
   med.camada.addLayer(med.camMao);desenharMao();desenharGiroGrupo();
   if(!med.manual&&(med.modo==="desenho"||med.editando))med.pts.forEach((p,i)=>{
-    const mk=L.marker(p,{draggable:true,icon:L.divIcon({className:"vert",iconSize:[14,14]})}).addTo(med.camada);
+    const fecha=med.modo==="desenho"&&i===0&&med.pts.length>=3;
+    const mk=L.marker(p,{draggable:true,title:fecha?"Clique para fechar o contorno":"Clique para apagar este ponto (ou arraste para mover)",
+      icon:L.divIcon({className:"vert"+(fecha?" fecha":""),iconSize:[14,14]})}).addTo(med.camada);
     let antes=null;mk.on("dragstart",()=>{antes=med.pts[i].slice()});
     mk.on("drag",ev=>{const g=ev.target.getLatLng();med.pts[i]=[g.lat,g.lng];if(med.forma)med.forma.setLatLngs(med.pts)});
     mk.on("dragend",()=>{if(antes){const ka=vk(antes),novo=med.pts[i];
         med.areas.forEach(f=>f.forEach((q,j)=>{if(vk(q)===ka)f[j]=novo.slice()}));
         if(med.alt.has(ka)){med.alt.set(vk(novo),med.alt.get(ka));med.alt.delete(ka)}}
       medDesenhar();medRender()});
-    mk.on("click",ev=>{L.DomEvent.stopPropagation(ev);if(med.modo==="desenho"&&i===0&&med.pts.length>=3){medModo("pronto",true)}});
+    // clique no ponto: o primeiro (com 3 ou mais) fecha o contorno; os outros são apagados (clicou errado)
+    mk.on("click",ev=>{L.DomEvent.stopPropagation(ev);
+      if(med.modo==="desenho"&&i===0&&med.pts.length>=3){medModo("pronto",true);return}
+      if(med.modo!=="desenho"&&med.pts.length<=3){medMsgTopo("Um contorno precisa de pelo menos 3 pontos.");return}
+      med.pts.splice(i,1);if(med.modo!=="desenho"&&med.pts.length<3)medModo("desenho",true);else{medDesenhar();medRender()}});
     med.marcadores.push(mk)});
 }
 const MED_DESENHO=12000;
@@ -1737,7 +1744,7 @@ function medLayout(pts,c){
 }
 function medModo(m,manter){
   med.modo=m;
-  $("medDica").textContent=m==="desenho"?`Toque nos cantos ${med.tipo==="solo"?"do terreno":"do telhado"}, em sequência, na imagem de satélite. Para terminar, toque no primeiro canto. Arraste um canto para ajustar.`
+  $("medDica").textContent=m==="desenho"?`Toque nos cantos ${med.tipo==="solo"?"do terreno":"do telhado"}, em sequência. Para terminar, toque no primeiro canto (verde). Clicou errado? Toque no ponto para apagar (ou Backspace). Arraste um canto para ajustar.`
     :med.tipo==="solo"?"Contorno pronto. Use \"Ajustar cantos\" para corrigir ou \"Novo contorno\" para começar de novo."
     :"Água pronta e selecionada: ajuste beiral e módulos no painel da água (abaixo). Toque em outra água para editá-la, ou em \"✏ Nova água\" para desenhar a próxima (toque nos cantos já marcados para ligar as águas).";
   if(m==="desenho"&&!manter){med.pts=[];med.editando=false}
@@ -2301,6 +2308,7 @@ document.addEventListener("keydown",e=>{
   if(abaAtual!=="M"||e.target.closest("input,textarea,select,[contenteditable]"))return;const k=e.key.toLowerCase(),ctl=e.ctrlKey||e.metaKey;
   if(ctl&&k==="z"&&!e.shiftKey){e.preventDefault();medDesfaz()}
   else if(ctl&&(k==="y"||(k==="z"&&e.shiftKey))){e.preventDefault();medRefaz()}
+  else if((k==="delete"||k==="backspace")&&!med.manual&&med.modo==="desenho"&&med.pts.length){e.preventDefault();med.pts.pop();medDesenhar();medRender()}
   else if((k==="delete"||k==="backspace")&&med.manual&&(med.selM>=0||med.selG!=null)){e.preventDefault();modApaga()}
   else if(k==="escape"&&med.manual&&(med.selM>=0||med.selG!=null)){med.selM=-1;med.selG=null;medDesenhar();medRender()}
   else if((k==="delete"||k==="backspace")&&med.seSel&&med.seSel.p&&med.seSel.p.sel.size){e.preventDefault();seApagaSel()}
