@@ -1282,6 +1282,22 @@ body.medindo #medTools{display:flex}
 body.plantaFundo #map{background:#fff}body.plantaFundo .leaflet-tile-pane{opacity:0}body.plantaFundo .selo{visibility:hidden}
 .medCalPt{background:#e11d48;border:2px solid #fff;border-radius:50%}
 body.medindo .leaflet-control.legenda,body.medindo .leaflet-control.legAlimC{display:none!important}
+#cliTxt{width:100%;min-height:120px;padding:8px 10px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--ink);font:12px/1.45 var(--mono);resize:vertical}
+#cliNome{flex:1 1 0;width:0;min-width:140px}
+.cliLista{display:grid;gap:6px}
+.cliLista button{display:grid;grid-template-columns:28px minmax(0,1fr) auto;gap:10px;align-items:center;text-align:left;background:var(--chip);color:var(--ink);font-weight:500;padding:9px 10px}
+.cliLista button[aria-current="true"]{outline:2px solid var(--accent);outline-offset:-2px}
+.cliLista .d{font:12px var(--mono);color:var(--muted)}.cliLista .dir{text-align:right;white-space:nowrap}
+.cliN{display:inline-block;width:26px;height:26px;border-radius:50%;color:#fff;font:700 12px/26px var(--mono);text-align:center}
+.cliPinW{background:none;border:0}
+.cliPin{position:absolute;transform:translate(-50%,-50%);width:26px;height:26px;border-radius:50%;color:#fff;font:700 12px/22px var(--mono);text-align:center;border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.45);cursor:pointer}
+.cliPin.sel{width:34px;height:34px;line-height:30px;border:3px solid #111}
+.cliResumo{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-bottom:8px}
+.cliResumo div{border:1px solid var(--line);border-radius:8px;padding:6px 8px;text-align:center;display:grid}
+.cliResumo b{font:600 22px var(--mono)}
+.cliTag{display:inline-block;font:600 11px var(--body);padding:2px 7px;border-radius:999px;background:#dcfce7;color:#14532d}
+.cliTag.aviso{background:#fef3c7;color:#78350f}.cliTag.ruim{background:#fee2e2;color:#7f1d1d}
+#cliEntra textarea{margin-top:8px}
 @media (max-width:760px){
   aside#side{left:0;right:0;bottom:0;top:auto;width:auto;max-height:62vh;border-radius:14px 14px 0 0;border-bottom:0;grid-row:auto}
   .abasMapa .tabs{gap:4px}.abasMapa .tabs button{padding:5px 9px;font-size:12px;min-height:32px}
@@ -1460,6 +1476,21 @@ body.medindo .leaflet-control.legenda,body.medindo .leaflet-control.legAlimC{dis
     </div>
     <div class="scroll" id="infoInv"></div>
   </section>
+  <section class="aba" id="abaK" role="tabpanel" aria-labelledby="tabK" hidden>
+    <div class="painel">
+      <p class="pergunta">Analisar um cliente</p>
+      <p class="hint">Para clientes com várias unidades (filiais, postos, lojas): qual local tem mais chance de aprovar GD e quanto cada um libera.</p>
+      <div class="row"><label for="cliNome">Cliente</label><input id="cliNome" type="text" placeholder="Nome do cliente" autocomplete="off"></div>
+      <details class="menu" id="cliEntra" open><summary>Unidades (endereços)</summary>
+        <p class="hint">Uma unidade por linha: <b>nome; endereço, cidade</b>. Também aceita só o endereço ou o texto do contrato social (“FILIAL I - localizada na …”). A lista fica só neste aparelho.</p>
+        <textarea id="cliTxt" rows="7" spellcheck="false" placeholder="Matriz; Rodovia BR 392, Km 1,4, Santa Maria&#10;Filial II; Rua Barão do Triunfo, 965, Santa Maria"></textarea>
+      </details>
+      <div class="acoes"><button type="button" id="cliOk">Analisar</button><button type="button" class="ghost" id="cliCsv">Baixar (CSV)</button>
+        <button type="button" class="ghost" id="cliExp">Exportar</button><button type="button" class="ghost" id="cliImp">Importar</button>
+        <button type="button" class="ghost" id="cliLimpa">Limpar</button><input type="file" id="cliImpArq" accept=".json,.txt,.csv,application/json,text/plain,text/csv" hidden></div>
+    </div>
+    <div class="scroll" id="infoCli"></div>
+  </section>
   <section class="aba" id="abaS" role="tabpanel" aria-labelledby="tabS" hidden>
     <div class="scroll sobre">
       <p class="pergunta">De onde vêm os números</p>
@@ -1563,6 +1594,7 @@ caixa("topleft","abasMapa",`<nav class="tabs" role="tablist" aria-label="Seçõe
   <button type="button" role="tab" id="tabP" data-tab="P" aria-selected="false" aria-controls="abaP" hidden>Prospectar</button>
   <button type="button" role="tab" id="tabI" data-tab="I" aria-selected="false" aria-controls="abaI" hidden>Usinas</button>
   <button type="button" role="tab" id="tabG" data-tab="G" aria-selected="false" aria-controls="abaG" hidden>GDs</button>
+  <button type="button" role="tab" id="tabK" data-tab="K" aria-selected="false" aria-controls="abaK" hidden>Cliente</button>
   <button type="button" role="tab" id="tabM" data-tab="M" aria-selected="false" aria-controls="abaM">Medir</button>
   <button type="button" role="tab" id="tabS" data-tab="S" aria-selected="false" aria-controls="abaS">Sobre</button></nav>`);
 caixa("bottomright","mapbox",`<b>Dados de ${esc(META.base)}</b> · estimativa para triagem`);
@@ -1901,6 +1933,7 @@ function render(){
     (ALIM&&$("invAlim").value?`<section class="legenda soCel">${htmlLegAlim(alimEscopo())}</section>`:"")+rodape();info.innerHTML=h;
   infoEmp.innerHTML=(empSel?fichaEmp(empSel):"")+resumoEmp()+($("empOn").checked&&empLegHtml?`<section class="legenda soCel">${empLegHtml}</section>`:"");
   infoInv.innerHTML=listaInv();
+  if(abaAtual==="K")cliRender();
   atualizarFicha();
 }
 // cliques nos botões do painel e da ficha: trafo da lista, "ver trafo", compartilhar, PDF
@@ -1921,7 +1954,7 @@ function marcarPonto(lat,lon,rotulo){
   // o trafo do ponto é o mais próximo, mesmo que não comporte a potência (a resposta diz se cabe)
   const p=maisProximo(lat,lon);sel=p?p.t:null;msg="";map.setView([lat,lon],18,{animate:false});desenhar();render();mostrarRede(sel);abrirPainel();topoPainel();
 }
-map.on("click",e=>{if(abaAtual==="M")medClique(e.latlng);else if(abaAtual==="C")pontoGlobal(e.latlng.lat,e.latlng.lng)});
+map.on("click",e=>{if(abaAtual==="M")medClique(e.latlng);else if(abaAtual==="C")pontoGlobal(e.latlng.lat,e.latlng.lng);else if(abaAtual==="K"&&cliMarcando>=0)cliPonto(e.latlng)});
 let abaAtual="C";
 // Área inteira: troca de município sob demanda (dados/<código>.json)
 // Várias distribuidoras (META.dists): cada município tem d (distribuidora) e k (chave única "d:código");
@@ -3406,7 +3439,7 @@ let empMexeu=false;
 // cada aba mostra só o que é dela: trocar de aba limpa o mapa e a seleção da anterior
 function aba(k){
   const antes=abaAtual;abaAtual=k;
-  ["C","P","I","G","M","S"].forEach(x=>{$("aba"+x).hidden=x!==k;$("tab"+x).setAttribute("aria-selected",x===k)});
+  ["C","P","I","G","K","M","S"].forEach(x=>{$("aba"+x).hidden=x!==k;$("tab"+x).setAttribute("aria-selected",x===k)});
   if(k==="M"&&antes!=="M")medEntrar();else if(antes==="M"&&k!=="M")medSair();
   if(typeof medArrasteMapa==="function")medArrasteMapa();
   if(typeof atualizarBarra==="function")atualizarBarra();
@@ -3414,16 +3447,17 @@ function aba(k){
     if((k==="P"||k==="I"||k==="G")&&META.bboxAll){const b=META.bboxAll;map.fitBounds([[b[0],b[1]],[b[2],b[3]]])}   // estado todo
     camadasDaAba()}
   if(k==="I"&&!INV&&!invErro&&META.muns)ligarInv();
+  if(k==="K"&&antes!=="K"&&META.muns)cliEntrar();
   marcarAbas();
 }
 function limparAba(){
-  sel=null;ponto=null;if(pino){map.removeLayer(pino);pino=null}empSel=null;alimSel=null;invSel=null;gdSel=null;msg="";
+  sel=null;ponto=null;if(pino){map.removeLayer(pino);pino=null}empSel=null;alimSel=null;invSel=null;gdSel=null;msg="";cliSel=-1;cliMarcando=-1;
   faixaOff.clear();rede.clearLayers();redeMt.clearLayers();alimDest.clearLayers();map.closePopup();fichaFechada=false;
 }
 function camadasDaAba(){
   const k=abaAtual,vis=(c,on)=>{if(on){if(!map.hasLayer(c))c.addTo(map)}else if(map.hasLayer(c))map.removeLayer(c)};
   vis(capa,k==="C");vis(camAlim,k==="C");vis(alimDest,k==="C"||k==="I");vis(empLayer,k==="P");vis(invLayer,k==="I");vis(gdLayer,k==="G");
-  vis(rede,k==="C"||k==="P"||k==="I");vis(redeMt,k==="P"||k==="I");
+  vis(rede,k==="C"||k==="P"||k==="I"||k==="K");vis(redeMt,k==="P"||k==="I"||k==="K");vis(cliLayer,k==="K");
   legEmpCtl.getContainer().hidden=k!=="P";legGdCtl.getContainer().hidden=k!=="G";if(k!=="C"&&k!=="I")legAlimCtl.getContainer().hidden=true;
   if(k==="G")desenharGd();
   desenhar();desenharEmp();render();
@@ -3466,6 +3500,305 @@ munBusca.addEventListener("keydown",e=>{const li=[...munLista.querySelectorAll("
   else if(e.key==="Escape"){fecharMuns();munBusca.value=nomeAtual();munBusca.blur()}});
 munLista.addEventListener("mousedown",e=>{e.preventDefault();const li=e.target.closest("li[data-k]");if(li)escolherMun(li.dataset.k)});
 munBusca.addEventListener("blur",()=>setTimeout(()=>{fecharMuns();munBusca.value=nomeAtual()},150));
+// ---- aba Cliente: as unidades (filiais) de um cliente, achadas na base de empresas (dados/emp/) pelo endereço.
+// Para cada uma: consumo, Pg, folga do trafo e do alimentador e quanto de GD o local libera sem estudo; ranking por chance.
+// A lista fica só neste navegador (localStorage "cliente.v1"): nada do cliente vai para o repositório.
+var CLI={nome:"",txt:"",u:[]},cliSel=-1,cliMarcando=-1,cliOcupado=false,cliMsg="",cliFeito=false;
+var cliLayer=L.layerGroup().addTo(map);
+const CLI_EMP={},CLI_MIN=.85,CLI_OK=1.5;
+const CLI_CH=[{t:"Alta",cor:"#16a34a"},{t:"Média",cor:"#d97706"},{t:"Baixa",cor:"#dc2626"},{t:"Sem dado",cor:"#7a8784"}];
+const cliAc=t=>String(t??"").normalize("NFD").replace(/[̀-ͯ]/g,"").toLowerCase();
+// casamento do endereço digitado com o da BDGD, que usa as abreviações da distribuidora (AV NSA MEDIANEIRA, R BR DO TRIUNFO)
+const CLI_AB={avenida:"av",rua:"r",rodovia:"rod",rdv:"rod",est:"rod",estrada:"rod",estr:"rod",ers:"rs",rsc:"rs",prl:"rod",lin:"rod",
+  nossa:"ns",nsa:"ns",senhora:"sra",presidente:"pres",governador:"govr",gov:"govr",prefeito:"pref",coronel:"cel",
+  marechal:"mal",doutor:"dr",barao:"br",general:"gal",gen:"gal",professor:"prof",santo:"sto",santa:"sta",sao:"s",
+  travessa:"tv",trav:"tv",praca:"pc",pca:"pc",engenheiro:"eng",capitao:"cap",tenente:"ten",vereador:"ver",deputado:"dep",
+  visconde:"visc",almirante:"alm",padre:"pe",dom:"d",duque:"dq"};
+const CLI_FORA=new Set(["de","da","do","dos","das","e","no","nr","num","numero","sn","s/n","km","bl","bloco","sala","lj","loja","faixa",
+  "inicio","fim","esquina","esq","ad","hs","at","l","a","b","c"]);
+const CLI_TIPO=new Set(["av","r","rod","tv","pc","al","alameda"]);
+// {tk: palavras do logradouro, num, km, via: ["br","392"] quando é rodovia}
+function cliTokens(t){
+  t=" "+cliAc(t).replace(/\bn\s*[º°o]\.?\s*(?=\d)/g," ").replace(/(\d),(\d)/g,"$1.$2").replace(/[^a-z0-9./ ]/g," ")
+    .replace(/\b(br|rsc|ers|rs)\s*[-\/]?\s*(\d{2,3})\b/g," $1 $2 ")+" ";
+  const via=[],m=t.match(/ (br|rsc|ers|rs) (\d{2,3}) /);if(m)via.push(m[1]==="br"?"br":"rs",m[2]);
+  const k=t.match(/ km (\d+(?:\.\d+)?)/),km=k?+k[1]:null;
+  const w=t.split(/\s+/).filter(Boolean),tk=[];let num=null;
+  w.forEach((p,i)=>{const ant=w[i-1]||"";
+    if(/^\d+(\.\d+)?$/.test(p)){if(/^(br|rs|rsc|ers|km)$/.test(ant))return;if(num==null&&!p.includes("."))num=+p;return}
+    if(/^(br|rs|rsc|ers)$/.test(p)&&/^\d/.test(w[i+1]||""))return;
+    const q=CLI_AB[p]||p;if(CLI_FORA.has(q)||/\d/.test(q))return;tk.push(q)});
+  return {tk,num,km,via};
+}
+// endereço digitado: separa o logradouro (com número e km) do bairro
+function cliEndereco(s){
+  const seg=s.split(/[,;]/).map(x=>x.trim()).filter(Boolean),log=[],bai=[];
+  seg.forEach((x,i)=>{const a=cliAc(x);
+    if(/^(bairro|b\.|linha|acesso|distrito|localidade|loteamento|vila)\b/.test(a)||/^\d+º? distrito/.test(a))bai.push(a.replace(/^bairro\s*/,""));
+    else if(i===0||/^(n[º°o.]?\s*\d|\d|km\b|s\/?n\b|sala|loja|bloco)/.test(a))log.push(x)});
+  const u=cliTokens(log.join(" "));u.bairro=bai.join(" ");return u;
+}
+const cliDedup=s=>s.replace(/(.)\1+/g,"$1"),cliCons=s=>cliDedup(s).replace(/[aeiouy]/g,"");
+// palavras parecidas: iguais, uma é abreviação (começo) da outra ou mesmas consoantes (APPARICIO ~ APARICIO)
+function cliPar(a,b){if(a===b||cliDedup(a)===cliDedup(b))return 1;if(a.length<2||b.length<2)return 0;
+  if(a.startsWith(b)||b.startsWith(a))return .8;
+  const ca=cliCons(a),cb=cliCons(b);if(ca.length>=2&&cb.length>=2&&(ca===cb||ca.startsWith(cb)||cb.startsWith(ca)))return .6;return 0}
+// nota de quanto a unidade da BDGD (x[8] endereço, x[9] bairro) parece com o endereço digitado; 0 = não é
+function cliNota(u,x){
+  const e=cliTokens(x[8]||""),eb=cliAc(x[9]);let s;
+  if(u.via.length){   // rodovia: tem que ser a mesma (BR 392 ≠ BR 158); o km, quando os dois têm, decide
+    const ev=e.via.join(" ")||cliTokens(x[9]||"").via.join(" ");if(ev!==u.via.join(" "))return 0;
+    s=.6;if(u.km!=null&&e.km!=null)s+=Math.abs(u.km-e.km)<=1?.6:-.3;
+  }else{
+    const tk=u.tk.filter(p=>!CLI_TIPO.has(p)),et=e.tk.filter(p=>!CLI_TIPO.has(p));
+    if(!tk.length||!et.length)return 0;
+    const cob=(A,B)=>A.reduce((t,p)=>t+Math.max(0,...B.map(q=>cliPar(p,q))),0)/A.length;
+    s=Math.min(cob(tk,et),cob(et,tk));if(s<.5)return 0;   // os dois lados têm que estar cobertos
+  }
+  if(u.num!=null&&e.num!=null){const d=Math.abs(u.num-e.num);s+=d===0?.5:d<=10?.3:d<=60?.1:d<=200?-.2:-.5}   // número longe = outro imóvel
+  if(u.bairro&&eb){const bt=u.bairro.split(/\s+/).filter(p=>p.length>2&&!CLI_FORA.has(p));
+    if(bt.some(p=>eb.split(/\s+/).some(q=>cliPar(p,q)>=.8)))s+=.1}
+  if(String(x[16]||"").startsWith("4731"))s+=.3;   // CNAE de posto de combustível
+  return s;
+}
+// município da linha: o nome de município que aparece por último no texto
+let cliRes=null;
+function cliMunDe(a){
+  if(!cliRes){const vis=new Set();cliRes=[];META.muns.forEach(m=>{if(vis.has(m.c))return;vis.add(m.c);const n=cliAc(m.n);
+    cliRes.push({m,n,re:new RegExp("(^|[^a-z])"+n.replace(/[.*+?^${}()|[\]\\]/g,"\\$&")+"(?![a-z])","g")})})}
+  let mel=null,pos=-1;
+  for(const o of cliRes){o.re.lastIndex=0;let r,k=-1;while((r=o.re.exec(a)))k=r.index+r[1].length;
+    if(k>pos||(k>=0&&k===pos&&o.n.length>mel.n.length)){pos=k;mel=o}}
+  return mel?{m:mel.m,pos}:null;
+}
+// linha: "nome; endereço, cidade" (ou "nome - endereço" ou só o endereço); aceita o texto do contrato social
+function cliLinha(l,i){
+  l=l.replace(/\s+/g," ").trim();if(l.length<6)return null;
+  let n="",e=l;const p=l.split(/\t|;/);
+  if(p.length>1&&p[0].trim().length<=60){n=p[0].trim();e=p.slice(1).join(", ")}
+  else{const m=l.match(/^([^,]{1,40}?)\s+[-–—:]\s+(.+)$/);if(m){n=m[1];e=m[2]}}
+  e=e.replace(/^\s*(localizad[ao]|situad[ao]|estabelecid[ao])\s+(na|no|em)\s+/i,"").replace(/[\s,;.-]*\b(CEP|NIRE|CNPJ)\b.*$/i,"").trim();
+  const a=cliAc(e),mm=cliMunDe(a);
+  const q=(mm&&mm.pos>0?a.slice(0,mm.pos):a).replace(/[\s,(-]*(no|em)?\s*(municipio de|cidade de)?\s*$/,"");
+  return {n:n||"Unidade "+(i+1),e,c:mm?mm.m.c:null,mn:mm?mm.m.n:null,q,esc:null,auto:true,pt:null};
+}
+async function cliEmpMun(c){
+  await Promise.all(META.muns.filter(m=>m.c===c).map(async m=>{const k=munK(m);if(k in CLI_EMP)return;
+    const dd=distDe(m);try{const r=await fetch(`${BASE}${dd?dd.p:""}dados/emp/${c}.json`);CLI_EMP[k]=r.ok?{k,d:m.d,c,e:await r.json()}:null}catch(e){CLI_EMP[k]=null}}));
+}
+const cliEmpDe=c=>META.muns.filter(m=>m.c===c).map(m=>CLI_EMP[munK(m)]).filter(Boolean);
+// escolha: primeiro as que o usuário fixou; depois as melhores notas, sem repetir a mesma unidade em duas filiais
+// (duas linhas com o mesmo endereço, como escritório e posto no mesmo número, podem ficar com a mesma unidade)
+function cliAtribuir(){
+  const usados=new Map(),chave=u=>{const e=cliEndereco(u.q||"");return JSON.stringify([u.c,e.tk,e.num,e.km,e.via])};
+  CLI.u.forEach(u=>{u.x=null;u.ek=null;u.nota=null;u.dup=null;
+    if(!u.auto&&u.esc){const f=CLI_EMP[u.esc.k];let i=u.esc.i,x=f&&f.e.e[i];
+      if(f&&(!x||x[8]!==u.esc.a)){i=f.e.e.findIndex(y=>y[8]===u.esc.a&&y[2]===u.esc.kwh);x=i>=0?f.e.e[i]:null}   // dados regerados
+      if(x){u.x=x;u.ek={k:u.esc.k,d:f.d,c:f.c,i};usados.set(u.esc.k+"#"+i,u)}else if(!u.pt){u.auto=true;u.esc=null}}});
+  const pares=[];CLI.u.forEach((u,j)=>{if(u.auto)(u.cand||[]).forEach(c=>{if(c.n>=CLI_MIN&&c.a)pares.push({j,c})})});
+  pares.sort((a,b)=>b.c.n-a.c.n||b.c.x[2]-a.c.x[2]);
+  const feito=new Set();
+  for(const {j,c} of pares){const ch=c.k+"#"+c.i,u=CLI.u[j],o=usados.get(ch);if(feito.has(j)||(o&&chave(o)!==chave(u)))continue;
+    u.x=c.x;u.ek={k:c.k,d:c.d,c:c.c,i:c.i};u.nota=c.n;feito.add(j);if(o)u.dup=o.n;else usados.set(ch,u)}
+}
+function cliCapT(t,d){const inv=t.cmin==null?null:t.cmin*META.fs-fgdDe(d)*t.gd,lim=t.kva==null?null:t.kva-t.gd;
+  return (inv==null&&lim==null)?null:Math.max(0,Math.min(inv??Infinity,lim??Infinity))}
+// mesma conta da ficha da empresa (redeEmp): cabe = menor folga entre trafo e alimentador (BT: até 75 kW; MT: até a demanda);
+// liberado sem estudo = o maior entre o que cabe e o Pg (dispensa da análise de inversão, só microgeração em BT)
+function cliConta(x,t,al,d){
+  const mt=x?!!x[11]:false,capT=t&&!mt?cliCapT(t,d):null,capA=al?al.capa:(t?t.capa:null);
+  const lim=[capA,capT].filter(v=>v!=null);let cabe=lim.length?Math.max(0,Math.min(...lim)):null;
+  let quem=cabe==null?"":(mt||capT==null||(capA!=null&&capA<=capT))?"alimentador":"trafo";
+  if(cabe!=null&&x&&!mt)cabe=Math.min(cabe,75);
+  if(cabe!=null&&mt&&x[15]>0&&x[15]<cabe){cabe=x[15];quem="demanda contratada"}
+  const pg=x&&!mt?Math.min(x[17]||0,75):0,need=x?x[3]:null;
+  const lib=cabe==null&&!pg?null:Math.max(cabe||0,pg),alvo=need??75;
+  const ch=lib==null?3:lib>0&&lib>=alvo-.05?0:lib>0&&lib>=.3*alvo?1:2;
+  let pq;
+  if(lib==null)pq="Sem dados de carga da rede neste local.";
+  else if(pg>0&&need!=null&&pg>=need-.05)pq=`O Pg dispensa a análise de inversão até ${fmt(pg,0)} kW: cobre o sistema inteiro.`;
+  else if(cabe!=null&&need!=null&&cabe>=need-.05)pq=`Trafo e alimentador têm folga para o sistema inteiro.`;
+  else if(lib>0)pq=`Libera ${fmt(lib,0)} kW${need!=null?` dos ${fmt(need,0)} kWp que zerariam o consumo`:""}, ${pg>0&&pg>=(cabe||0)?"pelo Pg (dispensa da análise de inversão)":quem==="demanda contratada"?"limitado pela demanda contratada":"limitado pelo "+quem}.`;
+  else pq=`O ${quem||"alimentador"} não tem folga e o Pg não ajuda: a conexão deve precisar de estudo de inversão de fluxo.`;
+  return {mt,capT,capA,cabe,quem,pg,need,lib,ch,pq,t,al};
+}
+async function cliCalcular(){
+  if(!ALIM&&!invErro)await ligarInv();
+  for(const u of CLI.u){u.r=null;
+    try{
+      if(u.x){const m=META.muns.find(m=>munK(m)===u.ek.k),D2=await dadosMun(m),x=u.x;
+        const t=!x[11]&&x[13]?D2.find(t=>t.id===x[13]):null,al=ALIM&&ALIM.find(a=>a.a===x[14]&&(!m.d||a.d===m.d));
+        u.r=cliConta(x,t,al,m.d)}
+      else if(u.pt){const m=await munDoPonto(u.pt[0],u.pt[1]);if(!m)continue;const D2=await dadosMun(m);
+        let t=null,dm=Infinity;D2.forEach(y=>{const v=dist(u.pt[0],u.pt[1],y.lat,y.lon);if(v<dm){dm=v;t=y}});
+        const al=t&&ALIM&&ALIM.find(a=>a.a===t.alim&&(!m.d||a.d===m.d));u.r=cliConta(null,t,al,m.d);u.r.k=munK(m);u.r.d=m.d}
+    }catch(e){u.r=null}}
+}
+function cliCandidatos(u){
+  u.cand=[];if(!u.c)return;const q=cliEndereco(u.q);
+  for(const f of cliEmpDe(u.c))f.e.e.forEach((x,i)=>{const n=cliNota(q,x);if(n<=0)return;
+    // escolha automática só se for posto (CNAE 4731) ou se o número (ou o km) bater; senão fica como sugestão
+    const e=cliTokens(x[8]||""),perto=(q.num!=null&&e.num!=null&&Math.abs(q.num-e.num)<=10)||(q.km!=null&&e.km!=null&&Math.abs(q.km-e.km)<=1);
+    u.cand.push({k:f.k,d:f.d,c:f.c,i,x,n,a:perto||String(x[16]||"").startsWith("4731")})});
+  u.cand.sort((a,b)=>b.n-a.n||b.x[2]-a.x[2]);u.cand=u.cand.slice(0,8);
+}
+async function cliAnalisar(){
+  if(cliOcupado||!META.muns)return;cliOcupado=true;cliFeito=true;
+  cliMsg="Procurando as unidades na base das distribuidoras…";cliRender();
+  try{
+    await Promise.all([...new Set(CLI.u.map(u=>u.c).filter(Boolean))].map(cliEmpMun));
+    CLI.u.forEach(u=>{if(!u.pt)cliCandidatos(u)});
+    cliAtribuir();cliMsg="Calculando a folga de cada local…";cliRender();
+    await cliCalcular();cliMsg="";
+  }catch(e){cliMsg="Não consegui analisar agora (sem internet?). Tente de novo."}
+  cliOcupado=false;cliSalvar();cliRender();cliDesenhar();if(cliSel<0)cliEnquadrar();
+}
+async function cliRecalcular(j){cliAtribuir();await cliCalcular();cliSalvar();cliRender();cliDesenhar();if(j>=0)cliAbrir(j)}
+// ordem do ranking: chance (alta → baixa), depois quanto o local libera
+function cliOrdem(){return CLI.u.map((u,j)=>j).sort((a,b)=>{const A=CLI.u[a].r,B=CLI.u[b].r;
+  return (A?A.ch:4)-(B?B.ch:4)||((B&&B.lib)||0)-((A&&A.lib)||0)})}
+const cliPos=u=>u.x?[u.x[0],u.x[1]]:u.pt;
+function cliSitu(u){
+  if(u.x)return !u.auto?{t:"escolhida por você",ok:1}:u.nota>=CLI_OK?{t:"endereço confere",ok:1}:{t:"confira: endereço parecido",ok:0};
+  if(u.pt)return {t:"ponto marcado no mapa",ok:1};
+  return {t:u.c?"não achada na base":"cidade não reconhecida",ok:-1};
+}
+function cliRender(){
+  const el=$("infoCli");if(!el)return;
+  let h=cliMsg?`<p class="hint">${esc(cliMsg)}</p>`:"";
+  if(cliMarcando>=0)h+=`<p class="msg">Toque no mapa no local de <b>${esc(CLI.u[cliMarcando].n)}</b> (use o satélite para achar o posto). <button type="button" class="ghost" data-clia="naomarca">Cancelar</button></p>`;
+  if(cliSel>=0&&CLI.u[cliSel])h+=cliFicha(cliSel);
+  if(CLI.u.length&&cliFeito)h+=cliLista();
+  else if(!CLI.u.length)h+=`<section><h2>Como funciona</h2><p class="hint">Cada unidade é procurada pelo endereço na base de unidades consumidoras da distribuidora (BDGD). Para cada uma o site mostra o consumo, o Pg (até quanto a distribuidora dispensa a análise de inversão de fluxo), a folga do trafo e do alimentador e quanto de GD o local libera sem estudo. O ranking põe primeiro os locais com mais chance de aprovação.</p></section>`;
+  el.innerHTML=h;
+}
+function cliLista(){
+  const ord=cliOrdem(),n=[0,0,0,0];let tot=0,sem=0,conf=0;
+  CLI.u.forEach(u=>{if(u.r){n[u.r.ch]++;if(!u.dup)tot+=u.r.lib||0}else sem++;if(cliSitu(u).ok===0)conf++});
+  return `<section><h2>${esc(CLI.nome||"Cliente")} · ${CLI.u.length} unidades</h2>
+  <div class="cliResumo">${[0,1,2].map(i=>`<div><b style="color:${CLI_CH[i].cor}">${n[i]}</b><span class="base">chance ${CLI_CH[i].t.toLowerCase()}</span></div>`).join("")}</div>
+  <p class="hint">Somando tudo, os locais liberam cerca de <b>${fmt(tot,0)} kW</b> de GD sem estudo de inversão.${sem?` ${sem} sem análise (não achadas na base: toque nelas para marcar no mapa).`:""}${conf?` ${conf} com endereço parecido: confira.`:""}</p>
+  <div class="cliLista">${ord.map((j,p)=>{const u=CLI.u[j],r=u.r,s=cliSitu(u),c=CLI_CH[r?r.ch:3];
+    return `<button type="button" data-cli="${j}" aria-current="${j===cliSel}"><span class="cliN" style="background:${c.cor}">${p+1}</span>
+    <span><b>${esc(u.n)}</b><br><span class="d">${esc(u.mn||"?")}${u.ek&&META.dists?" · "+esc(nomeDist(u.ek.d)):""}${u.x?` · ${fmt(u.x[2],0)} kWh/mês · ${u.x[11]?"MT":"BT"}`:""}</span>
+    ${s.ok<1?`<br><span class="cliTag${s.ok<0?" ruim":" aviso"}">${esc(s.t)}</span>`:""}${u.dup?`<br><span class="cliTag aviso">mesma unidade de ${esc(u.dup)}</span>`:""}</span>
+    <span class="dir">${r&&r.lib!=null?`<b>${fmt(r.lib,0)}</b> <span class="d">kW</span>`:"–"}<br><span class="d">${c.t}</span></span></button>`}).join("")}</div>
+  <p class="hint">Liberado = o que a rede comporta sem inversão de fluxo (folga do trafo e do alimentador) ou, se for maior, o Pg, que dispensa a análise (microgeração até 75 kW). Chance alta = libera o sistema que zera o consumo; média = libera ao menos 30% dele. Estimativa para triagem: não substitui o orçamento de conexão.</p></section>`;
+}
+function cliFicha(j){
+  const u=CLI.u[j],r=u.r,x=u.x,s=cliSitu(u),c=CLI_CH[r?r.ch:3],pos=cliOrdem().indexOf(j)+1;
+  const cand=(u.cand||[]).filter(cd=>!(u.ek&&cd.k===u.ek.k&&cd.i===u.ek.i));
+  return `<section><h2>Unidade ${pos}º no ranking</h2><div class="card">
+  <div class="top"><span class="id">${esc(u.n)}</span><span class="pill" style="background:${c.cor}">Chance ${c.t.toLowerCase()}</span></div>
+  <div class="base">Informado: ${esc(u.e)}</div>
+  ${u.dup?`<div class="base">Mesmo endereço e mesma unidade de ${esc(u.dup)}: não some as duas.</div>`:""}
+  ${x?`<div class="base">Na base${META.dists?" da "+esc(nomeDist(u.ek.d)):""}: <b>${esc(x[8])}</b> · ${esc(x[9])} · CNAE ${esc(x[16])}</div>`:""}
+  <div><span class="cliTag${s.ok<0?" ruim":s.ok?"":" aviso"}">${esc(s.t)}</span></div>
+  ${r?`<div class="cabe ${r.lib>0?"":"nao"}"><div class="base">Liberado sem estudo (estimativa)</div>
+    <div class="medGrande">${r.lib==null?"–":fmt(r.lib,1)} <small>kW</small></div><div class="base">${esc(r.pq)}</div></div>
+  <dl>${x?`<dt>Consumo médio (12 meses)</dt><dd><b>${fmt(x[2],0)} kWh/mês</b></dd><dt>Sistema p/ zerar o consumo</dt><dd>${fmt(x[3])} kWp</dd>
+    <dt>Rede</dt><dd>${x[11]?"MT":"BT"}${x[15]!=null?` · demanda ${fmt(x[15],0)} kW`:""}</dd>
+    <dt>Pg (dispensa da análise)</dt><dd>${x[11]?`${fmt(x[17],0)} kW (MT: só referência)`:fmt(r.pg,0)+" kW"}</dd>
+    <dt>GD</dt><dd>${x[6]===3?"<b>já tem GD</b>":esc(GDR[x[6]])}</dd>`:""}
+    ${r.mt?"":`<dt>Trafo</dt><dd>${esc(r.t?r.t.id:"–")}${r.t?` · ${fmt(r.t.kva,1)} kVA`:""}</dd><dt>Folga do trafo</dt><dd>${r.capT==null?"sem dado":fmt(r.capT,1)+" kW"}</dd>`}
+    <dt>Alimentador</dt><dd>${esc(r.al?r.al.a:(x?x[14]:r.t&&r.t.alim)||"–")}</dd><dt>Folga do alimentador</dt><dd>${r.capA==null?"sem dado":fmt(Math.max(0,r.capA),0)+" kW"}</dd></dl>`
+  :`<p class="hint">${u.c?"Não achei esta unidade na base pelo endereço. Escolha uma das parecidas abaixo ou marque o local no mapa.":"Não reconheci a cidade nesta linha. Confira o nome da cidade no fim do endereço."}</p>`}
+  ${x?graficoConsumo(x[19]):""}${x&&x[6]===3?`<p class="hint">Já tem GD: o consumo da base é o líquido (descontada a geração), então o sistema para zerar fica subestimado.</p>`:""}
+  ${cliPos(u)?`<div class="links"><a href="https://www.google.com/maps?q=${cliPos(u)[0]},${cliPos(u)[1]}" target="_blank" rel="noopener">Abrir no Google Maps</a><a class="gsat" href="${gSat(cliPos(u)[0],cliPos(u)[1])}" target="_blank" rel="noopener">Satélite no Google</a></div>`:""}
+  <div class="acoes"><button type="button" class="ghost" data-clia="marca">📍 Marcar no mapa</button>${!u.auto?`<button type="button" class="ghost" data-clia="auto">Voltar ao automático</button>`:""}<button type="button" class="ghost" data-clia="fecha">Fechar</button></div>
+  ${cand.length?`<h3 class="subt">${x?"Não é esta? Outras unidades":"Unidades"} ${u.pt&&!u.auto?"perto do ponto marcado":"com endereço parecido"}</h3><div class="cliLista">${cand.map(cd=>{const y=cd.x;
+    return `<button type="button" data-clic="${u.cand.indexOf(cd)}"><span class="cliN" style="background:${String(y[16]).startsWith("4731")?"#0f6b5c":"#7a8784"}">${String(y[16]).startsWith("4731")?"⛽":"·"}</span>
+    <span><b>${esc(y[8])}</b><br><span class="d">${esc(y[9])} · CNAE ${esc(y[16])}</span></span><span class="dir"><b>${fmt(y[2],0)}</b> <span class="d">kWh</span><br><span class="d">${y[11]?"MT":"BT"}${cd.dm!=null?" · "+fmtD(cd.dm):""}</span></span></button>`}).join("")}</div>`:""}
+  </div></section>`;
+}
+function cliDesenhar(){
+  cliLayer.clearLayers();if(!CLI.u.length)return;
+  cliOrdem().forEach((j,p)=>{const u=CLI.u[j],ll=cliPos(u);if(!ll)return;const c=CLI_CH[u.r?u.r.ch:3];
+    L.marker(ll,{zIndexOffset:j===cliSel?2000:1000,keyboard:false,icon:L.divIcon({className:"cliPinW",iconSize:[0,0],
+      html:`<span class="cliPin${j===cliSel?" sel":""}" style="background:${c.cor}">${p+1}</span>`})})
+      .bindTooltip(`<b>${p+1}º ${esc(u.n)}</b><br>${esc(u.mn||"")}<br>Liberado: <b>${u.r&&u.r.lib!=null?fmt(u.r.lib,0)+" kW":"–"}</b> · chance ${c.t.toLowerCase()}`,{direction:"top",offset:[0,-14]})
+      .on("click",e=>{L.DomEvent.stopPropagation(e);cliAbrir(j)}).addTo(cliLayer)});
+}
+function cliEnquadrar(){const l=CLI.u.map(cliPos).filter(Boolean);if(l.length)map.fitBounds(l,{padding:[40,40],maxZoom:15})}
+// abre a unidade: carrega o município dela e desenha trafo e rede BT (ou o alimentador, se MT), como na ficha da empresa
+async function cliAbrir(j){
+  const u=CLI.u[j];if(!u)return;cliSel=j;cliMarcando=-1;cliRender();cliDesenhar();abrirPainel();topoPainel();
+  const k=u.ek?u.ek.k:u.r&&u.r.k;
+  if(k&&k!==META.munK)await carregarMun(k,false);
+  if(cliSel!==j||abaAtual!=="K")return;
+  redeMt.clearLayers();rede.clearLayers();fichaFechada=true;empSel=null;sel=null;
+  const x=u.x,t=x?(!x[11]&&x[13]?D.find(t=>t.id===x[13]):null):(u.r&&u.r.t&&D.find(y=>y.id===u.r.t.id));
+  if(x){empSel=x;desenharGdEmp(x);if(!gdsDe(x).length)map.setView([x[0],x[1]],Math.max(map.getZoom(),17),{animate:false});if(x[11])mostrarAlim(x)}
+  else if(u.pt)map.setView(u.pt,Math.max(map.getZoom(),17),{animate:false});
+  if(t){sel=t;mostrarRede(t);
+    L.circleMarker([t.lat,t.lon],{radius:11,color:cssVar("--ink"),weight:3,fillColor:hex(classe(t,0)),fillOpacity:1}).bindTooltip(()=>dicaTrafo(t),{direction:"top",offset:[0,-8]}).addTo(redeMt);
+    const o=cliPos(u);if(o)L.polyline([o,[t.lat,t.lon]],{color:"#8e44ec",weight:2.5,dashArray:"5 5",interactive:false,renderer:rTopo}).addTo(redeMt)}
+  desenhar();cliRender();
+}
+// marcar no mapa: o ponto vira o local da unidade; sugere as unidades da base a até 300 m (posto mais perto, se houver)
+async function cliPonto(ll){
+  const j=cliMarcando;cliMarcando=-1;const u=CLI.u[j];if(!u)return;
+  cliMsg="Procurando unidades perto do ponto…";cliRender();
+  const m=await munDoPonto(ll.lat,ll.lng);
+  if(m){u.c=m.c;u.mn=m.n;await cliEmpMun(m.c)}
+  u.pt=[ll.lat,ll.lng];u.auto=false;u.esc=null;u.cand=[];
+  for(const f of cliEmpDe(u.c))f.e.e.forEach((x,i)=>{const dm=dist(ll.lat,ll.lng,x[0],x[1]);if(dm<=300)u.cand.push({k:f.k,d:f.d,c:f.c,i,x,n:0,dm})});
+  u.cand.sort((a,b)=>a.dm-b.dm);u.cand=u.cand.slice(0,8);
+  const posto=u.cand.find(c=>String(c.x[16]).startsWith("4731")&&c.dm<=150);
+  if(posto)u.esc={k:posto.k,i:posto.i,a:posto.x[8],kwh:posto.x[2]};
+  cliMsg="";cliFeito=true;await cliRecalcular(j);
+}
+function cliSalvar(){try{localStorage.setItem("cliente.v1",JSON.stringify(cliDados()))}catch(e){}}
+const cliDados=()=>({app:"capacidade-hospedagem",tipo:"cliente",v:1,nome:CLI.nome,txt:CLI.txt,
+  u:CLI.u.map(u=>({n:u.n,e:u.e,c:u.c,mn:u.mn,q:u.q,esc:u.esc,auto:u.auto,pt:u.pt}))});
+function cliCarregar(o){CLI={nome:o.nome||"",txt:o.txt||"",u:(o.u||[]).map(u=>({...u}))};$("cliNome").value=CLI.nome;$("cliTxt").value=CLI.txt}
+// lê a lista do texto; as unidades que já existiam (mesmo nome e endereço) mantêm a escolha feita à mão
+function cliDoTexto(){
+  CLI.nome=$("cliNome").value.trim();CLI.txt=$("cliTxt").value;
+  const ant=new Map(CLI.u.map(u=>[u.n+"|"+u.e,u]));
+  CLI.u=CLI.txt.split(/\r?\n/).map((l,i)=>cliLinha(l,i)).filter(Boolean).map(u=>{const a=ant.get(u.n+"|"+u.e);return a&&!a.auto?{...u,esc:a.esc,auto:false,pt:a.pt,c:a.c,mn:a.mn}:u});
+  cliSel=-1;$("cliEntra").open=!CLI.u.length;
+}
+function cliCsv(){
+  const q=v=>`"${String(v??"").replace(/"/g,'""')}"`,n=v=>v==null?"":String(Math.round(v*10)/10).replace(".",",");
+  const cab=["Posição","Unidade","Endereço informado","Município","Distribuidora","Endereço na BDGD","Situação","CNAE","Rede","Consumo médio 12 meses (kWh/mês)","Sistema p/ zerar (kWp)","Pg (kW)","Folga do trafo (kW)","Folga do alimentador (kW)","Liberado sem estudo (kW)","Chance","Motivo","Trafo","Alimentador","Latitude","Longitude","Google Maps"];
+  const lin=cliOrdem().map((j,p)=>{const u=CLI.u[j],r=u.r||{},x=u.x,ll=cliPos(u);
+    return [p+1,u.n,u.e,u.mn,u.ek?nomeDist(u.ek.d)||META.titulo:"",x?x[8]+" · "+x[9]:"",cliSitu(u).t,x?x[16]:"",x?(x[11]?"MT":"BT"):"",x?x[2]:"",x?n(x[3]):"",x?n(x[17]):"",
+      n(r.capT),n(r.capA),n(r.lib),CLI_CH[u.r?r.ch:3].t,r.pq||"",r.t?r.t.id:"",r.al?r.al.a:(x?x[14]:""),ll?ll[0]:"",ll?ll[1]:"",ll?`https://www.google.com/maps?q=${ll[0]},${ll[1]}`:""].map(q).join(";")});
+  const blob=new Blob(["﻿"+[cab.map(q).join(";"),...lin].join("\r\n")],{type:"text/csv;charset=utf-8"});
+  const l=document.createElement("a");l.href=URL.createObjectURL(blob);l.download=`cliente_${(CLI.nome||"analise").replace(/\W+/g,"_")}.csv`;l.click();setTimeout(()=>URL.revokeObjectURL(l.href),2000);
+}
+function cliEntrar(){
+  if(CLI.u.length&&!cliFeito)cliAnalisar();else{cliRender();cliDesenhar();if(CLI.u.length)cliEnquadrar()}
+}
+if(META.muns){
+  $("tabK").hidden=false;
+  try{const s=localStorage.getItem("cliente.v1");if(s)cliCarregar(JSON.parse(s))}catch(e){}
+  $("cliEntra").open=!CLI.u.length;
+  $("cliOk").onclick=()=>{cliDoTexto();cliSalvar();if(!CLI.u.length){cliMsg="Cole ao menos um endereço (uma unidade por linha).";cliRender();return}cliAnalisar()};
+  $("cliNome").addEventListener("change",()=>{CLI.nome=$("cliNome").value.trim();cliSalvar();cliRender()});
+  $("cliCsv").onclick=()=>{if(CLI.u.length)cliCsv()};
+  $("cliExp").onclick=()=>{if(!CLI.u.length)return;const b=new Blob([JSON.stringify(cliDados(),null,1)],{type:"application/json"}),l=document.createElement("a");
+    l.href=URL.createObjectURL(b);l.download=`cliente_${(CLI.nome||"analise").replace(/\W+/g,"_")}.json`;l.click();setTimeout(()=>URL.revokeObjectURL(l.href),2000)};
+  $("cliImp").onclick=()=>$("cliImpArq").click();
+  $("cliImpArq").addEventListener("change",async e=>{const f=e.target.files[0];e.target.value="";if(!f)return;const t=await f.text();
+    let o=null;try{o=JSON.parse(t)}catch(er){}
+    if(o&&o.tipo==="cliente"){cliCarregar(o);cliSel=-1;$("cliEntra").open=false}else{$("cliTxt").value=t;if(!$("cliNome").value)$("cliNome").value=f.name.replace(/\.\w+$/,"");cliDoTexto()}
+    cliFeito=false;cliSalvar();cliAnalisar()});
+  $("cliLimpa").onclick=()=>{if(CLI.u.length&&!confirm("Apagar a lista deste cliente deste aparelho?"))return;
+    CLI={nome:"",txt:"",u:[]};cliSel=-1;cliMarcando=-1;cliFeito=false;$("cliNome").value="";$("cliTxt").value="";$("cliEntra").open=true;
+    cliLayer.clearLayers();rede.clearLayers();redeMt.clearLayers();cliSalvar();cliRender()};
+  $("infoCli").addEventListener("click",e=>{
+    const b=e.target.closest("button[data-cli]");if(b){cliAbrir(+b.dataset.cli);return}
+    const c=e.target.closest("button[data-clic]");if(c&&cliSel>=0){const u=CLI.u[cliSel],cd=u.cand[+c.dataset.clic];if(!cd)return;
+      u.esc={k:cd.k,i:cd.i,a:cd.x[8],kwh:cd.x[2]};u.auto=false;if(cd.dm==null)u.pt=null;cliRecalcular(cliSel);return}
+    const a=e.target.closest("button[data-clia]");if(!a)return;const ac=a.dataset.clia;
+    if(ac==="marca"){cliMarcando=cliSel;const ll=cliPos(CLI.u[cliSel]);if(!ll&&CLI.u[cliSel].c){const m=META.muns.find(m=>m.c===CLI.u[cliSel].c);if(m&&m.b)map.fitBounds([[m.b[0],m.b[1]],[m.b[2],m.b[3]]])}
+      if(!desk.matches)fecharPainel();cliRender()}
+    else if(ac==="naomarca"){cliMarcando=-1;cliRender()}
+    else if(ac==="auto"){const u=CLI.u[cliSel];u.auto=true;u.esc=null;u.pt=null;cliCandidatos(u);cliRecalcular(cliSel)}
+    else if(ac==="fecha"){cliSel=-1;rede.clearLayers();redeMt.clearLayers();sel=null;empSel=null;cliRender();cliDesenhar()}});
+}
 // link direto: #<município>/<trafo>/<kW>
 const [hMun,hTr,hKw]=location.hash.slice(1).split("/").map(s=>{try{return decodeURIComponent(s)}catch(e){return s}});
 if(hKw&&+hKw>0){potEl.value=+hKw;filtraRow.hidden=false}

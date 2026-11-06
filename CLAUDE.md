@@ -67,6 +67,16 @@ nem sempre programadores: explique resultados em linguagem simples.
   BDGD.zip gd.parquet <pasta>dados`): local = PN_CON → PONNOT (poste/estrutura, 4 casas ≈ 10 m);
   potência/classe/modalidade/fonte = base de GD da ANEEL pelo CEG_GD. O mapa desenha as 4.000 maiores
   da área visível. Não há medição horária pública de alimentador ou trafo (só energia mensal).
+- **Aba Cliente** (`abaK`, código `cli*` no `TEMPLATE`): analisa um cliente com várias unidades (ex.: rede de postos).
+  O usuário cola uma linha por unidade (`nome; endereço, cidade`, ou o texto do contrato social); a cidade é o nome
+  de município que aparece por último. Cada unidade é procurada em `dados/emp/<município>.json` de todas as
+  distribuidoras da cidade pelo endereço (`cliNota`: abreviações da BDGD, rodovia + km, número, bônus para CNAE 4731);
+  escolha automática só com nota ≥ 0,85 e posto ou número/km batendo, sem repetir unidade (salvo endereço idêntico).
+  O usuário corrige escolhendo outro candidato ou "Marcar no mapa" (sugere unidades a até 300 m). Conta igual à ficha
+  da empresa: liberado sem estudo = maior entre a folga (trafo e alimentador; BT até 75 kW, MT até a demanda) e o Pg
+  (só BT). Chance alta = libera o sistema que zera o consumo (`x[3]`); média = ≥ 30%. Ranking, mapa numerado, CSV,
+  exportar/importar JSON. **A lista do cliente fica só no navegador** (`localStorage["cliente.v1"]`): nunca grave
+  dados de cliente no repositório.
 - **Aba Medir:** só desenho à mão. Telhado (vários telhados somados, módulos em pé alinhados ao maior
   lado) ou Solo (mesas de 2 linhas de módulos, passo centro a centro editável, padrão 6 m).
   O resultado é a contagem do esboço (`medLayout`): no telhado testa módulos em pé e deitados, 6 deslocamentos
