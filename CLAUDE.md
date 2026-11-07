@@ -73,7 +73,7 @@ nem sempre programadores: explique resultados em linguagem simples.
   Usinas (traz as folgas do trafo/alimentador/estudo como sugestão de limite). Orientação: só Norte, Leste/Oeste e Sul,
   sem campo de inclinação. **Padrão do usuário** (`CG_YLD`, `CG_FATOR`): 6,2 kWp gera em média 662 kWh/mês ao Norte
   ou Leste/Oeste e 563 kWh/mês ao Sul (igual em todo o RS; não "corrigir" sem discutir). Distribuído pelos meses
-  (`CG_MES`) e pelo dia: sol a cada 15 min (céu limpo no plano dos módulos, inclinação fixa por orientação em `CG_ORI`
+  (`CG_MES`, tabela "Mês a mês" `cgTabMes`) e pelo dia: sol a cada 15 min (céu limpo no plano dos módulos, inclinação fixa por orientação em `CG_ORI`
   só para a forma do dia) e 20 tipos de dia por mês. Corta pelo inversor e, com "Limitar a injeção", pelo
   limite + consumo do próprio local na hora; tabela "Mais módulos com o mesmo limite". Campos em
   `localStorage["geracao.v1"]`. Não considera sombra nem nuvens passageiras.

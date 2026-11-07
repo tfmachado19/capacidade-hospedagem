@@ -2500,6 +2500,13 @@ function cgGrafDia(r,o){
   <text x="${W-x0}" y="${(Y(teto)-4).toFixed(1)}" text-anchor="end" font-size="10" fill="var(--ink)">${o.lim!=null&&teto<o.inv?"limite":"inversor"} ${fmt(teto,1)} kW</text>${horas}</svg>
   <div class="cgLeg"><span><i style="background:var(--accent)"></i>dezembro</span><span><i style="background:var(--muted)"></i>junho (tracejado)</span><span><i style="background:var(--low);opacity:.6"></i>cortado</span></div></div>`;
 }
+// tabela mês a mês: geração aproveitada e (se houver) o que o limite/inversor corta
+function cgTabMes(r){
+  const corte=r.mes.some(x=>x.b-x.l>=0.5),MES=["Janeiro","Fevereiro","Março","Abril","Maio","Junho","Julho","Agosto","Setembro","Outubro","Novembro","Dezembro"];
+  return `<details class="menu" open><summary>Mês a mês</summary><table><thead><tr><th>Mês</th><th>Geração kWh</th>${corte?"<th>Cortado kWh</th>":""}</tr></thead><tbody>
+  ${r.mes.map((x,i)=>`<tr><td>${MES[i]}</td><td>${fmt(x.l,0)}</td>${corte?`<td>${fmt(x.b-x.l,0)}</td>`:""}</tr>`).join("")}
+  <tr class="atual"><td>Ano</td><td>${fmt(r.lim,0)}</td>${corte?`<td>${fmt(r.bruto-r.lim,0)}</td>`:""}</tr></tbody></table></details>`;
+}
 function cgRender(){
   if(!cgEl||abaAtual!=="X")return;
   try{localStorage.setItem("geracao.v1",JSON.stringify(Object.fromEntries(["cgKwp","cgInv","cgLim","cgCarga"].map(k=>[k,$(k).value])
@@ -2528,7 +2535,7 @@ function cgRender(){
   ${o.lim!=null?`Sem limite seriam ${fmt(r.inv/12,0)} kWh/mês. O limite de ${fmt(o.lim,1)} kW${o.carga>0?` (+ ${fmt(o.carga,1)} kW consumidos no local)`:""} corta <b>${fmt(perdaL/12,0)} kWh/mês (${fmt(pct(perdaL),1)}%)</b>.`:""}
   ${perdaI>0.005*r.bruto?` O inversor de ${fmt(o.inv,1)} kW corta ${fmt(perdaI/12,0)} kWh/mês (${fmt(pct(perdaI),1)}%).`:""}
   Relação módulos/inversor: ${fmt(o.kwp/o.inv,2)}.</p>
-  ${cgGrafMes(r)}${cgGrafDia(r,o)}${tab}
+  ${cgGrafMes(r)}${cgTabMes(r)}${cgGrafDia(r,o)}${tab}
   <p class="hint">Estimativa pelo padrão (6,2 kWp = 662 kWh/mês ao Norte ou Leste/Oeste, 563 kWh/mês ao Sul), distribuída pelos meses do ano e pelo sol no local ao longo do dia, com dias de céu limpo a nublado. Não considera sombra, sujeira nem nuvens passageiras (que geram picos rápidos e aumentam um pouco o corte).</p></section>`;
 }
 // atalho da aba Usinas: simula no local aberto, com as folgas dele como sugestão de limite
