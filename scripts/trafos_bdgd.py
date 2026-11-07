@@ -1505,7 +1505,8 @@ body.medindo .leaflet-control.legenda,body.medindo .leaflet-control.legAlimC{dis
         <p class="hint">O limitador (medidor no ponto de conexão + controle do inversor) corta a geração quando a injeção passa do limite. O que o local consome na hora não conta como injeção.</p>
       </div>
       <details class="menu"><summary>Ajustes</summary>
-        <div class="row"><label for="cgYld">Geração de referência</label><input id="cgYld" type="number" min="500" max="2500" step="10" value="1150"><span class="base">kWh/kWp·ano virado para o Norte a 20° (média do RS)</span></div>
+        <div class="row"><label for="cgYld">Produtividade da região</label><input id="cgYld" type="number" min="500" max="2500" step="10" value="1150"><span class="base">kWh por kWp por ano</span></div>
+        <p class="hint">Quanto cada 1 kWp gera num ano, com os módulos virados para o Norte a 20° e sem sombra. A média do RS é <b>1.150</b> (≈ 96 kWh por kWp por mês). Se você tiver um número melhor para o local (PVsyst, PVGIS ou uma usina vizinha), coloque aqui e toda a simulação se ajusta. A orientação e a inclinação escolhidas acima já descontam a perda em relação ao Norte.</p>
       </details>
     </div>
     <div class="scroll" id="cgRes"></div>
