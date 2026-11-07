@@ -238,7 +238,7 @@ aside#side h1{font-size:16px}
 .leaflet-control[hidden]{display:none!important}
 .row[hidden]{display:none}
 .graf{margin:10px 0 4px}.graf svg{display:block;margin:4px 0}
-.cg .row input[type=number]{width:7em}.cg #cgCoord{flex:1 1 12em}.cg .stats{margin-top:8px}
+.cg .row input[type=number]{width:7em}.cgMeses{display:grid;grid-template-columns:repeat(4,1fr);gap:6px}.cgMeses label{display:grid;gap:2px;font-size:12px;color:var(--muted)}.cgMeses input{width:100%;min-width:0;padding:6px 7px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--ink);font:inherit}.cg #cgCoord{flex:1 1 12em}.cg .stats{margin-top:8px}
 .cg table{width:100%;border-collapse:collapse;font-size:13px;margin-top:6px}.cg td,.cg th{padding:5px 4px;border-bottom:1px solid var(--line);text-align:right}
 .cg th{font-weight:600;color:var(--muted)}.cg td:first-child,.cg th:first-child{text-align:left}
 .cg tr[data-kwp]{cursor:pointer}.cg tr[data-kwp]:hover td{background:var(--chip)}.cg tr.atual td{font-weight:700}
@@ -493,12 +493,20 @@ body.medindo .leaflet-control.legenda,body.medindo .leaflet-control.legAlimC{dis
         <button type="button" data-ori="N" aria-pressed="true">Norte</button><button type="button" data-ori="LO" aria-pressed="false">Leste/Oeste</button>
         <button type="button" data-ori="S" aria-pressed="false">Sul</button></div>
       <p class="hint">Padrão de estimativa: sistema de 6,2 kWp gera em média 662 kWh/mês virado para o Norte, 622 kWh/mês para Leste/Oeste e 563 kWh/mês para o Sul.</p>
+      <details class="menu" id="cgConsBox"><summary>Consumo do cliente (fatura) <span class="base">opcional</span></summary>
+        <div class="row"><label for="cgClasse">Classe</label><select id="cgClasse"><option value="RE">Residencial</option><option value="CO" selected>Comercial</option>
+          <option value="IN">Industrial</option><option value="RU">Rural</option><option value="PP">Poder público</option><option value="SP">Serviço público</option></select></div>
+        <p class="hint">Preencha o consumo de cada mês da fatura (kWh). Mês em branco usa a média dos meses preenchidos. Se só tiver a média, use o campo abaixo.</p>
+        <div class="cgMeses"><label>Jan<input id="cgM0" type="number" min="0" max="10000000" step="1" inputmode="numeric"></label><label>Fev<input id="cgM1" type="number" min="0" max="10000000" step="1" inputmode="numeric"></label><label>Mar<input id="cgM2" type="number" min="0" max="10000000" step="1" inputmode="numeric"></label><label>Abr<input id="cgM3" type="number" min="0" max="10000000" step="1" inputmode="numeric"></label><label>Mai<input id="cgM4" type="number" min="0" max="10000000" step="1" inputmode="numeric"></label><label>Jun<input id="cgM5" type="number" min="0" max="10000000" step="1" inputmode="numeric"></label><label>Jul<input id="cgM6" type="number" min="0" max="10000000" step="1" inputmode="numeric"></label><label>Ago<input id="cgM7" type="number" min="0" max="10000000" step="1" inputmode="numeric"></label><label>Set<input id="cgM8" type="number" min="0" max="10000000" step="1" inputmode="numeric"></label><label>Out<input id="cgM9" type="number" min="0" max="10000000" step="1" inputmode="numeric"></label><label>Nov<input id="cgM10" type="number" min="0" max="10000000" step="1" inputmode="numeric"></label><label>Dez<input id="cgM11" type="number" min="0" max="10000000" step="1" inputmode="numeric"></label></div>
+        <div class="row"><label for="cgCons">Só a média</label><input id="cgCons" type="number" min="0" max="10000000" step="1"><span class="base">kWh/mês</span>
+          <button type="button" class="ghost" id="cgConsLimpa">Limpar</button></div>
+        <p class="hint">O consumo vira uma curva hora a hora pela curva típica da classe (dia útil, sábado e domingo, tirada da BDGD). O que o cliente consome na hora em que a usina gera não é injetado na rede.</p>
+      </details>
       <label class="chk"><input type="checkbox" id="cgLimOn"> Limitar a injeção na rede (para não inverter o fluxo)</label>
       <div id="cgLimBox" hidden>
         <div class="row"><label for="cgLim">Injetar no máximo</label><input id="cgLim" type="number" min="0" max="100000" step="0.1" value="30"><span class="base">kW</span></div>
         <div class="acoes" id="cgSug"></div>
-        <div class="row"><label for="cgCarga">Consumo do próprio local de dia</label><input id="cgCarga" type="number" min="0" max="100000" step="0.1" value="0"><span class="base">kW</span></div>
-        <p class="hint">O limitador (medidor no ponto de conexão + controle do inversor) corta a geração quando a injeção passa do limite. O que o local consome na hora não conta como injeção.</p>
+        <p class="hint">O limitador (medidor no ponto de conexão + controle do inversor) corta a geração quando a injeção passa do limite. O que o cliente consome na hora (consumo da fatura, acima) não conta como injeção.</p>
       </div>
     </div>
     <div class="scroll" id="cgRes"></div>
@@ -1406,6 +1414,9 @@ function baixarInv(){
 // forma mensal CG_MES. A inclinação fixa de cada orientação (CG_ORI) só dá a forma do dia, não muda a energia.
 // Corta pelo inversor e, com limite, pela injeção máxima + consumo do próprio local na hora.
 const CG_MES=[150,130,125,100,80,65,72,92,105,128,145,155],CG_DIAS=[31,28,31,30,31,30,31,31,30,31,30,31];
+// curvas típicas de consumo por classe (scripts/curvas_padrao.json, BDGD da RGE): [dia útil, sábado, domingo],
+// 96 pontos de 15 min, média da semana = 1. Se o json mudar, atualize aqui.
+const CG_CURVA={CO:[[0.61,0.62,0.61,0.61,0.6,0.6,0.6,0.58,0.58,0.59,0.57,0.57,0.58,0.59,0.57,0.58,0.58,0.59,0.59,0.59,0.6,0.61,0.63,0.63,0.68,0.71,0.75,0.81,0.87,0.96,1.1,1.25,1.34,1.41,1.48,1.52,1.56,1.64,1.65,1.69,1.74,1.75,1.74,1.78,1.79,1.82,1.75,1.65,1.57,1.5,1.46,1.46,1.53,1.64,1.81,1.87,1.88,1.88,1.91,1.9,1.88,1.92,1.93,1.89,1.89,1.88,1.84,1.79,1.69,1.61,1.5,1.37,1.23,1.14,1.08,1.01,0.94,0.87,0.86,0.84,0.79,0.77,0.76,0.75,0.74,0.75,0.73,0.72,0.72,0.71,0.71,0.68,0.68,0.65,0.64,0.64],[0.65,0.65,0.65,0.65,0.64,0.63,0.63,0.62,0.61,0.6,0.59,0.59,0.59,0.59,0.59,0.59,0.6,0.6,0.59,0.61,0.61,0.6,0.62,0.62,0.65,0.67,0.67,0.67,0.68,0.7,0.77,0.82,0.91,0.94,0.97,0.99,1.03,1.08,1.11,1.11,1.13,1.13,1.12,1.15,1.12,1.12,1.09,1.04,0.95,0.94,0.93,0.89,0.89,0.92,0.93,0.91,0.92,0.94,0.95,0.95,0.94,0.94,0.92,0.92,0.9,0.89,0.87,0.84,0.84,0.82,0.79,0.77,0.77,0.76,0.79,0.76,0.77,0.73,0.7,0.71,0.69,0.7,0.7,0.67,0.65,0.63,0.63,0.6,0.58,0.57,0.55,0.54,0.54,0.54,0.55,0.52],[0.51,0.5,0.5,0.51,0.51,0.5,0.5,0.49,0.48,0.48,0.47,0.48,0.48,0.47,0.46,0.46,0.46,0.47,0.47,0.46,0.46,0.46,0.45,0.44,0.45,0.45,0.44,0.44,0.45,0.45,0.46,0.48,0.49,0.5,0.5,0.52,0.54,0.56,0.55,0.57,0.58,0.59,0.61,0.61,0.64,0.64,0.64,0.61,0.61,0.65,0.63,0.61,0.63,0.63,0.63,0.64,0.65,0.64,0.62,0.62,0.6,0.59,0.6,0.6,0.6,0.61,0.62,0.63,0.63,0.63,0.63,0.64,0.64,0.63,0.63,0.66,0.66,0.65,0.65,0.63,0.65,0.65,0.63,0.6,0.6,0.6,0.6,0.59,0.6,0.57,0.57,0.56,0.56,0.56,0.55,0.55]],IN:[[0.6,0.6,0.59,0.59,0.58,0.57,0.57,0.56,0.55,0.56,0.55,0.54,0.54,0.56,0.55,0.56,0.58,0.59,0.6,0.61,0.63,0.65,0.7,0.73,0.8,0.86,0.93,1.03,1.18,1.33,1.57,1.68,1.8,1.9,1.98,2.01,2.03,2.07,2.06,2.08,2.09,2.11,2.08,2.1,2.1,2.01,1.88,1.71,1.56,1.46,1.41,1.47,1.6,1.73,1.94,2.02,2.04,2.06,2.09,2.08,2.11,2.09,2.05,2,1.99,1.96,1.9,1.84,1.7,1.53,1.3,1.11,0.92,0.85,0.78,0.74,0.72,0.7,0.68,0.66,0.65,0.64,0.61,0.6,0.63,0.64,0.65,0.66,0.65,0.66,0.66,0.66,0.65,0.65,0.65,0.65],[0.66,0.65,0.64,0.64,0.63,0.61,0.61,0.59,0.58,0.58,0.55,0.55,0.55,0.55,0.56,0.55,0.56,0.55,0.56,0.58,0.57,0.59,0.62,0.63,0.67,0.68,0.7,0.7,0.72,0.76,0.83,0.86,0.9,0.94,0.93,0.94,0.97,0.98,0.98,0.96,0.94,0.94,0.92,0.91,0.89,0.84,0.79,0.74,0.7,0.67,0.64,0.64,0.66,0.68,0.68,0.7,0.72,0.72,0.72,0.71,0.7,0.68,0.65,0.64,0.62,0.6,0.58,0.56,0.56,0.53,0.51,0.51,0.49,0.49,0.5,0.5,0.49,0.48,0.48,0.47,0.47,0.47,0.46,0.45,0.44,0.45,0.44,0.44,0.44,0.44,0.42,0.41,0.41,0.42,0.42,0.42],[0.39,0.39,0.39,0.39,0.39,0.38,0.37,0.37,0.37,0.37,0.37,0.38,0.38,0.37,0.36,0.36,0.35,0.36,0.35,0.36,0.36,0.36,0.36,0.35,0.35,0.36,0.35,0.35,0.35,0.34,0.33,0.34,0.33,0.34,0.35,0.36,0.36,0.37,0.36,0.38,0.37,0.37,0.37,0.38,0.38,0.37,0.36,0.35,0.35,0.35,0.35,0.36,0.35,0.36,0.35,0.35,0.36,0.36,0.36,0.36,0.37,0.35,0.36,0.35,0.36,0.37,0.38,0.38,0.37,0.38,0.38,0.38,0.4,0.4,0.41,0.41,0.42,0.43,0.41,0.42,0.42,0.42,0.42,0.41,0.41,0.43,0.45,0.44,0.44,0.44,0.44,0.45,0.44,0.45,0.45,0.45]],PP:[[0.79,0.82,0.79,0.78,0.8,0.77,0.71,0.7,0.71,0.74,0.72,0.66,0.68,0.71,0.7,0.7,0.7,0.67,0.68,0.72,0.73,0.74,0.77,0.81,0.81,0.85,0.89,1.03,1.06,1.07,1.14,1.21,1.27,1.28,1.31,1.33,1.39,1.42,1.37,1.37,1.35,1.43,1.45,1.42,1.43,1.44,1.38,1.33,1.29,1.27,1.22,1.24,1.28,1.29,1.35,1.36,1.36,1.38,1.38,1.35,1.34,1.33,1.3,1.33,1.33,1.29,1.25,1.21,1.25,1.21,1.18,1.1,1.05,1.03,0.99,1.06,1.05,1.02,1.03,1.05,1.04,0.99,0.99,0.96,1,0.99,0.94,0.95,0.99,0.97,0.98,0.9,0.86,0.88,0.84,0.82],[0.79,0.8,0.8,0.77,0.78,0.78,0.73,0.71,0.74,0.73,0.67,0.67,0.7,0.75,0.71,0.73,0.71,0.69,0.68,0.69,0.71,0.68,0.7,0.73,0.76,0.78,0.8,0.88,0.89,0.92,0.91,0.94,0.98,1.02,1.03,1.04,1.11,1.16,1.17,1.13,1.17,1.16,1.17,1.19,1.18,1.09,1.06,1.06,1.03,0.99,0.97,1.01,1.01,1.02,1.02,1.02,1.07,1.02,1.04,1.04,1.05,1.05,1.02,1.04,1.02,0.98,0.97,0.98,0.98,1.02,1,0.96,0.92,0.94,0.96,0.96,0.98,0.96,0.93,0.89,0.97,0.94,0.9,0.89,0.9,0.88,0.84,0.87,0.88,0.88,0.77,0.78,0.75,0.8,0.78,0.68],[0.7,0.71,0.74,0.74,0.69,0.69,0.61,0.58,0.58,0.65,0.62,0.57,0.6,0.59,0.58,0.63,0.59,0.54,0.54,0.51,0.59,0.56,0.56,0.6,0.65,0.63,0.63,0.68,0.68,0.68,0.69,0.7,0.74,0.77,0.76,0.78,0.85,0.89,0.86,0.86,0.92,0.95,0.94,0.97,0.94,0.92,0.92,0.87,0.89,0.87,0.89,0.88,0.88,0.9,0.89,0.92,0.94,0.91,0.87,0.87,0.84,0.86,0.83,0.85,0.85,0.84,0.84,0.85,0.86,0.92,0.92,0.87,0.84,0.87,0.88,0.84,0.89,0.86,0.87,0.87,0.92,0.87,0.8,0.78,0.89,0.88,0.82,0.85,0.82,0.81,0.8,0.76,0.77,0.73,0.74,0.72]],RE:[[0.95,0.81,0.8,0.77,0.76,0.73,0.67,0.65,0.65,0.62,0.63,0.65,0.6,0.57,0.59,0.6,0.6,0.56,0.54,0.55,0.57,0.55,0.56,0.56,0.77,0.72,0.7,0.81,0.87,0.76,0.87,0.78,0.69,0.66,0.69,0.76,0.69,0.8,0.69,0.77,0.7,0.7,0.76,0.77,0.76,0.81,0.83,0.9,0.99,0.94,0.95,0.91,0.92,0.88,0.82,0.88,0.84,0.77,0.79,0.74,0.73,0.76,0.84,0.88,0.84,0.86,1.01,0.88,0.95,1.08,1.01,1.06,1.24,1.5,1.6,1.72,1.71,1.73,2.28,1.98,1.9,1.58,1.65,1.59,1.58,1.51,1.52,1.34,1.3,1.19,1.22,1.09,1.07,1.04,0.96,0.86],[0.98,0.93,1.02,0.83,0.82,0.83,0.88,0.84,0.83,0.73,0.72,0.69,0.65,0.66,0.73,0.7,0.67,0.71,0.66,0.63,0.63,0.64,0.65,0.65,0.7,0.75,0.76,0.72,0.75,0.7,0.88,0.78,0.92,0.81,0.96,0.94,1.04,0.99,1.19,1.15,1.02,1.17,1.17,1.07,1.15,1.08,1.28,1.34,1.23,1.25,1.33,1.36,1.3,1.31,1.53,1.46,1.33,1.21,1.24,1.36,1.35,1.37,1.52,1.39,1.16,1.18,1.26,1.2,1.17,1.22,1.3,1.47,1.51,1.31,1.48,1.49,1.64,1.53,1.54,1.44,1.59,1.51,1.69,1.74,1.65,1.78,1.48,1.42,1.49,1.52,1.4,1.36,1.46,1.38,1.35,1.21],[1.07,1.11,1.08,1,0.93,0.91,0.97,0.84,0.86,0.8,0.79,0.77,0.75,0.77,0.74,0.73,0.74,0.73,0.7,0.68,0.66,0.71,0.68,0.72,0.67,0.72,0.65,0.68,0.78,0.69,0.76,0.86,0.74,0.8,0.87,1,1.02,1.06,1.06,1.3,1.28,1.35,1.29,1.15,1.17,1.36,1.48,1.41,1.61,1.55,1.75,1.47,1.47,1.27,1.26,1.31,1.43,1.32,1.24,1.33,1.27,1.37,1.27,1.35,1.19,1.19,1.24,1.25,1.31,1.21,1.46,1.48,1.61,1.67,1.68,1.69,1.45,1.18,1.26,1.42,1.49,1.44,1.62,1.42,1.62,1.49,1.73,1.56,1.25,1.45,1.54,1.33,1.34,1.42,1.35,1.08]],RU:[[0.77,0.74,0.7,0.68,0.67,0.69,0.69,0.69,0.69,0.7,0.68,0.65,0.69,0.69,0.67,0.67,0.69,0.69,0.65,0.71,0.72,0.68,0.72,0.74,0.81,0.9,0.94,0.91,0.92,0.97,1.03,1.09,1.07,1.15,1.19,1.14,1.15,1.16,1.19,1.18,1.23,1.24,1.26,1.28,1.26,1.26,1.22,1.2,1.23,1.19,1.11,1.07,1.11,1.15,1.21,1.2,1.22,1.23,1.25,1.22,1.2,1.23,1.27,1.25,1.23,1.24,1.22,1.28,1.24,1.24,1.17,1.16,1.22,1.21,1.32,1.35,1.42,1.36,1.38,1.4,1.29,1.2,1.15,1.1,1.16,1.07,1.02,0.97,0.92,0.9,0.88,0.84,0.81,0.8,0.82,0.78],[0.84,0.79,0.81,0.85,0.82,0.78,0.77,0.75,0.74,0.75,0.71,0.71,0.72,0.7,0.7,0.71,0.71,0.69,0.73,0.75,0.77,0.75,0.75,0.74,0.79,0.85,0.84,0.83,0.89,0.94,0.94,0.93,0.95,0.98,0.93,0.94,0.97,1.06,1.1,1.07,1.12,1.2,1.25,1.19,1.1,1.12,1.11,1.15,1.08,1.05,1.02,1.04,1.05,1.09,1.04,0.97,0.99,1,1.04,1.05,1.09,1.11,1.12,1.12,1.1,1.06,1.05,1.04,1.06,1.07,1.09,1.15,1.01,1.08,1.17,1.15,1.16,1.29,1.25,1.19,1.19,1.2,1.2,1.15,1.1,1,0.93,0.92,0.92,0.98,0.93,0.9,0.94,0.86,0.86,0.79],[0.79,0.81,0.77,0.74,0.7,0.7,0.7,0.69,0.69,0.68,0.66,0.68,0.69,0.65,0.65,0.65,0.64,0.64,0.64,0.65,0.65,0.64,0.65,0.67,0.68,0.75,0.74,0.73,0.75,0.82,0.89,0.89,0.89,0.84,0.84,0.89,0.98,0.96,0.95,1.02,1.11,1.03,1,1.03,1.1,1.08,1.1,1.07,1.01,1.03,0.98,1,1.01,1,1.04,1.03,1,0.92,0.91,0.93,0.94,0.92,0.86,0.9,0.93,0.89,0.89,0.94,1,0.97,0.96,0.97,1.04,1.06,1.01,1.02,1.07,1.02,1.12,1.18,1.18,1.15,1.06,1.06,1.07,0.96,0.93,0.96,0.93,0.92,0.92,0.87,0.87,0.85,0.84,0.79]],SP:[[0.72,0.74,0.73,0.72,0.72,0.71,0.68,0.67,0.67,0.69,0.68,0.65,0.67,0.7,0.68,0.69,0.71,0.7,0.71,0.74,0.76,0.79,0.8,0.85,0.89,0.95,0.97,1.05,1.13,1.21,1.35,1.45,1.53,1.6,1.62,1.64,1.68,1.7,1.68,1.69,1.67,1.7,1.69,1.7,1.7,1.67,1.59,1.49,1.35,1.32,1.29,1.33,1.41,1.49,1.58,1.63,1.63,1.66,1.67,1.66,1.67,1.66,1.62,1.63,1.62,1.57,1.53,1.49,1.42,1.32,1.2,1.07,0.96,0.93,0.87,0.87,0.86,0.84,0.83,0.83,0.82,0.8,0.78,0.75,0.8,0.82,0.82,0.85,0.85,0.84,0.85,0.81,0.79,0.8,0.78,0.76],[0.74,0.74,0.74,0.72,0.72,0.71,0.7,0.68,0.69,0.69,0.65,0.66,0.67,0.69,0.68,0.68,0.67,0.65,0.65,0.66,0.66,0.67,0.71,0.74,0.78,0.79,0.82,0.85,0.89,0.92,0.95,0.95,0.99,1.02,1.03,1.03,1.07,1.1,1.1,1.08,1.09,1.09,1.06,1.07,1.04,0.97,0.94,0.9,0.85,0.82,0.81,0.81,0.83,0.87,0.87,0.88,0.92,0.89,0.88,0.87,0.88,0.87,0.85,0.86,0.83,0.8,0.79,0.78,0.77,0.77,0.76,0.74,0.72,0.73,0.73,0.73,0.73,0.71,0.7,0.68,0.71,0.7,0.69,0.67,0.67,0.65,0.64,0.65,0.65,0.65,0.6,0.59,0.58,0.6,0.59,0.55],[0.54,0.55,0.56,0.56,0.54,0.53,0.5,0.5,0.49,0.51,0.51,0.49,0.5,0.48,0.47,0.49,0.46,0.45,0.45,0.45,0.47,0.46,0.46,0.47,0.48,0.48,0.47,0.49,0.5,0.49,0.49,0.5,0.51,0.52,0.53,0.55,0.58,0.6,0.59,0.59,0.61,0.62,0.61,0.64,0.63,0.62,0.61,0.58,0.58,0.58,0.59,0.59,0.59,0.6,0.6,0.6,0.62,0.6,0.59,0.58,0.58,0.58,0.57,0.57,0.58,0.58,0.59,0.59,0.59,0.62,0.62,0.6,0.6,0.62,0.63,0.61,0.63,0.62,0.62,0.62,0.64,0.62,0.6,0.6,0.65,0.66,0.66,0.66,0.65,0.64,0.63,0.63,0.63,0.61,0.63,0.63]]};
 const CG_YLD=662*12/6.2,CG_FATOR={N:1,LO:622/662,S:563/662};
 const CG_ORI={N:{i:20,a:[[0,1]]},LO:{i:10,a:[[90,.5],[270,.5]]},S:{i:10,a:[[180,1]]}};
 const CG_ORI_N={N:"Norte",LO:"Leste/Oeste",S:"Sul"};
@@ -1426,22 +1437,32 @@ function cgDiaLimpo(lat,m,incl,az){
 // dia limpo da orientação escolhida (Leste/Oeste = soma das duas metades)
 function cgDiaOri(o,m){const l=o.ori.a.map(([az,w])=>cgDiaLimpo(o.lat,m,o.ori.i,az).map(v=>v*w));return l[0].map((_,i)=>l.reduce((a,x)=>a+x[i],0))}
 function cgSim(o){
-  const tot=CG_MES.reduce((a,b)=>a+b,0),mes=[];let bruto=0,inv=0,lim=0,dias=[],ref=0;
+  const tot=CG_MES.reduce((a,b)=>a+b,0),mes=[];let bruto=0,inv=0,lim=0,auto=0,dias=[],ref=0;
   for(let m=0;m<12;m++){
     const dl=cgDiaOri(o,m),sl=dl.reduce((a,b)=>a+b,0);
     const eR=CG_YLD*CG_MES[m]/tot/CG_DIAS[m]*o.kwp,em=eR*o.fator,ec=sl*0.25*o.kwp;ref+=eR*CG_DIAS[m];
     const k=Math.min(0.97,em/Math.max(ec,1e-9)),a=1/k-1;let ss=[];for(let i=0;i<20;i++)ss.push(Math.pow((i+0.5)/20,a));
     const sm=ss.reduce((x,y)=>x+y,0)/20;ss=ss.map(x=>Math.min(1,x*k/sm));
-    let eB=0,eI=0,eL=0;
-    for(const s of ss)for(const p0 of dl){const p=p0*o.kwp*s,pi=Math.min(p,o.inv),pl=o.lim!=null?Math.min(pi,o.lim+o.carga):pi;eB+=p;eI+=pi;eL+=pl}
-    const f=0.25/20*CG_DIAS[m];eB*=f;eI*=f;eL*=f;mes.push({b:eB,i:eI,l:eL});bruto+=eB;inv+=eI;lim+=eL;
-    if(m===11||m===5)dias.push({m,p:dl.map(x=>x*o.kwp)})}
-  return {mes,bruto,inv,lim,dias,ref};
+    // consumo do cliente: kW médio do mês × curva da classe; semana = 5 dias úteis + sábado + domingo
+    const kb=o.cons?o.cons[m]/(CG_DIAS[m]*24):0,cv=o.cons?CG_CURVA[o.classe]||CG_CURVA.CO:null,tipos=o.cons?[[0,5/7],[1,1/7],[2,1/7]]:[[0,1]];
+    let eB=0,eI=0,eL=0,eA=0;
+    for(const [t,w] of tipos)for(const s of ss)for(let j=0;j<96;j++){const p=dl[j]*o.kwp*s,pi=Math.min(p,o.inv),c=cv?kb*cv[t][j]:0,
+      pl=o.lim!=null?Math.min(pi,o.lim+c):pi;eB+=p*w;eI+=pi*w;eL+=pl*w;eA+=Math.min(pl,c)*w}
+    const f=0.25/20*CG_DIAS[m];eB*=f;eI*=f;eL*=f;eA*=f;mes.push({b:eB,i:eI,l:eL,a:eA,c:o.cons?o.cons[m]:null});bruto+=eB;inv+=eI;lim+=eL;auto+=eA;
+    if(m===11||m===5)dias.push({m,p:dl.map(x=>x*o.kwp),c:cv?cv[0].map(x=>x*kb):null})}
+  return {mes,bruto,inv,lim,auto,dias,ref};
+}
+// consumo mês a mês da fatura: mês em branco = média dos preenchidos; sem nenhum mês, o campo "Só a média"
+function cgConsMes(){
+  const v=[...Array(12)].map((_,i)=>{const x=cgVal("cgM"+i);return x>0?x:null}),f=v.filter(x=>x!=null);
+  const med=f.length?f.reduce((a,b)=>a+b,0)/f.length:cgVal("cgCons");
+  $("cgCons").placeholder=f.length?fmt(med,0):"";$("cgCons").disabled=f.length>0;
+  return med>0?v.map(x=>x??med):null;
 }
 function cgParams(){
   const c=cgLocal||(()=>{const p=map.getCenter();return {lat:p.lat,lon:p.lng}})();
   return {lat:c.lat,kwp:Math.max(0.1,cgVal("cgKwp")),inv:Math.max(0.1,cgVal("cgInv")),lim:$("cgLimOn").checked?Math.max(0,cgVal("cgLim")):null,
-    carga:$("cgLimOn").checked?Math.max(0,cgVal("cgCarga")):0,ori:CG_ORI[cgOri],fator:CG_FATOR[cgOri]};
+    cons:cgConsMes(),classe:$("cgClasse").value,ori:CG_ORI[cgOri],fator:CG_FATOR[cgOri]};
 }
 // coordenada colada: decimal ("-29.68, -53.80", "-29,68 -53,80", link do Google Maps) ou graus/min/seg (29°41'02"S 53°48'25"W)
 function cgLerCoord(t){
@@ -1481,11 +1502,14 @@ function cgGrafMes(r){
 }
 // dia de céu limpo em dezembro e junho: curva dos módulos, limite e o que é cortado
 function cgGrafDia(r,o){
-  const W=300,H=120,x0=6,y0=H-16,mx=Math.max(...r.dias.flatMap(d=>d.p),o.inv,1)*1.08,X=i=>x0+(i/96)*(W-2*x0),Y=v=>y0-v/mx*(y0-8);
-  const teto=o.lim!=null?Math.min(o.inv,o.lim+o.carga):o.inv;
-  const curva=d=>d.p.map((v,i)=>`${X(i+0.5).toFixed(1)},${Y(v).toFixed(1)}`).join(" ");
-  const corte=d=>d.p.map((v,i)=>`${X(i+0.5).toFixed(1)},${Y(Math.min(v,teto)).toFixed(1)}`).join(" ");
+  const W=300,H=120,x0=6,y0=H-16,mx=Math.max(...r.dias.flatMap(d=>d.p),...r.dias.flatMap(d=>d.c||[]),o.inv,1)*1.08,X=i=>x0+(i/96)*(W-2*x0),Y=v=>y0-v/mx*(y0-8);
   const dez=r.dias.find(d=>d.m===11),jun=r.dias.find(d=>d.m===5);
+  // teto da usina em cada instante (dia útil de dezembro): inversor, ou limite + consumo do cliente na hora
+  const tetoI=i=>o.lim!=null?Math.min(o.inv,o.lim+(dez.c?dez.c[i]:0)):o.inv,teto=tetoI(48);
+  const curva=d=>d.p.map((v,i)=>`${X(i+0.5).toFixed(1)},${Y(v).toFixed(1)}`).join(" ");
+  const corte=d=>d.p.map((v,i)=>`${X(i+0.5).toFixed(1)},${Y(Math.min(v,tetoI(i))).toFixed(1)}`).join(" ");
+  const tetoL=dez.p.map((_,i)=>`${X(i+0.5).toFixed(1)},${Y(tetoI(i)).toFixed(1)}`).join(" ");
+  const consL=dez.c?dez.c.map((v,i)=>`${X(i+0.5).toFixed(1)},${Y(v).toFixed(1)}`).join(" "):"";
   const horas=[6,9,12,15,18].map(h=>`<text x="${X(h*4).toFixed(1)}" y="${H-3}" text-anchor="middle" font-size="10" fill="var(--muted)">${h}h</text>`).join("");
   return `<div class="graf"><div class="base">Dia de sol (céu limpo), potência em kW</div>
   <svg viewBox="0 0 ${W} ${H}" width="100%" role="img" aria-label="Curva de um dia de sol em dezembro e junho com o limite de ${fmt(teto,1)} kW">
@@ -1494,20 +1518,23 @@ function cgGrafDia(r,o){
   <polygon points="${X(0)},${y0} ${corte(dez)} ${X(96)},${y0}" fill="var(--accent)" opacity=".35"/>
   <polyline points="${curva(dez)}" fill="none" stroke="var(--accent)" stroke-width="2"/>
   <polyline points="${curva(jun)}" fill="none" stroke="var(--muted)" stroke-width="2" stroke-dasharray="3 3"/>
-  <line x1="${x0}" x2="${W-x0}" y1="${Y(teto).toFixed(1)}" y2="${Y(teto).toFixed(1)}" stroke="var(--none)" stroke-width="1.5" stroke-dasharray="6 4"/>
-  <text x="${W-x0}" y="${(Y(teto)-4).toFixed(1)}" text-anchor="end" font-size="10" fill="var(--ink)">${o.lim!=null&&teto<o.inv?"limite":"inversor"} ${fmt(teto,1)} kW</text>${horas}</svg>
-  <div class="cgLeg"><span><i style="background:var(--accent)"></i>dezembro</span><span><i style="background:var(--muted)"></i>junho (tracejado)</span><span><i style="background:var(--low);opacity:.6"></i>cortado</span></div></div>`;
+  ${consL?`<polyline points="${consL}" fill="none" stroke="var(--mid)" stroke-width="2"/>`:""}
+  <polyline points="${tetoL}" fill="none" stroke="var(--none)" stroke-width="1.5" stroke-dasharray="6 4"/>
+  <text x="${W-x0}" y="${(Y(teto)-4).toFixed(1)}" text-anchor="end" font-size="10" fill="var(--ink)">${o.lim!=null&&teto<o.inv?(dez.c?"limite + consumo":"limite"):"inversor"} ${fmt(teto,1)} kW</text>${horas}</svg>
+  <div class="cgLeg"><span><i style="background:var(--accent)"></i>dezembro</span><span><i style="background:var(--muted)"></i>junho (tracejado)</span>${consL?`<span><i style="background:var(--mid)"></i>consumo do cliente (dia útil de dez.)</span>`:""}<span><i style="background:var(--low);opacity:.6"></i>cortado</span></div></div>`;
 }
 // tabela mês a mês: geração aproveitada e (se houver) o que o limite/inversor corta
 function cgTabMes(r){
   const corte=r.mes.some(x=>x.b-x.l>=0.5),MES=["Janeiro","Fevereiro","Março","Abril","Maio","Junho","Julho","Agosto","Setembro","Outubro","Novembro","Dezembro"];
-  return `<details class="menu" open><summary>Mês a mês</summary><table><thead><tr><th>Mês</th><th>Geração kWh</th>${corte?"<th>Cortado kWh</th>":""}</tr></thead><tbody>
-  ${r.mes.map((x,i)=>`<tr><td>${MES[i]}</td><td>${fmt(x.l,0)}</td>${corte?`<td>${fmt(x.b-x.l,0)}</td>`:""}</tr>`).join("")}
-  <tr class="atual"><td>Ano</td><td>${fmt(r.lim,0)}</td>${corte?`<td>${fmt(r.bruto-r.lim,0)}</td>`:""}</tr></tbody></table></details>`;
+  const cons=r.mes[0].c!=null,tc=cons?r.mes.reduce((a,x)=>a+x.c,0):0;
+  return `<details class="menu" open><summary>Mês a mês</summary><table><thead><tr><th>Mês</th><th>Geração kWh</th>${corte?"<th>Cortado kWh</th>":""}${cons?"<th>Consumo kWh</th><th>Usado na hora</th>":""}</tr></thead><tbody>
+  ${r.mes.map((x,i)=>`<tr><td>${MES[i]}</td><td>${fmt(x.l,0)}</td>${corte?`<td>${fmt(x.b-x.l,0)}</td>`:""}${cons?`<td>${fmt(x.c,0)}</td><td>${fmt(x.a,0)}</td>`:""}</tr>`).join("")}
+  <tr class="atual"><td>Ano</td><td>${fmt(r.lim,0)}</td>${corte?`<td>${fmt(r.bruto-r.lim,0)}</td>`:""}${cons?`<td>${fmt(tc,0)}</td><td>${fmt(r.auto,0)}</td>`:""}</tr></tbody></table>
+  ${cons?`<p class="hint">Usado na hora = parte da geração que o próprio cliente consome no momento (não passa pela rede).</p>`:""}</details>`;
 }
 function cgRender(){
   if(!cgEl||abaAtual!=="X")return;
-  try{localStorage.setItem("geracao.v1",JSON.stringify(Object.fromEntries(["cgKwp","cgInv","cgLim","cgCarga"].map(k=>[k,$(k).value])
+  try{localStorage.setItem("geracao.v1",JSON.stringify(Object.fromEntries(["cgKwp","cgInv","cgLim","cgCons","cgClasse",...[...Array(12)].map((_,i)=>"cgM"+i)].map(k=>[k,$(k).value])
     .concat([["cgLimOn",$("cgLimOn").checked],["ori",cgOri]]))))}catch(e){}
   $("cgLimBox").hidden=!$("cgLimOn").checked;
   $("cgOri").querySelectorAll("[data-ori]").forEach(b=>b.setAttribute("aria-pressed",b.dataset.ori===cgOri));
@@ -1521,7 +1548,9 @@ function cgRender(){
   const perdaL=r.inv-r.lim,perdaI=r.bruto-r.inv,pct=v=>r.bruto>0?v/r.bruto*100:0;
   // quanto vale pôr mais módulos com o mesmo limite (mantém a relação módulos/inversor)
   let tab="";
-  if(o.lim!=null&&o.lim>0){const rel=o.kwp/o.inv,base=o.lim+o.carga;
+  // consumo médio do cliente das 10h às 14h em dia útil (só para escolher os tamanhos da tabela)
+  const cDia=o.cons?o.cons.reduce((a,c,m)=>a+c/(CG_DIAS[m]*24),0)/12*((CG_CURVA[o.classe]||CG_CURVA.CO)[0].slice(40,56).reduce((a,b)=>a+b,0)/16):0;
+  if(o.lim!=null&&o.lim>0){const rel=o.kwp/o.inv,base=o.lim+cDia;
     const lin=[1,1.25,1.5,1.75,2,2.5,3].map(f=>{const kwp=Math.round(base*f*rel*10)/10,inv=Math.max(base,kwp/rel),s=cgSim({...o,kwp,inv});
       return `<tr data-kwp="${kwp}" data-inv="${Math.round(inv*10)/10}"${Math.abs(kwp-o.kwp)<0.05?' class="atual"':""}><td>${fmt(kwp,1)}</td><td>${fmt(inv,1)}</td><td>${fmt(s.lim/12,0)}</td><td>${fmt(s.lim/kwp,0)}</td><td>${fmt(s.bruto>0?(s.bruto-s.lim)/s.bruto*100:0,1)}%</td></tr>`}).join("");
     tab=`<h3 class="base">Mais módulos com o mesmo limite</h3><table><thead><tr><th>kWp</th><th>Inversor kW</th><th>kWh/mês</th><th>kWh/kWp·ano</th><th>Cortado</th></tr></thead><tbody>${lin}</tbody></table>
@@ -1530,9 +1559,10 @@ function cgRender(){
   $("cgRes").innerHTML=`<section><h2>Resultado</h2><div class="stats"><div class="stat"><b>${fmt(r.lim/12,0)}</b><span>kWh/mês (média)</span></div>
   <div class="stat"><b>${fmt(r.lim/1000,1)}</b><span>MWh/ano</span></div><div class="stat"><b>${fmt(r.lim/o.kwp,0)}</b><span>kWh/kWp·ano</span></div></div>
   <p class="hint">${fmt(o.kwp,2)} kWp virados para <b>${esc(oriTxt)}</b>${cgOri==="N"?"":`: ${fmt(r.bruto/r.ref*100,0)}% do que gerariam virados para o Norte`}.
-  ${o.lim!=null?`Sem limite seriam ${fmt(r.inv/12,0)} kWh/mês. O limite de ${fmt(o.lim,1)} kW${o.carga>0?` (+ ${fmt(o.carga,1)} kW consumidos no local)`:""} corta <b>${fmt(perdaL/12,0)} kWh/mês (${fmt(pct(perdaL),1)}%)</b>.`:""}
+  ${o.lim!=null?`Sem limite seriam ${fmt(r.inv/12,0)} kWh/mês. O limite de ${fmt(o.lim,1)} kW${o.cons?" (mais o consumo do cliente na hora)":""} corta <b>${fmt(perdaL/12,0)} kWh/mês (${fmt(pct(perdaL),1)}%)</b>.`:""}
   ${perdaI>0.005*r.bruto?` O inversor de ${fmt(o.inv,1)} kW corta ${fmt(perdaI/12,0)} kWh/mês (${fmt(pct(perdaI),1)}%).`:""}
   Relação módulos/inversor: ${fmt(o.kwp/o.inv,2)}.</p>
+  ${o.cons?(()=>{const tc=o.cons.reduce((a,b)=>a+b,0);return `<p class="hint">Consumo da fatura: <b>${fmt(tc/12,0)} kWh/mês</b> (${esc($("cgClasse").selectedOptions[0].text.toLowerCase())}). A usina gera ${fmt(r.lim/tc*100,0)}% desse consumo. O cliente usa na hora <b>${fmt(r.auto/12,0)} kWh/mês</b> (${fmt(r.lim>0?r.auto/r.lim*100:0,0)}% da geração); vão para a rede <b>${fmt((r.lim-r.auto)/12,0)} kWh/mês</b>.</p>`})():""}
   ${cgGrafMes(r)}${cgTabMes(r)}${cgGrafDia(r,o)}${tab}
   <p class="hint">Estimativa pelo padrão (6,2 kWp = 662 kWh/mês ao Norte, 622 a Leste/Oeste, 563 ao Sul), distribuída pelos meses do ano e pelo sol no local ao longo do dia, com dias de céu limpo a nublado. Não considera sombra, sujeira nem nuvens passageiras (que geram picos rápidos e aumentam um pouco o corte).</p></section>`;
 }
@@ -1553,6 +1583,8 @@ if(cgEl){
     cgPonto(c[0],c[1],true)});
   $("cgGps").onclick=()=>{if(!navigator.geolocation)return;navigator.geolocation.getCurrentPosition(p=>cgPonto(p.coords.latitude,p.coords.longitude,true),
     ()=>{$("cgOnde").textContent="Não consegui a sua localização (permissão negada?)."},{enableHighAccuracy:true,timeout:15000})};
+  cgEl.addEventListener("change",e=>{if(e.target.id==="cgClasse")cgRender()});
+  $("cgConsLimpa").onclick=()=>{["cgCons",...[...Array(12)].map((_,i)=>"cgM"+i)].forEach(k=>$(k).value="");cgRender()};
   cgEl.addEventListener("input",e=>{if(e.target.id==="cgCoord")return;if(e.target.id==="cgLim")e.target.dataset.mexeu="1";cgRender()});
   cgEl.addEventListener("click",e=>{const b=e.target.closest("[data-cglim]");if(b){$("cgLim").value=b.dataset.cglim;$("cgLim").dataset.mexeu="1";cgRender();return}
     const ob=e.target.closest("[data-ori]");if(ob){cgOri=ob.dataset.ori;cgRender();return}

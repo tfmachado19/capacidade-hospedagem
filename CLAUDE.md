@@ -74,8 +74,11 @@ nem sempre programadores: explique resultados em linguagem simples.
   sem campo de inclinação. **Padrão do usuário** (`CG_YLD`, `CG_FATOR`): 6,2 kWp gera em média 662 kWh/mês ao Norte,
   622 a Leste/Oeste e 563 ao Sul (igual em todo o RS; não "corrigir" sem discutir). Distribuído pelos meses
   (`CG_MES`, tabela "Mês a mês" `cgTabMes`) e pelo dia: sol a cada 15 min (céu limpo no plano dos módulos, inclinação fixa por orientação em `CG_ORI`
-  só para a forma do dia) e 20 tipos de dia por mês. Corta pelo inversor e, com "Limitar a injeção", pelo
-  limite + consumo do próprio local na hora; tabela "Mais módulos com o mesmo limite". Campos em
+  só para a forma do dia) e 20 tipos de dia por mês. **Consumo do cliente (fatura)** (`#cgConsBox`,
+  `cgConsMes`): 12 meses em kWh (mês em branco = média dos preenchidos) ou só a média, e a classe; vira curva de 15 min
+  pela curva típica da classe (`CG_CURVA` = cópia de `scripts/curvas_padrao.json`, dia útil/sábado/domingo, peso 5/1/1).
+  Corta pelo inversor e, com "Limitar a injeção", pelo limite + consumo do cliente na hora; mostra o usado na hora
+  (autoconsumo) e o injetado; tabela "Mais módulos com o mesmo limite". Campos em
   `localStorage["geracao.v1"]`. Não considera sombra nem nuvens passageiras.
 - **Trocar de aba não mexe no mapa** (pedido do usuário): sem enquadrar o estado; o ponto pesquisado (`ponto`/`pino`)
   continua nas outras abas (o marcador some só no Medir).
