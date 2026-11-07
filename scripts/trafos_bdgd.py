@@ -1493,10 +1493,8 @@ body.medindo .leaflet-control.legenda,body.medindo .leaflet-control.legAlimC{dis
       <div class="row"><span class="base">Módulos virados para</span></div>
       <div class="acoes" id="cgOri" role="group" aria-label="Orientação dos módulos">
         <button type="button" data-ori="N" aria-pressed="true">Norte</button><button type="button" data-ori="LO" aria-pressed="false">Leste/Oeste</button>
-        <button type="button" data-ori="L" aria-pressed="false">Leste</button><button type="button" data-ori="O" aria-pressed="false">Oeste</button>
-        <button type="button" data-ori="S" aria-pressed="false">Sul</button><button type="button" data-ori="X" aria-pressed="false">Outro</button></div>
-      <div class="row"><label for="cgIncl">Inclinação</label><input id="cgIncl" type="number" min="0" max="90" step="1" value="20"><span class="base">°</span>
-        <span id="cgAzBox" hidden><label for="cgAz">Azimute</label> <input id="cgAz" type="number" min="0" max="360" step="1" value="0"> <span class="base">° (0 = N, 90 = L, 180 = S, 270 = O)</span></span></div>
+        <button type="button" data-ori="S" aria-pressed="false">Sul</button></div>
+      <p class="hint">Padrão de estimativa: sistema de 6,2 kWp gera em média 662 kWh/mês virado para o Norte ou Leste/Oeste e 563 kWh/mês virado para o Sul.</p>
       <label class="chk"><input type="checkbox" id="cgLimOn"> Limitar a injeção na rede (para não inverter o fluxo)</label>
       <div id="cgLimBox" hidden>
         <div class="row"><label for="cgLim">Injetar no máximo</label><input id="cgLim" type="number" min="0" max="100000" step="0.1" value="30"><span class="base">kW</span></div>
@@ -1504,10 +1502,6 @@ body.medindo .leaflet-control.legenda,body.medindo .leaflet-control.legAlimC{dis
         <div class="row"><label for="cgCarga">Consumo do próprio local de dia</label><input id="cgCarga" type="number" min="0" max="100000" step="0.1" value="0"><span class="base">kW</span></div>
         <p class="hint">O limitador (medidor no ponto de conexão + controle do inversor) corta a geração quando a injeção passa do limite. O que o local consome na hora não conta como injeção.</p>
       </div>
-      <details class="menu"><summary>Ajustes</summary>
-        <div class="row"><label for="cgYld">Produtividade da região</label><input id="cgYld" type="number" min="500" max="2500" step="10" value="1150"><span class="base">kWh por kWp por ano</span></div>
-        <p class="hint">Quanto cada 1 kWp gera num ano, com os módulos virados para o Norte a 20° e sem sombra. A média do RS é <b>1.150</b> (≈ 96 kWh por kWp por mês). Se você tiver um número melhor para o local (PVsyst, PVGIS ou uma usina vizinha), coloque aqui e toda a simulação se ajusta. A orientação e a inclinação escolhidas acima já descontam a perda em relação ao Norte.</p>
-      </details>
     </div>
     <div class="scroll" id="cgRes"></div>
   </section>
@@ -2410,12 +2404,13 @@ function baixarInv(){
 }
 // ---- Aba Simular: geração estimada num ponto (coordenada, toque no mapa ou local da aba Usinas).
 // Sol a cada 15 min (céu limpo no plano dos módulos) e 20 tipos de dia por mês (fator s = q^a). A energia do mês
-// = referência do RS (cgYld, módulos ao Norte a 20°; forma mensal CG_MES) × ganho da orientação escolhida
-// (75% pela razão do céu limpo, 25% pela parte difusa, que quase não depende da orientação).
+// = padrão do usuário (6,2 kWp: Norte e Leste/Oeste 662 kWh/mês, Sul 563 kWh/mês; sem campo de inclinação) com a
+// forma mensal CG_MES. A inclinação fixa de cada orientação (CG_ORI) só dá a forma do dia, não muda a energia.
 // Corta pelo inversor e, com limite, pela injeção máxima + consumo do próprio local na hora.
 const CG_MES=[150,130,125,100,80,65,72,92,105,128,145,155],CG_DIAS=[31,28,31,30,31,30,31,31,30,31,30,31];
-const CG_ORI={N:[[0,1]],S:[[180,1]],L:[[90,1]],O:[[270,1]],LO:[[90,.5],[270,.5]]};
-const CG_ORI_N={N:"Norte",S:"Sul",L:"Leste",O:"Oeste",LO:"Leste/Oeste (metade para cada lado)",X:"azimute"};
+const CG_YLD=662*12/6.2,CG_FATOR={N:1,LO:1,S:563/662};
+const CG_ORI={N:{i:20,a:[[0,1]]},LO:{i:10,a:[[90,.5],[270,.5]]},S:{i:10,a:[[180,1]]}};
+const CG_ORI_N={N:"Norte",LO:"Leste/Oeste",S:"Sul"};
 let cgLocal=null,cgOri="N";const cgEl=$("abaX"),cgLayer=L.layerGroup();
 const cgVal=id=>{const v=parseFloat(($(id).value||"").replace(",","."));return isFinite(v)?v:0};
 // potência de céu limpo (kW por kWp, já com perdas) a cada 15 min do dia 15 do mês m
@@ -2431,13 +2426,12 @@ function cgDiaLimpo(lat,m,incl,az){
   return out;
 }
 // dia limpo da orientação escolhida (Leste/Oeste = soma das duas metades)
-function cgDiaOri(o,m){const l=o.ori.map(([az,w])=>cgDiaLimpo(o.lat,m,o.incl,az).map(v=>v*w));return l[0].map((_,i)=>l.reduce((a,x)=>a+x[i],0))}
+function cgDiaOri(o,m){const l=o.ori.a.map(([az,w])=>cgDiaLimpo(o.lat,m,o.ori.i,az).map(v=>v*w));return l[0].map((_,i)=>l.reduce((a,x)=>a+x[i],0))}
 function cgSim(o){
   const tot=CG_MES.reduce((a,b)=>a+b,0),mes=[];let bruto=0,inv=0,lim=0,dias=[],ref=0;
-  const dif=(1+Math.cos(o.incl*Math.PI/180))/(1+Math.cos(20*Math.PI/180));
   for(let m=0;m<12;m++){
-    const dl=cgDiaOri(o,m),dr=cgDiaLimpo(o.lat,m,20,0),sl=dl.reduce((a,b)=>a+b,0),sr=dr.reduce((a,b)=>a+b,0);
-    const ganho=0.75*sl/Math.max(sr,1e-9)+0.25*dif,eR=o.yld*CG_MES[m]/tot/CG_DIAS[m]*o.kwp,em=eR*ganho,ec=sl*0.25*o.kwp;ref+=eR*CG_DIAS[m];
+    const dl=cgDiaOri(o,m),sl=dl.reduce((a,b)=>a+b,0);
+    const eR=CG_YLD*CG_MES[m]/tot/CG_DIAS[m]*o.kwp,em=eR*o.fator,ec=sl*0.25*o.kwp;ref+=eR*CG_DIAS[m];
     const k=Math.min(0.97,em/Math.max(ec,1e-9)),a=1/k-1;let ss=[];for(let i=0;i<20;i++)ss.push(Math.pow((i+0.5)/20,a));
     const sm=ss.reduce((x,y)=>x+y,0)/20;ss=ss.map(x=>Math.min(1,x*k/sm));
     let eB=0,eI=0,eL=0;
@@ -2449,8 +2443,7 @@ function cgSim(o){
 function cgParams(){
   const c=cgLocal||(()=>{const p=map.getCenter();return {lat:p.lat,lon:p.lng}})();
   return {lat:c.lat,kwp:Math.max(0.1,cgVal("cgKwp")),inv:Math.max(0.1,cgVal("cgInv")),lim:$("cgLimOn").checked?Math.max(0,cgVal("cgLim")):null,
-    carga:$("cgLimOn").checked?Math.max(0,cgVal("cgCarga")):0,yld:Math.max(100,cgVal("cgYld")||1150),incl:Math.min(90,Math.max(0,cgVal("cgIncl"))),
-    ori:cgOri==="X"?[[cgVal("cgAz"),1]]:CG_ORI[cgOri]};
+    carga:$("cgLimOn").checked?Math.max(0,cgVal("cgCarga")):0,ori:CG_ORI[cgOri],fator:CG_FATOR[cgOri]};
 }
 // coordenada colada: decimal ("-29.68, -53.80", "-29,68 -53,80", link do Google Maps) ou graus/min/seg (29°41'02"S 53°48'25"W)
 function cgLerCoord(t){
@@ -2509,9 +2502,9 @@ function cgGrafDia(r,o){
 }
 function cgRender(){
   if(!cgEl||abaAtual!=="X")return;
-  try{localStorage.setItem("geracao.v1",JSON.stringify(Object.fromEntries(["cgKwp","cgInv","cgLim","cgCarga","cgYld","cgIncl","cgAz"].map(k=>[k,$(k).value])
+  try{localStorage.setItem("geracao.v1",JSON.stringify(Object.fromEntries(["cgKwp","cgInv","cgLim","cgCarga"].map(k=>[k,$(k).value])
     .concat([["cgLimOn",$("cgLimOn").checked],["ori",cgOri]]))))}catch(e){}
-  $("cgLimBox").hidden=!$("cgLimOn").checked;$("cgAzBox").hidden=cgOri!=="X";
+  $("cgLimBox").hidden=!$("cgLimOn").checked;
   $("cgOri").querySelectorAll("[data-ori]").forEach(b=>b.setAttribute("aria-pressed",b.dataset.ori===cgOri));
   const o=cgParams(),r=cgSim(o);
   $("cgOnde").innerHTML=cgLocal?(cgLocal.id?`Local: <b>trafo ${esc(cgLocal.id)}</b> · ${esc(cgLocal.mun||"")} · `:"Local: ")+
@@ -2528,15 +2521,15 @@ function cgRender(){
       return `<tr data-kwp="${kwp}" data-inv="${Math.round(inv*10)/10}"${Math.abs(kwp-o.kwp)<0.05?' class="atual"':""}><td>${fmt(kwp,1)}</td><td>${fmt(inv,1)}</td><td>${fmt(s.lim/12,0)}</td><td>${fmt(s.lim/kwp,0)}</td><td>${fmt(s.bruto>0?(s.bruto-s.lim)/s.bruto*100:0,1)}%</td></tr>`}).join("");
     tab=`<h3 class="base">Mais módulos com o mesmo limite</h3><table><thead><tr><th>kWp</th><th>Inversor kW</th><th>kWh/mês</th><th>kWh/kWp·ano</th><th>Cortado</th></tr></thead><tbody>${lin}</tbody></table>
     <p class="hint">Toque numa linha para usar. Passar dos módulos aumenta a geração de manhã, à tarde e no inverno, mas o corte no meio do dia cresce.</p>`}
-  const oriTxt=cgOri==="X"?`azimute ${fmt(cgVal("cgAz"),0)}°`:CG_ORI_N[cgOri];
+  const oriTxt=CG_ORI_N[cgOri];
   $("cgRes").innerHTML=`<section><h2>Resultado</h2><div class="stats"><div class="stat"><b>${fmt(r.lim/12,0)}</b><span>kWh/mês (média)</span></div>
   <div class="stat"><b>${fmt(r.lim/1000,1)}</b><span>MWh/ano</span></div><div class="stat"><b>${fmt(r.lim/o.kwp,0)}</b><span>kWh/kWp·ano</span></div></div>
-  <p class="hint">${fmt(o.kwp,2)} kWp virados para <b>${esc(oriTxt)}</b> a ${fmt(o.incl,0)}°: ${fmt(r.bruto/r.ref*100,0)}% do que gerariam virados para o Norte a 20°.
+  <p class="hint">${fmt(o.kwp,2)} kWp virados para <b>${esc(oriTxt)}</b>${cgOri==="N"?"":`: ${fmt(r.bruto/r.ref*100,0)}% do que gerariam virados para o Norte`}.
   ${o.lim!=null?`Sem limite seriam ${fmt(r.inv/12,0)} kWh/mês. O limite de ${fmt(o.lim,1)} kW${o.carga>0?` (+ ${fmt(o.carga,1)} kW consumidos no local)`:""} corta <b>${fmt(perdaL/12,0)} kWh/mês (${fmt(pct(perdaL),1)}%)</b>.`:""}
   ${perdaI>0.005*r.bruto?` O inversor de ${fmt(o.inv,1)} kW corta ${fmt(perdaI/12,0)} kWh/mês (${fmt(pct(perdaI),1)}%).`:""}
   Relação módulos/inversor: ${fmt(o.kwp/o.inv,2)}.</p>
   ${cgGrafMes(r)}${cgGrafDia(r,o)}${tab}
-  <p class="hint">Estimativa: média do RS (${fmt(o.yld,0)} kWh/kWp·ano ao Norte a 20°) distribuída pelos meses, forma do dia pelo sol no local e dias de céu limpo a nublado. Não considera sombra, sujeira nem nuvens passageiras (que geram picos rápidos e aumentam um pouco o corte). Para o projeto final, confira no PVsyst ou PVGIS.</p></section>`;
+  <p class="hint">Estimativa pelo padrão (6,2 kWp = 662 kWh/mês ao Norte ou Leste/Oeste, 563 kWh/mês ao Sul), distribuída pelos meses do ano e pelo sol no local ao longo do dia, com dias de céu limpo a nublado. Não considera sombra, sujeira nem nuvens passageiras (que geram picos rápidos e aumentam um pouco o corte).</p></section>`;
 }
 // atalho da aba Usinas: simula no local aberto, com as folgas dele como sugestão de limite
 function cgUsarLocal(t){
@@ -2548,7 +2541,7 @@ function cgUsarLocal(t){
   $("cgCoord").value=`${t.lat.toFixed(6)}, ${t.lon.toFixed(6)}`;cgMarca();cgRender();
 }
 if(cgEl){
-  try{const s=JSON.parse(localStorage.getItem("geracao.v1")||"null");if(s){for(const k in s){if(k==="cgLimOn")$(k).checked=!!s[k];else if(k==="ori"){if(CG_ORI[s[k]]||s[k]==="X")cgOri=s[k]}
+  try{const s=JSON.parse(localStorage.getItem("geracao.v1")||"null");if(s){for(const k in s){if(k==="cgLimOn")$(k).checked=!!s[k];else if(k==="ori"){if(CG_ORI[s[k]])cgOri=s[k]}
     else if($(k)&&s[k]!=="")$(k).value=s[k]}if(s.cgLim)$("cgLim").dataset.mexeu="1"}}catch(e){}
   $("cgBusca").addEventListener("submit",e=>{e.preventDefault();const c=cgLerCoord($("cgCoord").value);
     if(!c){$("cgOnde").innerHTML=`<span class="msg">Não entendi a coordenada. Exemplos: <b>-29.6842, -53.8069</b> ou <b>29°41'03"S 53°48'25"O</b>.</span>`;return}
@@ -2557,9 +2550,8 @@ if(cgEl){
     ()=>{$("cgOnde").textContent="Não consegui a sua localização (permissão negada?)."},{enableHighAccuracy:true,timeout:15000})};
   cgEl.addEventListener("input",e=>{if(e.target.id==="cgCoord")return;if(e.target.id==="cgLim")e.target.dataset.mexeu="1";cgRender()});
   cgEl.addEventListener("click",e=>{const b=e.target.closest("[data-cglim]");if(b){$("cgLim").value=b.dataset.cglim;$("cgLim").dataset.mexeu="1";cgRender();return}
-    const ob=e.target.closest("[data-ori]");if(ob){cgOri=ob.dataset.ori;if(cgOri==="LO"&&!$("cgIncl").dataset.mexeu)$("cgIncl").value=10;cgRender();return}
+    const ob=e.target.closest("[data-ori]");if(ob){cgOri=ob.dataset.ori;cgRender();return}
     const tr=e.target.closest("tr[data-kwp]");if(tr){$("cgKwp").value=tr.dataset.kwp;$("cgInv").value=tr.dataset.inv;cgRender()}});
-  $("cgIncl").addEventListener("input",e=>{e.target.dataset.mexeu="1"});
 }
 // Informações ao passar o mouse (ou tocar) no mapa
 function dicaTrafo(t){
