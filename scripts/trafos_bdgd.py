@@ -1494,7 +1494,7 @@ body.medindo .leaflet-control.legenda,body.medindo .leaflet-control.legAlimC{dis
       <div class="acoes" id="cgOri" role="group" aria-label="Orientação dos módulos">
         <button type="button" data-ori="N" aria-pressed="true">Norte</button><button type="button" data-ori="LO" aria-pressed="false">Leste/Oeste</button>
         <button type="button" data-ori="S" aria-pressed="false">Sul</button></div>
-      <p class="hint">Padrão de estimativa: sistema de 6,2 kWp gera em média 662 kWh/mês virado para o Norte ou Leste/Oeste e 563 kWh/mês virado para o Sul.</p>
+      <p class="hint">Padrão de estimativa: sistema de 6,2 kWp gera em média 662 kWh/mês virado para o Norte, 622 kWh/mês para Leste/Oeste e 563 kWh/mês para o Sul.</p>
       <label class="chk"><input type="checkbox" id="cgLimOn"> Limitar a injeção na rede (para não inverter o fluxo)</label>
       <div id="cgLimBox" hidden>
         <div class="row"><label for="cgLim">Injetar no máximo</label><input id="cgLim" type="number" min="0" max="100000" step="0.1" value="30"><span class="base">kW</span></div>
@@ -2404,11 +2404,11 @@ function baixarInv(){
 }
 // ---- Aba Simular: geração estimada num ponto (coordenada, toque no mapa ou local da aba Usinas).
 // Sol a cada 15 min (céu limpo no plano dos módulos) e 20 tipos de dia por mês (fator s = q^a). A energia do mês
-// = padrão do usuário (6,2 kWp: Norte e Leste/Oeste 662 kWh/mês, Sul 563 kWh/mês; sem campo de inclinação) com a
+// = padrão do usuário (6,2 kWp: Norte 662, Leste/Oeste 622, Sul 563 kWh/mês; sem campo de inclinação) com a
 // forma mensal CG_MES. A inclinação fixa de cada orientação (CG_ORI) só dá a forma do dia, não muda a energia.
 // Corta pelo inversor e, com limite, pela injeção máxima + consumo do próprio local na hora.
 const CG_MES=[150,130,125,100,80,65,72,92,105,128,145,155],CG_DIAS=[31,28,31,30,31,30,31,31,30,31,30,31];
-const CG_YLD=662*12/6.2,CG_FATOR={N:1,LO:1,S:563/662};
+const CG_YLD=662*12/6.2,CG_FATOR={N:1,LO:622/662,S:563/662};
 const CG_ORI={N:{i:20,a:[[0,1]]},LO:{i:10,a:[[90,.5],[270,.5]]},S:{i:10,a:[[180,1]]}};
 const CG_ORI_N={N:"Norte",LO:"Leste/Oeste",S:"Sul"};
 let cgLocal=null,cgOri="N";const cgEl=$("abaX"),cgLayer=L.layerGroup();
@@ -2536,7 +2536,7 @@ function cgRender(){
   ${perdaI>0.005*r.bruto?` O inversor de ${fmt(o.inv,1)} kW corta ${fmt(perdaI/12,0)} kWh/mês (${fmt(pct(perdaI),1)}%).`:""}
   Relação módulos/inversor: ${fmt(o.kwp/o.inv,2)}.</p>
   ${cgGrafMes(r)}${cgTabMes(r)}${cgGrafDia(r,o)}${tab}
-  <p class="hint">Estimativa pelo padrão (6,2 kWp = 662 kWh/mês ao Norte ou Leste/Oeste, 563 kWh/mês ao Sul), distribuída pelos meses do ano e pelo sol no local ao longo do dia, com dias de céu limpo a nublado. Não considera sombra, sujeira nem nuvens passageiras (que geram picos rápidos e aumentam um pouco o corte).</p></section>`;
+  <p class="hint">Estimativa pelo padrão (6,2 kWp = 662 kWh/mês ao Norte, 622 a Leste/Oeste, 563 ao Sul), distribuída pelos meses do ano e pelo sol no local ao longo do dia, com dias de céu limpo a nublado. Não considera sombra, sujeira nem nuvens passageiras (que geram picos rápidos e aumentam um pouco o corte).</p></section>`;
 }
 // atalho da aba Usinas: simula no local aberto, com as folgas dele como sugestão de limite
 function cgUsarLocal(t){

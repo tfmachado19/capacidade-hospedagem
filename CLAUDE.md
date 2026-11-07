@@ -71,8 +71,8 @@ nem sempre programadores: explique resultados em linguagem simples.
   decimal com ponto ou vírgula, link do Google Maps, graus/min/seg com S/O; sem sinal = Brasil), toque no mapa, 📍
   localização, o último ponto pesquisado no Consultar, ou o atalho "Simular a geração neste local" da ficha da aba
   Usinas (traz as folgas do trafo/alimentador/estudo como sugestão de limite). Orientação: só Norte, Leste/Oeste e Sul,
-  sem campo de inclinação. **Padrão do usuário** (`CG_YLD`, `CG_FATOR`): 6,2 kWp gera em média 662 kWh/mês ao Norte
-  ou Leste/Oeste e 563 kWh/mês ao Sul (igual em todo o RS; não "corrigir" sem discutir). Distribuído pelos meses
+  sem campo de inclinação. **Padrão do usuário** (`CG_YLD`, `CG_FATOR`): 6,2 kWp gera em média 662 kWh/mês ao Norte,
+  622 a Leste/Oeste e 563 ao Sul (igual em todo o RS; não "corrigir" sem discutir). Distribuído pelos meses
   (`CG_MES`, tabela "Mês a mês" `cgTabMes`) e pelo dia: sol a cada 15 min (céu limpo no plano dos módulos, inclinação fixa por orientação em `CG_ORI`
   só para a forma do dia) e 20 tipos de dia por mês. Corta pelo inversor e, com "Limitar a injeção", pelo
   limite + consumo do próprio local na hora; tabela "Mais módulos com o mesmo limite". Campos em
