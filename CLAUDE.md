@@ -67,12 +67,17 @@ nem sempre programadores: explique resultados em linguagem simples.
   BDGD.zip gd.parquet <pasta>dados`): local = PN_CON → PONNOT (poste/estrutura, 4 casas ≈ 10 m);
   potência/classe/modalidade/fonte = base de GD da ANEEL pelo CEG_GD. O mapa desenha as 4.000 maiores
   da área visível. Não há medição horária pública de alimentador ou trafo (só energia mensal).
-- **Calculadora de geração** (aba Usinas, `#cgBox`, código `cg*` no `TEMPLATE`): geração estimada no local aberto
-  (ou no centro do mapa). Sol hora a hora (céu limpo no plano dos módulos, inclinação/orientação editáveis) e 20 tipos de
-  dia por mês, escalados para a média do RS (`CG_MES`, 1.150 kWh/kWp·ano editável). Corta pelo inversor e, com
-  "Limitar a injeção", pelo limite + consumo do próprio local na hora. Sugere limites pelas folgas do trafo, do
-  alimentador (padrão) e do estudo da distribuidora; tabela "Mais módulos com o mesmo limite". Campos salvos em
+- **Aba Simular** (`abaX`, código `cg*` no `TEMPLATE`): geração estimada num ponto. Coordenada colada (`cgLerCoord`:
+  decimal com ponto ou vírgula, link do Google Maps, graus/min/seg com S/O; sem sinal = Brasil), toque no mapa, 📍
+  localização, o último ponto pesquisado no Consultar, ou o atalho "Simular a geração neste local" da ficha da aba
+  Usinas (traz as folgas do trafo/alimentador/estudo como sugestão de limite). Orientação: Norte, Leste/Oeste (metade
+  para cada lado), Leste, Oeste, Sul ou azimute livre; inclinação editável. Sol a cada 15 min (céu limpo no plano dos
+  módulos) e 20 tipos de dia por mês; energia = referência do RS ao Norte a 20° (`CG_MES`, 1.150 kWh/kWp·ano editável)
+  × ganho da orientação (75% razão de céu limpo + 25% difusa). Corta pelo inversor e, com "Limitar a injeção", pelo
+  limite + consumo do próprio local na hora; tabela "Mais módulos com o mesmo limite". Campos em
   `localStorage["geracao.v1"]`. Não considera sombra nem nuvens passageiras.
+- **Trocar de aba não mexe no mapa** (pedido do usuário): sem enquadrar o estado; o ponto pesquisado (`ponto`/`pino`)
+  continua nas outras abas (o marcador some só no Medir).
 - **Aba Cliente** (`abaK`, código `cli*` no `TEMPLATE`): analisa um cliente com várias unidades (ex.: rede de postos).
   O usuário cola uma linha por unidade (`nome; endereço, cidade`, ou o texto do contrato social); a cidade é o nome
   de município que aparece por último. Cada unidade é procurada em `dados/emp/<município>.json` de todas as

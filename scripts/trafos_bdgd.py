@@ -1240,7 +1240,7 @@ aside#side h1{font-size:16px}
 .leaflet-control[hidden]{display:none!important}
 .row[hidden]{display:none}
 .graf{margin:10px 0 4px}.graf svg{display:block;margin:4px 0}
-.cg{margin:8px 0}.cg .row input{width:7em}.cg .stats{margin-top:8px}
+.cg .row input[type=number]{width:7em}.cg #cgCoord{flex:1 1 12em}.cg .stats{margin-top:8px}
 .cg table{width:100%;border-collapse:collapse;font-size:13px;margin-top:6px}.cg td,.cg th{padding:5px 4px;border-bottom:1px solid var(--line);text-align:right}
 .cg th{font-weight:600;color:var(--muted)}.cg td:first-child,.cg th:first-child{text-align:left}
 .cg tr[data-kwp]{cursor:pointer}.cg tr[data-kwp]:hover td{background:var(--chip)}.cg tr.atual td{font-weight:700}
@@ -1480,10 +1480,23 @@ body.medindo .leaflet-control.legenda,body.medindo .leaflet-control.legAlimC{dis
       <button type="button" class="ghost" id="invCsv">Baixar lista (CSV)</button>
     </div>
     <div class="scroll" id="infoInv"></div>
-    <details class="menu cg" id="cgBox"><summary>Calculadora de geração <span class="base">estimativa</span></summary>
+  </section>
+  <section class="aba cg" id="abaX" role="tabpanel" aria-labelledby="tabX" hidden>
+    <div class="painel">
+      <p class="pergunta">Simular geração</p>
+      <p class="hint">Cole a coordenada do local (ou toque no mapa) e veja quanto a usina gera, com e sem limite de injeção.</p>
+      <form class="row" id="cgBusca"><label for="cgCoord">Coordenada</label><input id="cgCoord" type="text" inputmode="text" autocomplete="off" spellcheck="false" placeholder="-29.6842, -53.8069">
+        <button type="submit">Simular</button><button type="button" class="ghost" id="cgGps" title="Usar a minha localização">📍</button></form>
       <p class="hint" id="cgOnde"></p>
       <div class="row"><label for="cgKwp">Módulos</label><input id="cgKwp" type="number" min="0.5" max="100000" step="0.01" value="75"><span class="base">kWp</span>
         <label for="cgInv">Inversor</label><input id="cgInv" type="number" min="0.5" max="100000" step="0.1" value="60"><span class="base">kW</span></div>
+      <div class="row"><span class="base">Módulos virados para</span></div>
+      <div class="acoes" id="cgOri" role="group" aria-label="Orientação dos módulos">
+        <button type="button" data-ori="N" aria-pressed="true">Norte</button><button type="button" data-ori="LO" aria-pressed="false">Leste/Oeste</button>
+        <button type="button" data-ori="L" aria-pressed="false">Leste</button><button type="button" data-ori="O" aria-pressed="false">Oeste</button>
+        <button type="button" data-ori="S" aria-pressed="false">Sul</button><button type="button" data-ori="X" aria-pressed="false">Outro</button></div>
+      <div class="row"><label for="cgIncl">Inclinação</label><input id="cgIncl" type="number" min="0" max="90" step="1" value="20"><span class="base">°</span>
+        <span id="cgAzBox" hidden><label for="cgAz">Azimute</label> <input id="cgAz" type="number" min="0" max="360" step="1" value="0"> <span class="base">° (0 = N, 90 = L, 180 = S, 270 = O)</span></span></div>
       <label class="chk"><input type="checkbox" id="cgLimOn"> Limitar a injeção na rede (para não inverter o fluxo)</label>
       <div id="cgLimBox" hidden>
         <div class="row"><label for="cgLim">Injetar no máximo</label><input id="cgLim" type="number" min="0" max="100000" step="0.1" value="30"><span class="base">kW</span></div>
@@ -1492,12 +1505,10 @@ body.medindo .leaflet-control.legenda,body.medindo .leaflet-control.legAlimC{dis
         <p class="hint">O limitador (medidor no ponto de conexão + controle do inversor) corta a geração quando a injeção passa do limite. O que o local consome na hora não conta como injeção.</p>
       </div>
       <details class="menu"><summary>Ajustes</summary>
-        <div class="row"><label for="cgYld">Geração anual</label><input id="cgYld" type="number" min="500" max="2500" step="10" value="1150"><span class="base">kWh/kWp·ano (média do RS)</span></div>
-        <div class="row"><label for="cgIncl">Inclinação</label><input id="cgIncl" type="number" min="0" max="90" step="1" value="20"><span class="base">°</span>
-          <label for="cgAz">Orientação</label><input id="cgAz" type="number" min="-180" max="360" step="1" value="0"><span class="base">° (0 = Norte, 90 = Leste)</span></div>
+        <div class="row"><label for="cgYld">Geração de referência</label><input id="cgYld" type="number" min="500" max="2500" step="10" value="1150"><span class="base">kWh/kWp·ano virado para o Norte a 20° (média do RS)</span></div>
       </details>
-      <div id="cgRes"></div>
-    </details>
+    </div>
+    <div class="scroll" id="cgRes"></div>
   </section>
   <section class="aba" id="abaK" role="tabpanel" aria-labelledby="tabK" hidden>
     <div class="painel">
@@ -1618,6 +1629,7 @@ caixa("topleft","abasMapa",`<nav class="tabs" role="tablist" aria-label="Seçõe
   <button type="button" role="tab" id="tabI" data-tab="I" aria-selected="false" aria-controls="abaI" hidden>Usinas</button>
   <button type="button" role="tab" id="tabG" data-tab="G" aria-selected="false" aria-controls="abaG" hidden>GDs</button>
   <button type="button" role="tab" id="tabK" data-tab="K" aria-selected="false" aria-controls="abaK" hidden>Cliente</button>
+  <button type="button" role="tab" id="tabX" data-tab="X" aria-selected="false" aria-controls="abaX">Simular</button>
   <button type="button" role="tab" id="tabM" data-tab="M" aria-selected="false" aria-controls="abaM">Medir</button>
   <button type="button" role="tab" id="tabS" data-tab="S" aria-selected="false" aria-controls="abaS">Sobre</button></nav>`);
 caixa("bottomright","mapbox",`<b>Dados de ${esc(META.base)}</b> · estimativa para triagem`);
@@ -1956,7 +1968,6 @@ function render(){
     (ALIM&&$("invAlim").value?`<section class="legenda soCel">${htmlLegAlim(alimEscopo())}</section>`:"")+rodape();info.innerHTML=h;
   infoEmp.innerHTML=(empSel?fichaEmp(empSel):"")+resumoEmp()+($("empOn").checked&&empLegHtml?`<section class="legenda soCel">${empLegHtml}</section>`:"");
   infoInv.innerHTML=listaInv();
-  if(cgEl){const ph=$("cgPh");if(ph)ph.replaceWith(cgEl);else if(cgEl.parentNode!==infoInv.parentNode)infoInv.after(cgEl)}
   if(abaAtual==="K")cliRender();
   atualizarFicha();
 }
@@ -1973,12 +1984,12 @@ function abrir(t,voar=true){
   try{history.replaceState(null,"","#"+[META.mun||"",t.id].map(encodeURIComponent).join("/"))}catch(e){}
   if(voar)map.setView([t.lat,t.lon],Math.max(map.getZoom(),17),{animate:false});desenhar();render();mostrarRede(t);if(!desk.matches){abrirPainel();topoPainel()}}
 function marcarPonto(lat,lon,rotulo){
-  ponto=[lat,lon];empSel=null;fichaFechada=false;alimSel=null;alimDest.clearLayers();aba("C");if(pino)map.removeLayer(pino);
+  ponto=[lat,lon];cgLocal=null;empSel=null;fichaFechada=false;alimSel=null;alimDest.clearLayers();aba("C");if(pino)map.removeLayer(pino);
   pino=L.marker([lat,lon]).addTo(map).bindTooltip(rotulo||"Ponto consultado");
   // o trafo do ponto é o mais próximo, mesmo que não comporte a potência (a resposta diz se cabe)
   const p=maisProximo(lat,lon);sel=p?p.t:null;msg="";map.setView([lat,lon],18,{animate:false});desenhar();render();mostrarRede(sel);abrirPainel();topoPainel();
 }
-map.on("click",e=>{if(abaAtual==="M")medClique(e.latlng);else if(abaAtual==="C")pontoGlobal(e.latlng.lat,e.latlng.lng);else if(abaAtual==="K"&&cliMarcando>=0)cliPonto(e.latlng)});
+map.on("click",e=>{if(abaAtual==="M")medClique(e.latlng);else if(abaAtual==="C")pontoGlobal(e.latlng.lat,e.latlng.lng);else if(abaAtual==="K"&&cliMarcando>=0)cliPonto(e.latlng);else if(abaAtual==="X")cgPonto(e.latlng.lat,e.latlng.lng)});
 let abaAtual="C";
 // Área inteira: troca de município sob demanda (dados/<código>.json)
 // Várias distribuidoras (META.dists): cada município tem d (distribuidora) e k (chave única "d:código");
@@ -2243,7 +2254,6 @@ let invSel=null;
 async function abrirInv(t){
   if(t.m!==META.mun||(t.d&&t.d!==META.dist))await carregarMun((t.d?t.d+":":"")+t.m,false);
   const x=D.find(x=>x.id===t.id);invSel=t;sel=x||null;fichaFechada=false;
-  cgUsarLocal(t);
   map.setView([t.lat,t.lon],Math.max(map.getZoom(),16),{animate:false});
   const a=ALIM&&ALIM.find(a=>a.a===t.alim&&a.d===t.d);alimSel=null;
   if(a)destacarAlim(a);
@@ -2370,8 +2380,8 @@ function listaInv(){
   if(!INV)return "";
   const o=invOnde(),todo=true;
   const pot=+potEl.value||0,tr=$("invTr").checked,na=new Set(invVis.map(t=>t.d+"|"+t.alim)).size;
-  const fichaLocal=invSel&&sel?`<section><h2>Local de usina</h2>${ficha(sel)}</section>`:"";
-  return `${fichaLocal}<div id="cgPh"></div><section><h2>${esc(o.rotulo)}${distOff.I.size?` · ${(META.dists.length-distOff.I.size)} de ${META.dists.length} distribuidoras`:""}</h2>
+  const fichaLocal=invSel&&sel?`<section><h2>Local de usina</h2>${ficha(sel)}<div class="acoes"><button type="button" class="ghost" data-sim="1">Simular a geração neste local</button></div></section>`:"";
+  return `${fichaLocal}<section><h2>${esc(o.rotulo)}${distOff.I.size?` · ${(META.dists.length-distOff.I.size)} de ${META.dists.length} distribuidoras`:""}</h2>
   <div class="stats"><div class="stat"><b>${invVis.length.toLocaleString("pt-BR")}</b><span>locais</span></div>
   <div class="stat"><b>${na.toLocaleString("pt-BR")}</b><span>alimentadores</span></div>
   ${ALIM&&todo?(()=>{const l=alimEscopo(),k=l.filter(alimOk).length;return `<div class="stat"><b>${k.toLocaleString("pt-BR")}</b><span>de ${l.length.toLocaleString("pt-BR")} alim. sem inversão</span></div>`})():""}
@@ -2384,6 +2394,7 @@ function listaInv(){
   ${invVis.length>invN?`<button type="button" class="ghost" data-mais="1">Mostrar mais (${(invVis.length-invN).toLocaleString("pt-BR")} restantes)</button>`:""}</section>`;
 }
 infoInv.addEventListener("click",e=>{
+  if(e.target.closest("button[data-sim]")&&invSel){const t=invSel;aba("X");abrirPainel();cgUsarLocal(t);topoPainel();return}
   const b=e.target.closest("button[data-inv],button[data-mais]");if(!b)return;
   if(b.dataset.mais){invN+=30;render();return}
   const t=INV.find(t=>t.id===b.dataset.inv&&t.m===b.dataset.m&&(t.d||"")===b.dataset.d);if(t)abrirInv(t);
@@ -2396,11 +2407,15 @@ function baixarInv(){
   const o=invOnde(),onde=(o.todo?(o.dist?nomeDist(o.dist):"RS"):META.munNome.split(",")[0]).replace(/\W+/g,"_");
   const l=document.createElement("a");l.href=URL.createObjectURL(blob);l.download=`usinas_investimento_${onde}.csv`;l.click();setTimeout(()=>URL.revokeObjectURL(l.href),2000);
 }
-// ---- Calculadora de geração (aba Usinas): sol hora a hora no local, corte pelo inversor e pelo limite de injeção.
-// Forma do dia = céu limpo (posição do sol + massa de ar) no plano dos módulos; cada mês tem 20 tipos de dia
-// (fator s = q^a, média = geração do mês ÷ dia limpo), escalados para a geração anual (padrão RS, GER_FV).
+// ---- Aba Simular: geração estimada num ponto (coordenada, toque no mapa ou local da aba Usinas).
+// Sol a cada 15 min (céu limpo no plano dos módulos) e 20 tipos de dia por mês (fator s = q^a). A energia do mês
+// = referência do RS (cgYld, módulos ao Norte a 20°; forma mensal CG_MES) × ganho da orientação escolhida
+// (75% pela razão do céu limpo, 25% pela parte difusa, que quase não depende da orientação).
+// Corta pelo inversor e, com limite, pela injeção máxima + consumo do próprio local na hora.
 const CG_MES=[150,130,125,100,80,65,72,92,105,128,145,155],CG_DIAS=[31,28,31,30,31,30,31,31,30,31,30,31];
-let cgLocal=null;const cgEl=$("cgBox");
+const CG_ORI={N:[[0,1]],S:[[180,1]],L:[[90,1]],O:[[270,1]],LO:[[90,.5],[270,.5]]};
+const CG_ORI_N={N:"Norte",S:"Sul",L:"Leste",O:"Oeste",LO:"Leste/Oeste (metade para cada lado)",X:"azimute"};
+let cgLocal=null,cgOri="N";const cgEl=$("abaX"),cgLayer=L.layerGroup();
 const cgVal=id=>{const v=parseFloat(($(id).value||"").replace(",","."));return isFinite(v)?v:0};
 // potência de céu limpo (kW por kWp, já com perdas) a cada 15 min do dia 15 do mês m
 function cgDiaLimpo(lat,m,incl,az){
@@ -2414,23 +2429,51 @@ function cgDiaLimpo(lat,m,incl,az){
     out.push(poa/1000*0.85)}
   return out;
 }
+// dia limpo da orientação escolhida (Leste/Oeste = soma das duas metades)
+function cgDiaOri(o,m){const l=o.ori.map(([az,w])=>cgDiaLimpo(o.lat,m,o.incl,az).map(v=>v*w));return l[0].map((_,i)=>l.reduce((a,x)=>a+x[i],0))}
 function cgSim(o){
-  const tot=CG_MES.reduce((a,b)=>a+b,0),mes=[];let bruto=0,inv=0,lim=0,dias=[];
+  const tot=CG_MES.reduce((a,b)=>a+b,0),mes=[];let bruto=0,inv=0,lim=0,dias=[],ref=0;
+  const dif=(1+Math.cos(o.incl*Math.PI/180))/(1+Math.cos(20*Math.PI/180));
   for(let m=0;m<12;m++){
-    const dl=cgDiaLimpo(o.lat,m,o.incl,o.az),ec=dl.reduce((a,b)=>a+b,0)*0.25*o.kwp,em=o.yld*CG_MES[m]/tot/CG_DIAS[m]*o.kwp;
+    const dl=cgDiaOri(o,m),dr=cgDiaLimpo(o.lat,m,20,0),sl=dl.reduce((a,b)=>a+b,0),sr=dr.reduce((a,b)=>a+b,0);
+    const ganho=0.75*sl/Math.max(sr,1e-9)+0.25*dif,eR=o.yld*CG_MES[m]/tot/CG_DIAS[m]*o.kwp,em=eR*ganho,ec=sl*0.25*o.kwp;ref+=eR*CG_DIAS[m];
     const k=Math.min(0.97,em/Math.max(ec,1e-9)),a=1/k-1;let ss=[];for(let i=0;i<20;i++)ss.push(Math.pow((i+0.5)/20,a));
     const sm=ss.reduce((x,y)=>x+y,0)/20;ss=ss.map(x=>Math.min(1,x*k/sm));
     let eB=0,eI=0,eL=0;
     for(const s of ss)for(const p0 of dl){const p=p0*o.kwp*s,pi=Math.min(p,o.inv),pl=o.lim!=null?Math.min(pi,o.lim+o.carga):pi;eB+=p;eI+=pi;eL+=pl}
-    const f=0.25/20*CG_DIAS[m*1];eB*=f;eI*=f;eL*=f;mes.push({b:eB,i:eI,l:eL});bruto+=eB;inv+=eI;lim+=eL;
+    const f=0.25/20*CG_DIAS[m];eB*=f;eI*=f;eL*=f;mes.push({b:eB,i:eI,l:eL});bruto+=eB;inv+=eI;lim+=eL;
     if(m===11||m===5)dias.push({m,p:dl.map(x=>x*o.kwp)})}
-  return {mes,bruto,inv,lim,dias};
+  return {mes,bruto,inv,lim,dias,ref};
 }
 function cgParams(){
   const c=cgLocal||(()=>{const p=map.getCenter();return {lat:p.lat,lon:p.lng}})();
   return {lat:c.lat,kwp:Math.max(0.1,cgVal("cgKwp")),inv:Math.max(0.1,cgVal("cgInv")),lim:$("cgLimOn").checked?Math.max(0,cgVal("cgLim")):null,
-    carga:$("cgLimOn").checked?Math.max(0,cgVal("cgCarga")):0,yld:Math.max(100,cgVal("cgYld")||1150),incl:cgVal("cgIncl"),az:cgVal("cgAz")};
+    carga:$("cgLimOn").checked?Math.max(0,cgVal("cgCarga")):0,yld:Math.max(100,cgVal("cgYld")||1150),incl:Math.min(90,Math.max(0,cgVal("cgIncl"))),
+    ori:cgOri==="X"?[[cgVal("cgAz"),1]]:CG_ORI[cgOri]};
 }
+// coordenada colada: decimal ("-29.68, -53.80", "-29,68 -53,80", link do Google Maps) ou graus/min/seg (29°41'02"S 53°48'25"W)
+function cgLerCoord(t){
+  t=String(t||"").trim();if(!t)return null;
+  const dms=[...t.matchAll(/(-?\d+(?:[.,]\d+)?)\s*°\s*(?:(\d+(?:[.,]\d+)?)\s*['′’]\s*)?(?:(\d+(?:[.,]\d+)?)\s*(?:["″”]|''))?\s*([NSLOEW])?/gi)];
+  let v;
+  if(dms.length>=2)v=dms.slice(0,2).map(m=>{const n=x=>parseFloat((x||"0").replace(",","."));let d=Math.abs(n(m[1]))+n(m[2])/60+n(m[3])/3600;
+    if(m[1].startsWith("-")||/[SOW]/i.test(m[4]||""))d=-d;return d});
+  else{const u=t.replace(/(^|[^\d.])(-?\d+),(\d+)/g,"$1$2.$3"),ns=(u.match(/-?\d+(?:\.\d+)?/g)||[]).map(Number);if(ns.length<2)return null;v=ns.slice(0,2)}
+  let [la,lo]=v;
+  if(Math.abs(la)>34&&Math.abs(lo)<=34)[la,lo]=[lo,la];          // veio "longitude, latitude"
+  if(la>0&&lo>0&&!/[NE]/i.test(t)){la=-la;lo=-lo}                 // sem sinal: Brasil (sul e oeste)
+  if(!(Math.abs(la)<=90&&Math.abs(lo)<=180))return null;
+  return [la,lo];
+}
+function cgPonto(la,lo,mexerMapa){
+  cgLocal={lat:la,lon:lo};$("cgCoord").value=`${la.toFixed(6)}, ${lo.toFixed(6)}`;
+  cgMarca();if(mexerMapa)map.setView([la,lo],Math.max(map.getZoom(),15));cgRender();
+}
+function cgMarca(){
+  cgLayer.clearLayers();if(!cgLocal)return;
+  L.circleMarker([cgLocal.lat,cgLocal.lon],{radius:9,color:"#fff",weight:3,fillColor:"#e0a100",fillOpacity:1}).bindTooltip("Local simulado").addTo(cgLayer);
+}
+function cgEntrar(){if(!cgLocal&&ponto){cgPonto(ponto[0],ponto[1]);return}cgMarca();cgRender()}
 // barras do mês: aproveitado (cor) + perdido pelo limite/inversor (laranja) empilhado
 function cgGrafMes(r){
   const W=300,H=110,bw=W/12,M="JFMAMJJASOND",mx=Math.max(...r.mes.map(x=>x.b),1);
@@ -2464,13 +2507,16 @@ function cgGrafDia(r,o){
   <div class="cgLeg"><span><i style="background:var(--accent)"></i>dezembro</span><span><i style="background:var(--muted)"></i>junho (tracejado)</span><span><i style="background:var(--low);opacity:.6"></i>cortado</span></div></div>`;
 }
 function cgRender(){
-  if(!cgEl||!cgEl.open)return;
-  try{localStorage.setItem("geracao.v1",JSON.stringify(Object.fromEntries(["cgKwp","cgInv","cgLim","cgCarga","cgYld","cgIncl","cgAz"].map(k=>[k,$(k).value]).concat([["cgLimOn",$("cgLimOn").checked]]))))}catch(e){}
-  $("cgLimBox").hidden=!$("cgLimOn").checked;
+  if(!cgEl||abaAtual!=="X")return;
+  try{localStorage.setItem("geracao.v1",JSON.stringify(Object.fromEntries(["cgKwp","cgInv","cgLim","cgCarga","cgYld","cgIncl","cgAz"].map(k=>[k,$(k).value])
+    .concat([["cgLimOn",$("cgLimOn").checked],["ori",cgOri]]))))}catch(e){}
+  $("cgLimBox").hidden=!$("cgLimOn").checked;$("cgAzBox").hidden=cgOri!=="X";
+  $("cgOri").querySelectorAll("[data-ori]").forEach(b=>b.setAttribute("aria-pressed",b.dataset.ori===cgOri));
   const o=cgParams(),r=cgSim(o);
-  $("cgOnde").innerHTML=cgLocal?`Local: <b>trafo ${esc(cgLocal.id)}</b> · ${esc(cgLocal.mun||"")} (lat. ${fmt(o.lat,2)}°)`:`Local: centro do mapa (lat. ${fmt(o.lat,2)}°). Abra um local da lista para usar o lugar e as folgas dele.`;
-  // sugestões de limite: folga do trafo, do alimentador e o estudo da distribuidora
-  const sg=[];if(cgLocal){if(cgLocal.cap!=null)sg.push(["Folga do trafo",cgLocal.cap]);if(cgLocal.capa!=null)sg.push(["Folga do alimentador",cgLocal.capa]);
+  $("cgOnde").innerHTML=cgLocal?(cgLocal.id?`Local: <b>trafo ${esc(cgLocal.id)}</b> · ${esc(cgLocal.mun||"")} · `:"Local: ")+
+    `${fmt(cgLocal.lat,5)}, ${fmt(cgLocal.lon,5)} (ponto amarelo no mapa)`:`Ainda sem local: usando o centro do mapa (lat. ${fmt(o.lat,2)}°). Cole a coordenada ou toque no mapa.`;
+  // sugestões de limite: folgas do local da aba Usinas e o estudo da distribuidora
+  const sg=[];if(cgLocal&&cgLocal.id){if(cgLocal.cap!=null)sg.push(["Folga do trafo",cgLocal.cap]);if(cgLocal.capa!=null)sg.push(["Folga do alimentador",cgLocal.capa]);
     if(cgLocal.orc!=null)sg.push(["Estudo da distribuidora",cgLocal.orc])}
   $("cgSug").innerHTML=sg.map(([n,v])=>`<button type="button" class="ghost" data-cglim="${Math.max(0,Math.round(v*10)/10)}">${n}: ${fmt(Math.max(0,v),1)} kW</button>`).join("");
   const perdaL=r.inv-r.lim,perdaI=r.bruto-r.inv,pct=v=>r.bruto>0?v/r.bruto*100:0;
@@ -2481,30 +2527,38 @@ function cgRender(){
       return `<tr data-kwp="${kwp}" data-inv="${Math.round(inv*10)/10}"${Math.abs(kwp-o.kwp)<0.05?' class="atual"':""}><td>${fmt(kwp,1)}</td><td>${fmt(inv,1)}</td><td>${fmt(s.lim/12,0)}</td><td>${fmt(s.lim/kwp,0)}</td><td>${fmt(s.bruto>0?(s.bruto-s.lim)/s.bruto*100:0,1)}%</td></tr>`}).join("");
     tab=`<h3 class="base">Mais módulos com o mesmo limite</h3><table><thead><tr><th>kWp</th><th>Inversor kW</th><th>kWh/mês</th><th>kWh/kWp·ano</th><th>Cortado</th></tr></thead><tbody>${lin}</tbody></table>
     <p class="hint">Toque numa linha para usar. Passar dos módulos aumenta a geração de manhã, à tarde e no inverno, mas o corte no meio do dia cresce.</p>`}
-  $("cgRes").innerHTML=`<div class="stats"><div class="stat"><b>${fmt(r.lim/12,0)}</b><span>kWh/mês (média)</span></div>
+  const oriTxt=cgOri==="X"?`azimute ${fmt(cgVal("cgAz"),0)}°`:CG_ORI_N[cgOri];
+  $("cgRes").innerHTML=`<section><h2>Resultado</h2><div class="stats"><div class="stat"><b>${fmt(r.lim/12,0)}</b><span>kWh/mês (média)</span></div>
   <div class="stat"><b>${fmt(r.lim/1000,1)}</b><span>MWh/ano</span></div><div class="stat"><b>${fmt(r.lim/o.kwp,0)}</b><span>kWh/kWp·ano</span></div></div>
-  <p class="hint">${o.lim!=null?`Sem limite seriam ${fmt(r.inv/12,0)} kWh/mês. O limite de ${fmt(o.lim,1)} kW${o.carga>0?` (+ ${fmt(o.carga,1)} kW consumidos no local)`:""} corta <b>${fmt(perdaL/12,0)} kWh/mês (${fmt(pct(perdaL),1)}%)</b>.`:""}
+  <p class="hint">${fmt(o.kwp,2)} kWp virados para <b>${esc(oriTxt)}</b> a ${fmt(o.incl,0)}°: ${fmt(r.bruto/r.ref*100,0)}% do que gerariam virados para o Norte a 20°.
+  ${o.lim!=null?`Sem limite seriam ${fmt(r.inv/12,0)} kWh/mês. O limite de ${fmt(o.lim,1)} kW${o.carga>0?` (+ ${fmt(o.carga,1)} kW consumidos no local)`:""} corta <b>${fmt(perdaL/12,0)} kWh/mês (${fmt(pct(perdaL),1)}%)</b>.`:""}
   ${perdaI>0.005*r.bruto?` O inversor de ${fmt(o.inv,1)} kW corta ${fmt(perdaI/12,0)} kWh/mês (${fmt(pct(perdaI),1)}%).`:""}
   Relação módulos/inversor: ${fmt(o.kwp/o.inv,2)}.</p>
   ${cgGrafMes(r)}${cgGrafDia(r,o)}${tab}
-  <p class="hint">Estimativa: média do RS (${fmt(o.yld,0)} kWh/kWp·ano) distribuída pelos meses, forma do dia pelo sol no local e dias de céu limpo a nublado. Não considera sombra, sujeira nem nuvens passageiras (que geram picos rápidos e aumentam um pouco o corte). Para o projeto final, confira no PVsyst ou PVGIS.</p>`;
+  <p class="hint">Estimativa: média do RS (${fmt(o.yld,0)} kWh/kWp·ano ao Norte a 20°) distribuída pelos meses, forma do dia pelo sol no local e dias de céu limpo a nublado. Não considera sombra, sujeira nem nuvens passageiras (que geram picos rápidos e aumentam um pouco o corte). Para o projeto final, confira no PVsyst ou PVGIS.</p></section>`;
 }
+// atalho da aba Usinas: simula no local aberto, com as folgas dele como sugestão de limite
 function cgUsarLocal(t){
-  if(!t){cgLocal=null;return}
   const x=D.find(x=>x.id===t.id),oc=x&&orcDe(x),e=oc&&oc.e[0];
   cgLocal={id:t.id,lat:t.lat,lon:t.lon,mun:nomeMun(t),cap:t.cap,capa:t.capa,orc:e?(e.f==="I"?0:e.lim):null};
   // limite sugerido: folga do alimentador (o trafo de 1 UC costuma ser trocado pela usina); com "Exigir folga
   // também no trafo", a menor das duas. Não mexe se o usuário já digitou um limite.
   if(!$("cgLim").dataset.mexeu){const v=($("invTr").checked?[t.cap,t.capa]:[t.capa]).filter(v=>v!=null);if(v.length)$("cgLim").value=Math.max(0,Math.round(Math.min(...v)*10)/10)}
-  cgRender();
+  $("cgCoord").value=`${t.lat.toFixed(6)}, ${t.lon.toFixed(6)}`;cgMarca();cgRender();
 }
 if(cgEl){
-  try{const s=JSON.parse(localStorage.getItem("geracao.v1")||"null");if(s)for(const k in s){if(k==="cgLimOn")$(k).checked=!!s[k];else if($(k)&&s[k]!=="")$(k).value=s[k]}
-    if(s&&s.cgLim)$("cgLim").dataset.mexeu="1"}catch(e){}
-  cgEl.addEventListener("toggle",cgRender);
-  cgEl.addEventListener("input",e=>{if(e.target.id==="cgLim")e.target.dataset.mexeu="1";cgRender()});
+  try{const s=JSON.parse(localStorage.getItem("geracao.v1")||"null");if(s){for(const k in s){if(k==="cgLimOn")$(k).checked=!!s[k];else if(k==="ori"){if(CG_ORI[s[k]]||s[k]==="X")cgOri=s[k]}
+    else if($(k)&&s[k]!=="")$(k).value=s[k]}if(s.cgLim)$("cgLim").dataset.mexeu="1"}}catch(e){}
+  $("cgBusca").addEventListener("submit",e=>{e.preventDefault();const c=cgLerCoord($("cgCoord").value);
+    if(!c){$("cgOnde").innerHTML=`<span class="msg">Não entendi a coordenada. Exemplos: <b>-29.6842, -53.8069</b> ou <b>29°41'03"S 53°48'25"O</b>.</span>`;return}
+    cgPonto(c[0],c[1],true)});
+  $("cgGps").onclick=()=>{if(!navigator.geolocation)return;navigator.geolocation.getCurrentPosition(p=>cgPonto(p.coords.latitude,p.coords.longitude,true),
+    ()=>{$("cgOnde").textContent="Não consegui a sua localização (permissão negada?)."},{enableHighAccuracy:true,timeout:15000})};
+  cgEl.addEventListener("input",e=>{if(e.target.id==="cgCoord")return;if(e.target.id==="cgLim")e.target.dataset.mexeu="1";cgRender()});
   cgEl.addEventListener("click",e=>{const b=e.target.closest("[data-cglim]");if(b){$("cgLim").value=b.dataset.cglim;$("cgLim").dataset.mexeu="1";cgRender();return}
+    const ob=e.target.closest("[data-ori]");if(ob){cgOri=ob.dataset.ori;if(cgOri==="LO"&&!$("cgIncl").dataset.mexeu)$("cgIncl").value=10;cgRender();return}
     const tr=e.target.closest("tr[data-kwp]");if(tr){$("cgKwp").value=tr.dataset.kwp;$("cgInv").value=tr.dataset.inv;cgRender()}});
+  $("cgIncl").addEventListener("input",e=>{e.target.dataset.mexeu="1"});
 }
 // Informações ao passar o mouse (ou tocar) no mapa
 function dicaTrafo(t){
@@ -3574,25 +3628,25 @@ let empMexeu=false;
 // cada aba mostra só o que é dela: trocar de aba limpa o mapa e a seleção da anterior
 function aba(k){
   const antes=abaAtual;abaAtual=k;
-  ["C","P","I","G","K","M","S"].forEach(x=>{$("aba"+x).hidden=x!==k;$("tab"+x).setAttribute("aria-selected",x===k)});
+  ["C","P","I","G","K","X","M","S"].forEach(x=>{$("aba"+x).hidden=x!==k;$("tab"+x).setAttribute("aria-selected",x===k)});
   if(k==="M"&&antes!=="M")medEntrar();else if(antes==="M"&&k!=="M")medSair();
   if(typeof medArrasteMapa==="function")medArrasteMapa();
   if(typeof atualizarBarra==="function")atualizarBarra();
-  if(k!==antes&&typeof invLayer!=="undefined"){limparAba();
-    if((k==="P"||k==="I"||k==="G")&&META.bboxAll){const b=META.bboxAll;map.fitBounds([[b[0],b[1]],[b[2],b[3]]])}   // estado todo
-    camadasDaAba()}
+  // o mapa fica onde está (pedido do usuário): pesquisar um ponto no Consultar e abrir Prospectar mostra as empresas dali
+  if(k!==antes&&typeof invLayer!=="undefined"){limparAba();camadasDaAba()}
   if(k==="I"&&!INV&&!invErro&&META.muns)ligarInv();
   if(k==="K"&&antes!=="K"&&META.muns)cliEntrar();
+  if(k==="X"&&antes!=="X")cgEntrar();
   marcarAbas();
 }
 function limparAba(){
-  sel=null;ponto=null;if(pino){map.removeLayer(pino);pino=null}empSel=null;alimSel=null;invSel=null;cgLocal=null;gdSel=null;msg="";cliSel=-1;cliMarcando=-1;
+  sel=null;empSel=null;alimSel=null;invSel=null;gdSel=null;msg="";cliSel=-1;cliMarcando=-1;
   faixaOff.clear();rede.clearLayers();redeMt.clearLayers();alimDest.clearLayers();map.closePopup();fichaFechada=false;
 }
 function camadasDaAba(){
   const k=abaAtual,vis=(c,on)=>{if(on){if(!map.hasLayer(c))c.addTo(map)}else if(map.hasLayer(c))map.removeLayer(c)};
   vis(capa,k==="C");vis(camAlim,k==="C");vis(alimDest,k==="C"||k==="I");vis(empLayer,k==="P");vis(invLayer,k==="I");vis(gdLayer,k==="G");
-  vis(rede,k==="C"||k==="P"||k==="I"||k==="K");vis(redeMt,k==="P"||k==="I"||k==="K");vis(cliLayer,k==="K");
+  vis(rede,k==="C"||k==="P"||k==="I"||k==="K");vis(redeMt,k==="P"||k==="I"||k==="K");vis(cliLayer,k==="K");vis(cgLayer,k==="X");if(pino)vis(pino,k!=="M");
   legEmpCtl.getContainer().hidden=k!=="P";legGdCtl.getContainer().hidden=k!=="G";if(k!=="C"&&k!=="I")legAlimCtl.getContainer().hidden=true;
   if(k==="G")desenharGd();
   desenhar();desenharEmp();render();
